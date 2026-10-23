@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from jammate.generate.harmony import progression
 from jammate.generate.patterns import bass_bar, comp_bar, drum_bar
+from jammate.generate.rhythm import rhythm_parts
 from jammate.music import BEATS_PER_BAR, Chord, Note
 from jammate.state import JamState
 
@@ -23,12 +24,13 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         return ()
     chord = chord_for_bar(state, bar_index)
     phrase_pos = bar_index % PHRASE_BARS
-    bar_notes = (
-        drum_bar(state.energy, phrase_pos)
-        + bass_bar(chord, state.energy)
-        + comp_bar(chord, state.energy)
-        + tuple(lead)
-    )
+    if state.rhythm is not None:
+        backing = rhythm_parts(chord, state.rhythm, state.rhythm_mode, state.energy, bar_index)
+    else:
+        backing = (drum_bar(state.energy, phrase_pos)
+                   + bass_bar(chord, state.energy)
+                   + comp_bar(chord, state.energy))
+    bar_notes = backing + tuple(lead)
     offset = bar_index * BEATS_PER_BAR
     return tuple(n.shifted(offset) for n in bar_notes)
 

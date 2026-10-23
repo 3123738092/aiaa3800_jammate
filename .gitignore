@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .coverage
 demo_out/
+# Personal microphone recordings; generate shareable fixtures with examples/.
+/my_rhythm.wav
+/headset_rhythm.wav

@@ -24,9 +24,15 @@ class Intent(str, Enum):
     BUILD = "build"
     NEW_IDEA = "new_idea"
     STOP = "stop"
+    RHYTHM_FOLLOW = "rhythm_follow"
+    RHYTHM_VARY = "rhythm_vary"
+    RHYTHM_SIMPLIFY = "rhythm_simplify"
 
 
 _PHRASES: tuple[tuple[str, Intent], ...] = (
+    ("follow rhythm", Intent.RHYTHM_FOLLOW), ("跟随节奏", Intent.RHYTHM_FOLLOW),
+    ("vary rhythm", Intent.RHYTHM_VARY), ("变化节奏", Intent.RHYTHM_VARY),
+    ("simplify", Intent.RHYTHM_SIMPLIFY), ("简化", Intent.RHYTHM_SIMPLIFY),
     ("speed up", Intent.FASTER), ("faster", Intent.FASTER), ("pick it up", Intent.FASTER),
     ("快一点", Intent.FASTER), ("快点", Intent.FASTER), ("加速", Intent.FASTER),
     ("slow down", Intent.SLOWER), ("slower", Intent.SLOWER),

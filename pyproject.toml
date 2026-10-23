@@ -37,7 +37,7 @@ markers = [
 [tool.coverage.run]
 source = ["jammate"]
 omit = [
-    # Thin adapter over the sound card; exercised by hand (README "手动验证").
+    # Device-independent scheduler/capture tests exist; physical I/O remains manual.
     "*/jammate/live.py",
     "*/jammate/__main__.py",
 ]

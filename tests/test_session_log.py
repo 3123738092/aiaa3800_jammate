@@ -30,7 +30,9 @@ def test_log_appends_json_lines_with_timestamps(tmp_path):
     log.write("decision", action="hold")
     lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert [line["type"] for line in lines] == ["phrase", "decision"]
-    assert lines[0] == {"t": "2026-01-01T00:00:00+00:00", "type": "phrase", "notes": 3}
+    assert lines[0]["t"] == "2026-01-01T00:00:00.000000+00:00"
+    assert lines[0]["notes"] == 3
+    assert lines[1]["monotonic_ns"] >= lines[0]["monotonic_ns"]
 
 
 def test_log_without_path_only_returns_records():

@@ -14,6 +14,7 @@ from jammate.analysis.key import estimate_key
 from jammate.director.commands import Intent
 from jammate.generate.response import answer_motif, initiate_motif, normalize
 from jammate.music import Note
+from jammate.rhythm import RhythmContext, RhythmMode
 from jammate.state import Action, JamState
 
 
@@ -33,7 +34,14 @@ class Silence:
     bars: int
 
 
-Event = Union[UserPhrase, UserCommand, Silence]
+@dataclass(frozen=True)
+class UserRhythm:
+    context: RhythmContext
+    mode: RhythmMode | None = None
+    update_tempo: bool = True
+
+
+Event = Union[UserPhrase, UserCommand, Silence, UserRhythm]
 
 
 @dataclass(frozen=True)
@@ -50,6 +58,8 @@ class PolicyConfig:
     initiate_after_bars: int = 2
     out_of_key_ratio: float = 0.34  # share of sung time outside the current key
     min_key_margin: float = 0.02
+    min_rhythm_confidence: float = 0.65
+    max_rhythm_tempo_step: float = 8.0
 
 
 # Strongest first: when several intents arrive together, the reported action
@@ -66,7 +76,24 @@ def decide(state: JamState, event: Event, rng: random.Random,
         return _on_command(state, event, rng, config)
     if isinstance(event, Silence):
         return _on_silence(state, event, rng, config)
+    if isinstance(event, UserRhythm):
+        return _on_rhythm(state, event, config)
     raise TypeError(f"unsupported event {type(event).__name__}")
+
+
+def _on_rhythm(state: JamState, event: UserRhythm, config: PolicyConfig) -> Decision:
+    rhythm = event.context
+    if not rhythm.onset_beats or rhythm.confidence < config.min_rhythm_confidence:
+        return Decision(Action.HOLD, state, reason="uncertain or empty rhythm; keeping the groove")
+    tempo = rhythm.tempo_bpm if event.update_tempo else state.tempo_bpm
+    if state.rhythm is not None and event.update_tempo:
+        delta = max(-config.max_rhythm_tempo_step,
+                    min(config.max_rhythm_tempo_step, tempo - state.tempo_bpm))
+        tempo = state.tempo_bpm + delta
+    mode = RhythmMode(event.mode) if event.mode is not None else state.rhythm_mode
+    new_state = state.with_tempo(tempo).with_updates(rhythm=rhythm, rhythm_mode=mode, playing=True)
+    return Decision(Action.FOLLOW, new_state,
+                    reason=f"{mode.value} rhythm with {len(rhythm.onset_beats)} anchors at {tempo:.1f} BPM")
 
 
 def _out_of_key_ratio(notes: tuple[Note, ...], state: JamState) -> float:
@@ -95,6 +122,12 @@ def _on_phrase(state: JamState, event: UserPhrase, rng: random.Random,
 
 def _apply_intent(state: JamState, intent: Intent, config: PolicyConfig) -> tuple[JamState, Action, str]:
     step = config.tempo_step_bpm
+    rhythm_modes = {Intent.RHYTHM_FOLLOW: RhythmMode.FOLLOW,
+                    Intent.RHYTHM_VARY: RhythmMode.VARY,
+                    Intent.RHYTHM_SIMPLIFY: RhythmMode.SIMPLIFY}
+    if intent in rhythm_modes:
+        mode = rhythm_modes[intent]
+        return state.with_updates(rhythm_mode=mode), Action.ADJUST, f"rhythm mode {mode.value}"
     if intent is Intent.FASTER:
         new = state.with_tempo(state.tempo_bpm + step)
         return new, Action.ADJUST, f"tempo {new.tempo_bpm:.0f} BPM"

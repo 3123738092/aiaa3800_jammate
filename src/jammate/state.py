@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 
 from jammate.music import Key, Note
+from jammate.rhythm import RhythmContext, RhythmMode
 
 MIN_TEMPO_BPM = 60.0
 MAX_TEMPO_BPM = 180.0
@@ -32,8 +33,11 @@ class JamState:
     last_user_motif: tuple[Note, ...] = ()
     last_ai_motif: tuple[Note, ...] = ()
     playing: bool = True
+    rhythm: RhythmContext | None = None
+    rhythm_mode: RhythmMode = RhythmMode.FOLLOW
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
         if not MIN_TEMPO_BPM <= self.tempo_bpm <= MAX_TEMPO_BPM:
             raise ValueError(
                 f"tempo must be within {MIN_TEMPO_BPM}-{MAX_TEMPO_BPM} BPM, got {self.tempo_bpm}"
