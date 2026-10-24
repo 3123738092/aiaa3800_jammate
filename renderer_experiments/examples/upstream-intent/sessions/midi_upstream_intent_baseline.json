@@ -1,0 +1,162 @@
+{
+  "experiment_id": "midi_upstream_intent_baseline",
+  "backend": "midi",
+  "status": "passed",
+  "source_intent": {
+    "schema_version": "1.1",
+    "event_id": "evt_001",
+    "session_id": "jam_001",
+    "status": "ready",
+    "summary": "Preserve drums groove; Add bass instrument [dynamics=soft] at next_bar; Set global mood dreamy; Style steering: dreamy.",
+    "style_prompt": "dreamy",
+    "actions": [
+      {
+        "target": "bass",
+        "operation": "add",
+        "parameter": "instrument",
+        "value": null,
+        "attributes": {
+          "dynamics": "soft"
+        },
+        "timing": "next_bar",
+        "magnitude": null,
+        "evidence": "add soft bass next bar"
+      },
+      {
+        "target": "global",
+        "operation": "set",
+        "parameter": "mood",
+        "value": "dreamy",
+        "attributes": {},
+        "timing": "unspecified",
+        "magnitude": null,
+        "evidence": "make it dreamier."
+      }
+    ],
+    "constraints": [
+      {
+        "target": "drums",
+        "parameter": "groove",
+        "operation": "preserve",
+        "value": null,
+        "evidence": "Keep the drum groove"
+      }
+    ],
+    "feedback": null,
+    "needs_clarification": false,
+    "clarification_question": null,
+    "parser": "rules-v1",
+    "latency_ms": 1.41,
+    "error_code": null
+  },
+  "baseline_state": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping"
+  },
+  "adapted_music_intent": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping"
+  },
+  "adapter_decision_log": [],
+  "unresolved_source_fields": [],
+  "backend_input": {
+    "instrument_profile": {
+      "name": "electric_performance",
+      "description": "Electric Piano 1 + Fingered Bass + Clavinet ornament",
+      "programs": {
+        "1": 4,
+        "2": 33,
+        "3": 7
+      }
+    },
+    "arrangement": "performance",
+    "midi_overrides": {
+      "bass_velocity_scale": 1.0,
+      "cc91_reverb": {
+        "1": 42,
+        "3": 30
+      }
+    }
+  },
+  "transformation": {
+    "drums": "performance arrangement; preserve-drum constraint checked by event signature",
+    "bass": "soft -> bass part .45; velocity scale .58",
+    "harmony": "same harmony and voice-led comping",
+    "dreamy_mood": "higher keyboard/ornament reverb CC91"
+  },
+  "midi_path": "examples/upstream-intent/sessions/midi_upstream_intent_baseline.mid",
+  "events_path": "examples/upstream-intent/sessions/midi_upstream_intent_baseline.events.json",
+  "wav_path": "examples/upstream-intent/audio/midi_upstream_intent_baseline.wav",
+  "objective_metrics": {
+    "duration_seconds": 24.253,
+    "estimated_bpm": 101.333,
+    "estimated_key_pitch_class": "G",
+    "estimated_key_method": "dominant_chroma_pitch_class; mode not inferred",
+    "onset_count": 129,
+    "onset_density_per_second": 5.319,
+    "mean_rms": 0.034726,
+    "mean_spectral_centroid_hz": 5746.59,
+    "beat_interval_std_seconds": 0.02452,
+    "requested_bpm": 100.0,
+    "bpm_error_raw": 1.333
+  },
+  "drum_events_preserved": null
+}

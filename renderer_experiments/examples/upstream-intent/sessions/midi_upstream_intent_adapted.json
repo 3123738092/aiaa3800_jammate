@@ -1,0 +1,187 @@
+{
+  "experiment_id": "midi_upstream_intent_adapted",
+  "backend": "midi",
+  "status": "passed",
+  "source_intent": {
+    "schema_version": "1.1",
+    "event_id": "evt_001",
+    "session_id": "jam_001",
+    "status": "ready",
+    "summary": "Preserve drums groove; Add bass instrument [dynamics=soft] at next_bar; Set global mood dreamy; Style steering: dreamy.",
+    "style_prompt": "dreamy",
+    "actions": [
+      {
+        "target": "bass",
+        "operation": "add",
+        "parameter": "instrument",
+        "value": null,
+        "attributes": {
+          "dynamics": "soft"
+        },
+        "timing": "next_bar",
+        "magnitude": null,
+        "evidence": "add soft bass next bar"
+      },
+      {
+        "target": "global",
+        "operation": "set",
+        "parameter": "mood",
+        "value": "dreamy",
+        "attributes": {},
+        "timing": "unspecified",
+        "magnitude": null,
+        "evidence": "make it dreamier."
+      }
+    ],
+    "constraints": [
+      {
+        "target": "drums",
+        "parameter": "groove",
+        "operation": "preserve",
+        "value": null,
+        "evidence": "Keep the drum groove"
+      }
+    ],
+    "feedback": null,
+    "needs_clarification": false,
+    "clarification_question": null,
+    "parser": "rules-v1",
+    "latency_ms": 1.41,
+    "error_code": null
+  },
+  "baseline_state": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping"
+  },
+  "adapted_music_intent": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy",
+        "dreamy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0.45,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping; dreamy atmosphere; add a soft supportive bass; mood: dreamy"
+  },
+  "adapter_decision_log": [
+    {
+      "source": "style_prompt",
+      "action": "append to mood and natural-language prompt",
+      "value": "dreamy"
+    },
+    {
+      "source": "actions.bass.add.instrument",
+      "action": "enable bass at 0.45; scale Bass velocity to 0.58; raise keyboard reverb",
+      "timing": "next_bar"
+    },
+    {
+      "source": "actions.global.mood",
+      "action": "merge into semantic.mood and prompt",
+      "value": "dreamy"
+    },
+    {
+      "source": "constraints.drums.groove",
+      "action": "reuse identical drum event sequence from baseline MIDI render"
+    }
+  ],
+  "unresolved_source_fields": [
+    "bass instrument value is null; MIDI uses Fingered Bass (GM 33) fallback"
+  ],
+  "backend_input": {
+    "instrument_profile": {
+      "name": "electric_performance",
+      "description": "Electric Piano 1 + Fingered Bass + Clavinet ornament",
+      "programs": {
+        "1": 4,
+        "2": 33,
+        "3": 7
+      }
+    },
+    "arrangement": "performance",
+    "midi_overrides": {
+      "bass_velocity_scale": 0.58,
+      "cc91_reverb": {
+        "1": 68,
+        "3": 54
+      },
+      "preserve_drum_events": true,
+      "bass_program_fallback": 33
+    }
+  },
+  "transformation": {
+    "drums": "performance arrangement; preserve-drum constraint checked by event signature",
+    "bass": "soft -> bass part .45; velocity scale .58",
+    "harmony": "same harmony and voice-led comping",
+    "dreamy_mood": "higher keyboard/ornament reverb CC91"
+  },
+  "midi_path": "examples/upstream-intent/sessions/midi_upstream_intent_adapted.mid",
+  "events_path": "examples/upstream-intent/sessions/midi_upstream_intent_adapted.events.json",
+  "wav_path": "examples/upstream-intent/audio/midi_upstream_intent_adapted.wav",
+  "objective_metrics": {
+    "duration_seconds": 24.253,
+    "estimated_bpm": 101.333,
+    "estimated_key_pitch_class": "G",
+    "estimated_key_method": "dominant_chroma_pitch_class; mode not inferred",
+    "onset_count": 128,
+    "onset_density_per_second": 5.278,
+    "mean_rms": 0.036699,
+    "mean_spectral_centroid_hz": 5410.262,
+    "beat_interval_std_seconds": 0.02508,
+    "requested_bpm": 100.0,
+    "bpm_error_raw": 1.333
+  },
+  "drum_events_preserved": true
+}
