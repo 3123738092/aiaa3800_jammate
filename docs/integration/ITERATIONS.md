@@ -37,3 +37,11 @@ Evidence: seven new regression cases failed: notes-only Hum Lab exports raised K
 Change: repair the adapter and validate velocity/rhythm consistency; use a separate session for each standalone clip while keeping its ID during reprocessing; make selected export status consistent; document session versus recording seconds and the existing-runtime adapter. No inferred alignment is imposed on unrelated recordings.
 
 Validation: all 15 Python InputEvent cases and 19 optimized JS cases pass. Browser download validation, MIDI correspondence, repeated conversion and independent rhythm-clip sessions pass with no page errors (round-3-browser.json). Baseline source remains frozen. The local lab still does not share a transport clock with the legacy live runtime; explicit session/offset arguments are required there.
+
+## Round 4 — Safe audio replacement and recording lifecycle
+
+Evidence: two clicks while the microphone permission promise was unresolved made two capture requests (regression observed: 2, expected 1). Import/record controls also remained available during recording, and failed decoding could leave the previous audio player's source visible after its analysis buffer was cleared.
+
+Change: explicit requesting/recording/stopping/loading/analyzing states lock incompatible operations. Failed replacement removes old audio/results; stop/error/page exit releases tracks. Added an original-audio download to preserve rhythm recordings before closing. Settings changes invalidate the old event.
+
+Validation: browser regression now passes permission-pending lock, denied-permission recovery, mocked recording/track release, corrupt-file clearing, successful reload/reanalysis, setting invalidation and mobile-width checks with no page errors. Evidence: round-4-browser.json; no physical microphone was used. Real device-specific capture behavior remains a manual acceptance check.
