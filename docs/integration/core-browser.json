@@ -1,0 +1,26 @@
+{
+  "versions": {
+    "baseline": {
+      "raw": 8,
+      "selected": 7,
+      "eventValid": true,
+      "midiConsistent": true
+    },
+    "optimized": {
+      "raw": 14,
+      "selected": 5,
+      "eventValid": true,
+      "midiConsistent": true
+    }
+  },
+  "rhythm": {
+    "bpm": 100.44642857142858,
+    "onsets": [
+      0,
+      1,
+      1.5,
+      3
+    ]
+  },
+  "pageErrors": []
+}

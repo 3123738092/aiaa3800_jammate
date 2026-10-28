@@ -57,9 +57,10 @@ async function loadModel() {
   ui['model-badge'].className = 'model-badge';
   ui['model-label'].textContent = '加载 Basic Pitch…';
   try {
+    // Repeatable reference backend: Windows WebGL runs differed on the same
+    // synthetic input. Keep the baseline untouched for an honest comparison.
+    await tf.setBackend('cpu');
     await tf.ready();
-    // The CPU backend remains available when this browser cannot initialize WebGL.
-    if (!tf.getBackend()) await tf.setBackend('cpu');
     model = new BasicPitch('./model/model.json');
     await model.model;
     modelReady = true;
@@ -256,6 +257,7 @@ async function convert() {
     const offset = prepared.metadata.processing.trimStartSec;
     const raw = standardizeNotes(decoded,Math.min(audioBuffer.duration,offset+samples.length/SAMPLE_RATE),offset);
     melodyDocument = createMelodyDocument(sourceInfo,prepared.metadata,raw,continuous,performance.now()-started);
+    melodyDocument.model.executionBackend = tf.getBackend();
     for (const n of continuous.notes) n.sourceNoteIds=raw.filter(r=>r.startSec<n.startSec+n.durationSec&&r.startSec+r.durationSec>n.startSec).map(r=>r.id);
     trackDuration = audioBuffer.duration;
     updateOutputs();

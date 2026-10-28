@@ -1,0 +1,61 @@
+{
+  "event_id": "evt_b175723b-b314-4017-a157-d13ac9ba0a56_cleaned",
+  "session_id": "2a3f1d5c-b2b2-4f1c-8563-29eb989d8549",
+  "source": "humming",
+  "event_type": "musical_phrase",
+  "started_at": 0,
+  "ended_at": 4.400041666666667,
+  "confidence": null,
+  "payload": {
+    "timebase": "seconds_from_recording_start",
+    "status": "ready",
+    "tempo_bpm": null,
+    "notes": [
+      {
+        "pitch_midi": 60,
+        "start_sec": 0.301859,
+        "duration_sec": 0.568889,
+        "velocity": 0.7086614173228346
+      },
+      {
+        "pitch_midi": 64,
+        "start_sec": 1.044898,
+        "duration_sec": 0.580499,
+        "velocity": 0.7086614173228346
+      },
+      {
+        "pitch_midi": 67,
+        "start_sec": 1.799546,
+        "duration_sec": 0.570173,
+        "velocity": 0.7086614173228346
+      },
+      {
+        "pitch_midi": 64,
+        "start_sec": 2.543869,
+        "duration_sec": 0.580499,
+        "velocity": 0.7086614173228346
+      },
+      {
+        "pitch_midi": 62,
+        "start_sec": 3.298517,
+        "duration_sec": 0.568889,
+        "velocity": 0.7086614173228346
+      }
+    ],
+    "audio": {
+      "id": "b175723b-b314-4017-a157-d13ac9ba0a56",
+      "name": "合成旋律示例",
+      "kind": "example",
+      "mimeType": "audio/wav",
+      "byteLength": 194086,
+      "durationSec": 4.400041666666667,
+      "decodedSampleRateHz": 48000,
+      "decodedChannels": 1
+    },
+    "analysis": {
+      "backend": "basic-pitch",
+      "variant": "cleaned",
+      "confidence_meaning": "uncalibrated; activations are not probabilities"
+    }
+  }
+}

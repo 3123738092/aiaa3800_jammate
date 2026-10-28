@@ -30,6 +30,14 @@ try{
     await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
     await page.setViewportSize({width:1360,height:1000});
     report.versions[version]={raw:doc.results.raw.notes.length,selected:doc.notes.length,eventValid:true,midiConsistent:true};
+    if(version==='optimized'){
+      assert.deepEqual(doc.notes.map(n=>n.pitchMidi),[60,64,67,64,62],'recover all five expected pitches');
+      assert.equal(doc.model.executionBackend,'cpu');
+      await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
+      const repeated=JSON.parse(await download('#download-json',path.join(root,'tmp/browser/repeated.melody.json')));
+      assert.deepEqual(repeated.notes,doc.notes,'repeat conversion is deterministic');
+      report.versions[version].repeatable=true;
+    }
     console.log(version,report.versions[version]);
   }
   await page.goto(`${base}/rhythm.html`);await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);

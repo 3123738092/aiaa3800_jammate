@@ -13,3 +13,11 @@ Added independent single-voice frame decoding, pitch persistence, acoustic rest 
 JS: 17 tests passed (including seven targeted continuity cases). Browser: optimized five-note example recovered `[60,64,67,64,62]`, raw 14 / selected 5; MIDI and InputEvent matched. Raw model output differed from baseline's run although weights were unchanged. Investigate execution-backend consistency next. The baseline directory remains frozen.
 
 Real human humming recordings have not been supplied for this run. All quality evidence below must distinguish synthetic audio, constructed model frames, and human observations.
+
+## Round 1 — Repeatable inference
+
+Evidence: two fresh browser runs of identical weights and audio produced raw 8 versus 14 notes; the first lost the initial C/E. This also appeared in the prior exploration log. The exact WebGL/driver cause is not established.
+
+Change: optimized version uses TensorFlow.js CPU as a reference execution backend and records it in exported diagnostics. Baseline keeps its original backend choice. Tradeoff: longer processing time, especially on long recordings.
+
+Validation: two consecutive CPU conversions returned byte-for-byte equal note objects and all five expected pitches [60,64,67,64,62]; InputEvent and MIDI matched, rhythm still passed. Evidence: round-1-browser.json. No claim of universal backend determinism or human accuracy.
