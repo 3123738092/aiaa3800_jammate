@@ -1,4 +1,14 @@
-# JamMate：会接你话的 AI 乐队（AIAA 3800 课程项目原型）
+# JamMate：哼唱与节拍输入整合
+
+同一个本地工作台，分别把哼唱与节拍转成 **InputEvent**。保留整合基线和最终优化版，重点改善哼唱碎音；没有把两段输入合成一首音乐。
+
+- [启动与复现](docs/integration/RUN.md)：本机已安装好依赖时，双击 `start-input-lab.cmd`。
+- [四轮审查记录](docs/integration/ITERATIONS.md)；启动后的 `/appendix.html` 提供可试听的前后对比。
+- [InputEvent 字段与时间约定](docs/integration/INPUT_EVENT.md)；[来源与接手时进度](docs/integration/PROVENANCE.md)。
+- `web/baseline` 保持原识别逻辑；`web/optimized` 是优化版；节拍复用原有 Python 分析。
+- 五组合成音频回归通过，真人哼唱仍需验收。语音/NLP、自动模态路由和完整 BandPlan 迁移不在本次完成范围内。
+
+## 原项目说明与既有乐队原型
 
 对着麦克风拍几下定个速度，再哼一句。AI 乐队会听出你的速度和调，用你那句话的变形接回来（模进、倒影、逆行、错位）。你不出声，它就主动抛一个短动机等你接。也可以随时用文字指挥它："faster"、"更有力"、"停一下"、"your turn"。每个决定都附一句理由，告诉你它为什么这么做。
 

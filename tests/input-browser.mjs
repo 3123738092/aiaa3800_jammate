@@ -51,6 +51,12 @@ try{
   assert.notEqual(nextEvent.session_id,event.session_id,'independent clips use distinct sessions');
   report.rhythm={bpm:event.payload.rhythm.tempo_bpm,onsets:event.payload.rhythm.onset_beats};
   report.rhythm.independentClipSessions=true;
+  await page.goto(`${base}/appendix.html`);assert.equal(await page.locator('#scores tr').count(),5);
+  assert.equal(await page.locator('#rolls svg').count(),3);await page.locator('#case').selectOption('short');
+  assert.match(await page.locator('#comparison').innerText(),/优化 3 音/);
+  await page.locator('#case').selectOption('sustain');await page.screenshot({path:path.join(root,'tmp/browser/appendix.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'appendix mobile overflow');
+  report.appendix={cases:5,comparisonSwitchWorks:true,mobileOverflow:false};
   assert.deepEqual(errors,[]);report.pageErrors=errors;
   await writeFile(path.join(root,'tmp/browser/report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{await browser.close();}
