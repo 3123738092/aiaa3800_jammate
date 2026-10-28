@@ -21,3 +21,11 @@ Evidence: two fresh browser runs of identical weights and audio produced raw 8 v
 Change: optimized version uses TensorFlow.js CPU as a reference execution backend and records it in exported diagnostics. Baseline keeps its original backend choice. Tradeoff: longer processing time, especially on long recordings.
 
 Validation: two consecutive CPU conversions returned byte-for-byte equal note objects and all five expected pitches [60,64,67,64,62]; InputEvent and MIDI matched, rhythm still passed. Evidence: round-1-browser.json. No claim of universal backend determinism or human accuracy.
+
+## Round 2 — Preserve articulated short notes
+
+Evidence: a constructed frame case with a 100 ms D between C and E, plus residual C activation at 90% of D, incorrectly returned only C/E. Pitch hysteresis masked D before its articulation could be evaluated. This regression failed before the change.
+
+Change: strong-onset candidates can enter the existing persistence check despite residual previous-pitch activation; weak changes still use hysteresis. This is a focused change to continuity policy 1.1.0. A strong false onset could still promote a pitch error; raw output remains available.
+
+Validation: 18 optimized JS tests passed. Five complete synthetic audio cases (sustain with vibrato, same-pitch repeats, ascending steps, rest, articulated short note) passed through the actual browser model. Expected counts 1/3/4/2/3; optimized counts 1/3/4/2/3; baseline counts 13/8/5/5/5 in the recorded run. Maximum matched boundary error was 9.76 ms. These five examples are not an accuracy estimate on human recordings. Benchmark and generator: humming-benchmark.json, tests/humming-benchmark.mjs, examples/make_humming_benchmark.py.

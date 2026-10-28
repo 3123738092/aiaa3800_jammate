@@ -1,0 +1,92 @@
+{
+  "sustain": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 3.5
+      }
+    ],
+    "duration": 4.2
+  },
+  "repeated": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.36
+      },
+      {
+        "pitch": 60,
+        "start": 0.74,
+        "duration": 0.36
+      },
+      {
+        "pitch": 60,
+        "start": 1.18,
+        "duration": 0.36
+      }
+    ],
+    "duration": 1.94
+  },
+  "steps": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.45
+      },
+      {
+        "pitch": 62,
+        "start": 0.85,
+        "duration": 0.45
+      },
+      {
+        "pitch": 64,
+        "start": 1.4,
+        "duration": 0.45
+      },
+      {
+        "pitch": 67,
+        "start": 1.95,
+        "duration": 0.45
+      }
+    ],
+    "duration": 2.8
+  },
+  "rest": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.6
+      },
+      {
+        "pitch": 60,
+        "start": 1.3,
+        "duration": 0.6
+      }
+    ],
+    "duration": 2.3
+  },
+  "short": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.28
+      },
+      {
+        "pitch": 62,
+        "start": 0.65,
+        "duration": 0.12
+      },
+      {
+        "pitch": 64,
+        "start": 0.84,
+        "duration": 0.28
+      }
+    ],
+    "duration": 1.52
+  }
+}

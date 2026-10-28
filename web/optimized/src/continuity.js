@@ -1,6 +1,6 @@
 // Single-voice humming decoder. Raw polyphonic Basic Pitch output is retained.
 // Times are provided by the installed model's noteFramesToTime implementation.
-export const CONTINUITY = Object.freeze({version:'1.0.0', activation:.18, holdActivation:.12,
+export const CONTINUITY = Object.freeze({version:'1.1.0', activation:.18, holdActivation:.12,
   pitchMin:36,pitchMax:84,holdRatio:.8,changeSec:.14,articulatedChangeSec:.035,
   minimumNoteSec:.07,bridgeGapSec:.09,strongOnset:.65,repeatSeparationSec:.14});
 const round=n=>Math.round(n*1e6)/1e6;
@@ -29,7 +29,12 @@ export function decodeHumming(frames,onsets,times,{durationSec,offsetSec=0,rms=n
     const row=frames[i];let pitch=cfg.pitchMin,peak=-Infinity;
     for(let p=cfg.pitchMin;p<=cfg.pitchMax;p++)if((row[p-21]??0)>peak){peak=row[p-21];pitch=p;}
     const previous=current?.pitch??lastPitch;
-    if(previous!==null && row[previous-21]>=cfg.holdActivation && row[previous-21]>=peak*cfg.holdRatio)pitch=previous;
+    // A previous note's model tail can remain almost as strong as a newly
+    // articulated short note. Let that candidate pass persistence checks;
+    // otherwise hysteresis can erase the whole new note before it is tested.
+    const candidateAttack=(onsets[i]?.[pitch-21]??0)>=cfg.strongOnset ||
+      (pending?.pitch===pitch&&(onsets[pending.start]?.[pitch-21]??0)>=cfg.strongOnset);
+    if(!candidateAttack&&previous!==null && row[previous-21]>=cfg.holdActivation && row[previous-21]>=peak*cfg.holdRatio)pitch=previous;
     const audible=!rms||rms[i]>energyFloor;
     if(peak<cfg.activation||!audible){
       if(current){gap??={start:i,silent:0};if(!audible)gap.silent+=times[i+1]-times[i];
