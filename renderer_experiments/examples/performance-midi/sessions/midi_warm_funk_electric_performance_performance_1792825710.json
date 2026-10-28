@@ -1,0 +1,97 @@
+{
+  "experiment_id": "midi_warm_funk_electric_performance_performance_1792825710",
+  "backend": "midi",
+  "status": "passed",
+  "style": "warm_funk",
+  "instrument_profile": {
+    "name": "electric_performance",
+    "description": "Electric Piano 1 + Fingered Bass + Clavinet ornament",
+    "programs": {
+      "1": 4,
+      "2": 33,
+      "3": 7
+    }
+  },
+  "arrangement": "performance",
+  "prompt": "tight live-band funk groove",
+  "intent": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0.9,
+      "harmony": 0.5
+    },
+    "prompt": "tight live-band funk groove"
+  },
+  "transformation": {
+    "style": "warm_funk",
+    "arrangement": "performance",
+    "drums": "style-specific kick/snare/hat placement; energy controls velocity",
+    "bass": "style-specific root/chord-tone/octave/passing-note phrase; energy controls velocity",
+    "harmony": "style-specific rhythmic voicings; chord symbols map to explicit GM pitches",
+    "performance_layers": [
+      "8-bar phrase structure",
+      "drum ghost notes and fills",
+      "bass approach notes and phrase variation",
+      "voice-led comping",
+      "clavinet call-and-response",
+      "CC volume/pan/expression/reverb",
+      "deterministic microtiming"
+    ],
+    "instrument_programs": {
+      "1": 4,
+      "2": 33,
+      "3": 7
+    }
+  },
+  "midi_path": "examples/performance-midi/sessions/midi_warm_funk_electric_performance_performance_1792825710.mid",
+  "events_path": "examples/performance-midi/sessions/midi_warm_funk_electric_performance_performance_1792825710.events.json",
+  "wav_path": "examples/performance-midi/audio/midi_warm_funk_electric_performance_performance_1792825710.wav",
+  "audio_render": "rendered",
+  "objective_metrics": {
+    "duration_seconds": 24.253,
+    "estimated_bpm": 101.333,
+    "estimated_key_pitch_class": "G",
+    "estimated_key_method": "dominant_chroma_pitch_class; mode not inferred",
+    "onset_count": 128,
+    "onset_density_per_second": 5.278,
+    "mean_rms": 0.043631,
+    "mean_spectral_centroid_hz": 5180.406,
+    "beat_interval_std_seconds": 0.02489
+  },
+  "port": "not_requested",
+  "metrics": {
+    "dispatched": 0,
+    "late_events": 0,
+    "all_notes_off_sent": 0,
+    "active_notes": 0,
+    "jitter_mean_ms": 0,
+    "jitter_median_ms": 0,
+    "jitter_p95_ms": 0,
+    "jitter_max_ms": 0
+  }
+}

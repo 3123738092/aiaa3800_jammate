@@ -1,0 +1,331 @@
+{
+  "experiment_id": "lyria_upstream_intent_before_after_update",
+  "backend": "lyria",
+  "status": "passed",
+  "source_intent": {
+    "schema_version": "1.1",
+    "event_id": "evt_001",
+    "session_id": "jam_001",
+    "status": "ready",
+    "summary": "Preserve drums groove; Add bass instrument [dynamics=soft] at next_bar; Set global mood dreamy; Style steering: dreamy.",
+    "style_prompt": "dreamy",
+    "actions": [
+      {
+        "target": "bass",
+        "operation": "add",
+        "parameter": "instrument",
+        "value": null,
+        "attributes": {
+          "dynamics": "soft"
+        },
+        "timing": "next_bar",
+        "magnitude": null,
+        "evidence": "add soft bass next bar"
+      },
+      {
+        "target": "global",
+        "operation": "set",
+        "parameter": "mood",
+        "value": "dreamy",
+        "attributes": {},
+        "timing": "unspecified",
+        "magnitude": null,
+        "evidence": "make it dreamier."
+      }
+    ],
+    "constraints": [
+      {
+        "target": "drums",
+        "parameter": "groove",
+        "operation": "preserve",
+        "value": null,
+        "evidence": "Keep the drum groove"
+      }
+    ],
+    "feedback": null,
+    "needs_clarification": false,
+    "clarification_question": null,
+    "parser": "rules-v1",
+    "latency_ms": 1.41,
+    "error_code": null
+  },
+  "baseline_state": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping"
+  },
+  "adapted_music_intent": {
+    "tempo": {
+      "bpm": 100.0
+    },
+    "harmony": {
+      "key": "C",
+      "mode": "major",
+      "chords": [
+        "Cmaj7",
+        "Am7",
+        "Dm7",
+        "G7"
+      ]
+    },
+    "semantic": {
+      "style": [
+        "funk"
+      ],
+      "mood": [
+        "warm",
+        "groovy",
+        "dreamy"
+      ],
+      "energy": 0.7,
+      "density": 0.55,
+      "brightness": 0.55
+    },
+    "parts": {
+      "drums": 0.8,
+      "bass": 0.45,
+      "harmony": 0.5
+    },
+    "prompt": "warm funk drum groove with electric piano comping; dreamy atmosphere; add a soft supportive bass; mood: dreamy"
+  },
+  "adapter_decision_log": [
+    {
+      "source": "style_prompt",
+      "action": "append to mood and natural-language prompt",
+      "value": "dreamy"
+    },
+    {
+      "source": "actions.bass.add.instrument",
+      "action": "enable bass at 0.45; scale Bass velocity to 0.58; raise keyboard reverb",
+      "timing": "next_bar"
+    },
+    {
+      "source": "actions.global.mood",
+      "action": "merge into semantic.mood and prompt",
+      "value": "dreamy"
+    },
+    {
+      "source": "constraints.drums.groove",
+      "action": "reuse identical drum event sequence from baseline MIDI render"
+    }
+  ],
+  "unresolved_source_fields": [
+    "bass instrument value is null; MIDI uses Fingered Bass (GM 33) fallback"
+  ],
+  "timing_policy": {
+    "source_timing": "next_bar",
+    "baseline_wait_seconds": 9.6,
+    "interpretation": "update after four planned 100 BPM bars"
+  },
+  "segments": [
+    {
+      "label": "before_update",
+      "music_intent": {
+        "tempo": {
+          "bpm": 100.0
+        },
+        "harmony": {
+          "key": "C",
+          "mode": "major",
+          "chords": [
+            "Cmaj7",
+            "Am7",
+            "Dm7",
+            "G7"
+          ]
+        },
+        "semantic": {
+          "style": [
+            "funk"
+          ],
+          "mood": [
+            "warm",
+            "groovy"
+          ],
+          "energy": 0.7,
+          "density": 0.55,
+          "brightness": 0.55
+        },
+        "parts": {
+          "drums": 0.8,
+          "bass": 0,
+          "harmony": 0.5
+        },
+        "prompt": "warm funk drum groove with electric piano comping"
+      },
+      "backend_input": {
+        "weighted_prompts": [
+          {
+            "text": "funk",
+            "weight": 1.0
+          },
+          {
+            "text": "warm, groovy",
+            "weight": 0.65
+          },
+          {
+            "text": "warm funk drum groove with electric piano comping",
+            "weight": 1.0
+          },
+          {
+            "text": "moderate energy",
+            "weight": 0.75
+          },
+          {
+            "text": "harmonic movement: Cmaj7 - Am7 - Dm7 - G7",
+            "weight": 0.55
+          }
+        ],
+        "generation_config": {
+          "bpm": 100,
+          "density": 0.55,
+          "brightness": 0.55,
+          "scale": "C_MAJOR_A_MINOR",
+          "mute_bass": true,
+          "mute_drums": false
+        }
+      },
+      "audio_path": "examples/upstream-intent/audio/lyria_upstream_intent_before_after_update_before.wav",
+      "objective_metrics": {
+        "duration_seconds": 8.0,
+        "estimated_bpm": 100.446,
+        "estimated_key_pitch_class": "G",
+        "estimated_key_method": "dominant_chroma_pitch_class; mode not inferred",
+        "onset_count": 52,
+        "onset_density_per_second": 6.5,
+        "mean_rms": 0.066046,
+        "mean_spectral_centroid_hz": 3572.343,
+        "beat_interval_std_seconds": 0.0382,
+        "requested_bpm": 100.0,
+        "bpm_error_raw": 0.446
+      }
+    },
+    {
+      "label": "after_update",
+      "music_intent": {
+        "tempo": {
+          "bpm": 100.0
+        },
+        "harmony": {
+          "key": "C",
+          "mode": "major",
+          "chords": [
+            "Cmaj7",
+            "Am7",
+            "Dm7",
+            "G7"
+          ]
+        },
+        "semantic": {
+          "style": [
+            "funk"
+          ],
+          "mood": [
+            "warm",
+            "groovy",
+            "dreamy"
+          ],
+          "energy": 0.7,
+          "density": 0.55,
+          "brightness": 0.55
+        },
+        "parts": {
+          "drums": 0.8,
+          "bass": 0.45,
+          "harmony": 0.5
+        },
+        "prompt": "warm funk drum groove with electric piano comping; dreamy atmosphere; add a soft supportive bass; mood: dreamy"
+      },
+      "backend_input": {
+        "weighted_prompts": [
+          {
+            "text": "funk",
+            "weight": 1.0
+          },
+          {
+            "text": "warm, groovy, dreamy",
+            "weight": 0.65
+          },
+          {
+            "text": "warm funk drum groove with electric piano comping; dreamy atmosphere; add a soft supportive bass; mood: dreamy",
+            "weight": 1.0
+          },
+          {
+            "text": "moderate energy",
+            "weight": 0.75
+          },
+          {
+            "text": "harmonic movement: Cmaj7 - Am7 - Dm7 - G7",
+            "weight": 0.55
+          }
+        ],
+        "generation_config": {
+          "bpm": 100,
+          "density": 0.55,
+          "brightness": 0.55,
+          "scale": "C_MAJOR_A_MINOR",
+          "mute_bass": false,
+          "mute_drums": false
+        }
+      },
+      "audio_path": "examples/upstream-intent/audio/lyria_upstream_intent_before_after_update_after.wav",
+      "objective_metrics": {
+        "duration_seconds": 14.0,
+        "estimated_bpm": 100.446,
+        "estimated_key_pitch_class": "G",
+        "estimated_key_method": "dominant_chroma_pitch_class; mode not inferred",
+        "onset_count": 97,
+        "onset_density_per_second": 6.929,
+        "mean_rms": 0.065981,
+        "mean_spectral_centroid_hz": 3417.477,
+        "beat_interval_std_seconds": 0.02899,
+        "requested_bpm": 100.0,
+        "bpm_error_raw": 0.446
+      },
+      "update_sent_monotonic": 112029.734
+    }
+  ],
+  "renderer_metrics": {
+    "connected_at": 112017.578,
+    "first_audio_at": 112021.625,
+    "audio_chunks": 11,
+    "audio_bytes": 4224000,
+    "update_events": [
+      {
+        "sent_at": 112029.734,
+        "completed_at": 112029.734,
+        "kind": "intent_update"
+      }
+    ],
+    "errors": [],
+    "ttfa_ms": 4047.0
+  }
+}

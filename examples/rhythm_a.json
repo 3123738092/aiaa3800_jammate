@@ -1,0 +1,8 @@
+{
+  "tempo_bpm": 100,
+  "beat_origin_s": 0,
+  "beats_per_bar": 4,
+  "onset_beats": [0, 1, 1.5, 3],
+  "accents": [1, 0.5, 0.8, 1],
+  "confidence": 1
+}

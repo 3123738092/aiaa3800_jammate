@@ -1,0 +1,14 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.coverage
+demo_out/
+# Personal microphone recordings; generate shareable fixtures with examples/.
+/my_rhythm.wav
+/headset_rhythm.wav
+.venv/
+node_modules/
+dist/
+tmp/
+*.log
+/recordings/
