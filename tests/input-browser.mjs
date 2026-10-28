@@ -36,6 +36,7 @@ try{
       await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
       const repeated=JSON.parse(await download('#download-json',path.join(root,'tmp/browser/repeated.melody.json')));
       assert.deepEqual(repeated.notes,doc.notes,'repeat conversion is deterministic');
+      assert.equal(repeated.source.sessionId,event.session_id,'reprocessing retains clip session');
       report.versions[version].repeatable=true;
     }
     console.log(version,report.versions[version]);
@@ -44,7 +45,12 @@ try{
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
   const event=JSON.parse(await download('#download',path.join(root,'tmp/browser/rhythm.event.json')));
   assert.equal(event.event_type,'rhythm_seed');assert.deepEqual(event.payload.rhythm.onset_beats,[0,1,1.5,3]);
+  await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
+  await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
+  const nextEvent=JSON.parse(await download('#download',path.join(root,'tmp/browser/rhythm-next.event.json')));
+  assert.notEqual(nextEvent.session_id,event.session_id,'independent clips use distinct sessions');
   report.rhythm={bpm:event.payload.rhythm.tempo_bpm,onsets:event.payload.rhythm.onset_beats};
+  report.rhythm.independentClipSessions=true;
   assert.deepEqual(errors,[]);report.pageErrors=errors;
   await writeFile(path.join(root,'tmp/browser/report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{await browser.close();}

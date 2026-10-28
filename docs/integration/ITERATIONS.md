@@ -29,3 +29,11 @@ Evidence: a constructed frame case with a 100 ms D between C and E, plus residua
 Change: strong-onset candidates can enter the existing persistence check despite residual previous-pitch activation; weak changes still use hysteresis. This is a focused change to continuity policy 1.1.0. A strong false onset could still promote a pitch error; raw output remains available.
 
 Validation: 18 optimized JS tests passed. Five complete synthetic audio cases (sustain with vibrato, same-pitch repeats, ascending steps, rest, articulated short note) passed through the actual browser model. Expected counts 1/3/4/2/3; optimized counts 1/3/4/2/3; baseline counts 13/8/5/5/5 in the recorded run. Maximum matched boundary error was 9.76 ms. These five examples are not an accuracy estimate on human recordings. Benchmark and generator: humming-benchmark.json, tests/humming-benchmark.mjs, examples/make_humming_benchmark.py.
+
+## Round 3 — Reliable event contract and clock meaning
+
+Evidence: seven new regression cases failed: notes-only Hum Lab exports raised KeyError, four invalid velocities passed, missing rhythm data raised an unnormalized error, and quantized onset seconds could contradict beat positions. Review also found unrelated browser clips shared a session ID while every clip started at zero, and exported status could follow raw notes instead of the selected variant.
+
+Change: repair the adapter and validate velocity/rhythm consistency; use a separate session for each standalone clip while keeping its ID during reprocessing; make selected export status consistent; document session versus recording seconds and the existing-runtime adapter. No inferred alignment is imposed on unrelated recordings.
+
+Validation: all 15 Python InputEvent cases and 19 optimized JS cases pass. Browser download validation, MIDI correspondence, repeated conversion and independent rhythm-clip sessions pass with no page errors (round-3-browser.json). Baseline source remains frozen. The local lab still does not share a transport clock with the legacy live runtime; explicit session/offset arguments are required there.

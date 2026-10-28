@@ -1,7 +1,6 @@
 const $=id=>document.getElementById(id);
 let buffer, sourceURL, eventURL, recorder, stream, timer, busy=false, startedAt=0;
-const sessionId=sessionStorage.getItem('jammate-session')||crypto.randomUUID();
-sessionStorage.setItem('jammate-session',sessionId);
+let sessionId;
 function sync(){for(const id of ['record','file','example','count','tempo','origin'])$(id).disabled=busy; $('analyze').disabled=busy||!buffer||!!recorder;}
 function clearResult(){ $('result').hidden=true;if(eventURL)URL.revokeObjectURL(eventURL);eventURL=null;$('download').removeAttribute('href'); }
 async function load(blob){
@@ -9,7 +8,7 @@ async function load(blob){
   const ctx=new AudioContext();try{buffer=await ctx.decodeAudioData(await blob.arrayBuffer());}finally{await ctx.close();}
   if(buffer.duration<.5||buffer.duration>30){buffer=null;throw Error('录音需为 0.5–30 秒');}
   if(sourceURL)URL.revokeObjectURL(sourceURL);sourceURL=URL.createObjectURL(blob);$('original').src=sourceURL;
-  startedAt=0; $('status').textContent=`已载入 ${buffer.duration.toFixed(1)} 秒录音。`;sync();
+  sessionId=crypto.randomUUID();startedAt=0; $('status').textContent=`已载入 ${buffer.duration.toFixed(1)} 秒录音。`;sync();
 }
 function wavBase64(audio){
   const n=audio.length, data=new ArrayBuffer(44+n*2),v=new DataView(data);

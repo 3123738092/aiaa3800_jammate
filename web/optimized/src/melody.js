@@ -64,7 +64,7 @@ export function buildExports(document, variant = 'cleaned', timbreId = 'soft') {
   const bytes = midi.toArray();
   const exported = new Midi(bytes);
   return {bytes, playbackNotes:exported.tracks.flatMap(item=>item.notes),
-    document:{...document,selectedResult:variant,notes,
+    document:{...document,selectedResult:variant,notes,status:notes.length?'ready':'no_notes',
       playback:{timbreId,gmProgramNumber:TIMBRES[timbreId].program,gmProgramNumberBase:0,
         velocityPolicy:'fixed_audition_level', velocity01:VELOCITY,
         timbreNote:'Browser synthesizer approximations; external MIDI instruments may sound different.'},
@@ -76,7 +76,7 @@ export function buildExports(document, variant = 'cleaned', timbreId = 'soft') {
 
 export function createMelodyDocument(source, input, raw, cleaned, elapsedMs) {
   return {schemaVersion:'1.0.0',appVersion:APP_VERSION,id:source.id,
-    createdAt:new Date().toISOString(),status:raw.length?'ready':'no_notes',source,
+    createdAt:new Date().toISOString(),status:cleaned.notes.length?'ready':'no_notes',source,
     timebase:{unit:'seconds',origin:'original_audio_start'},
     tempo:{bpm:null,source:'unknown',mode:'free',quantized:false},
     key:null,timeSignature:null,input,

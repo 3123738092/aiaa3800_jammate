@@ -34,3 +34,27 @@ def test_reject_invalid_envelopes(field,value):
 def test_reject_note_beyond_recording():
     with pytest.raises(ValueError,match='fit inside'):
         make_event('humming',{'notes':[{'pitch_midi':60,'start_sec':2.9,'duration_sec':.4}]},3,session_id='s')
+
+
+def test_notes_only_export_is_accepted_without_results():
+    document={'source':{'durationSec':2},'notes':[{'pitchMidi':60,'startSec':.1,'durationSec':1}]}
+    event=from_melody_document(document,session_id='external-session',started_at=19)
+    assert event['ended_at']==21 and event['payload']['notes'][0]['start_sec']==.1
+
+
+@pytest.mark.parametrize('velocity',[-.1,1.1,True,'loud'])
+def test_invalid_velocity_is_rejected(velocity):
+    with pytest.raises(ValueError,match='velocity'):
+        make_event('humming',{'notes':[{'pitch_midi':60,'start_sec':0,'duration_sec':1,'velocity':velocity}]},2,session_id='s')
+
+
+def test_malformed_rhythm_is_a_validation_error():
+    with pytest.raises(ValueError,match='rhythm'):
+        make_event('rhythm',{},3,session_id='s')
+
+
+def test_quantized_onsets_must_match_their_rhythm_clock():
+    event=perceive_rhythm(claps([.3,.9,1.5,2.1,2.7,3.3,3.6,4.5],5.2),SR,session_id='s')
+    event['payload']['onsets_sec'][0] += 1
+    with pytest.raises(ValueError,match='onsets_sec'):
+        validate_event(event)

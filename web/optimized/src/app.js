@@ -7,8 +7,6 @@ import { DECODING, TIMBRES, standardizeNotes, cleanNotes, createMelodyDocument, 
 
 const $ = id => document.getElementById(id);
 const ui = Object.fromEntries(['record','record-rings','mic-icon','stop-icon','record-timer','record-prompt','input-level','example','import','file','original-track','original','source-name','source-duration','convert','status','progress','model-badge','model-label','retry-model','empty','result-content','note-count','result-time','piano-roll','play-midi','timbre','download-midi','conversion-time','download-original','download-json','quality-panel','quality-summary','quality-metrics','processing-summary','normalize','trim','variant','cleanup-summary','result-state','overlap-hint'].map(id => [id,$(id)]));
-const sessionId = sessionStorage.getItem('jammate-session') || crypto.randomUUID();
-sessionStorage.setItem('jammate-session', sessionId);
 let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
@@ -126,7 +124,7 @@ async function setAudio(blob, name, sourceType = 'recording') {
   if (decoded.duration < .5) throw new Error('录音太短了，试着哼 3–8 秒再转换。');
   if (decoded.duration > MAX_AUDIO_SECONDS + .2) throw new Error('请导入 30 秒以内的录音；短一点更方便比较效果。');
   audioBuffer = decoded;
-  sourceInfo = {id:crypto.randomUUID(),name,kind:sourceType,mimeType:blob.type || 'application/octet-stream',
+  sourceInfo = {id:crypto.randomUUID(),sessionId:crypto.randomUUID(),name,kind:sourceType,mimeType:blob.type || 'application/octet-stream',
     byteLength:blob.size,durationSec:decoded.duration,decodedSampleRateHz:decoded.sampleRate,decodedChannels:decoded.numberOfChannels};
   sourceMetrics = measureAudio(Array.from({length:decoded.numberOfChannels},(_,index)=>decoded.getChannelData(index)));
   monoSamples = await monoResample(decoded);
@@ -263,7 +261,7 @@ async function convert() {
     updateOutputs();
     ui['result-time'].textContent = `${trackDuration.toFixed(1)} 秒`;
     ui['conversion-time'].textContent = `转换用时 ${((performance.now()-started)/1000).toFixed(1)} 秒`;
-    status(raw.length ? '转换完成。切换“原始识别 / 连贯哼唱”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!raw.length);
+    status(continuous.notes.length ? '转换完成。切换“原始识别 / 连贯哼唱”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!continuous.notes.length);
   } catch (error) {
     console.error('Transcription failed',error);
     status(error.message?.includes('录音') ? error.message : '转换没有完成。可以试一段更短、更清晰的录音，再点“转成 MIDI”。',true);
@@ -278,7 +276,7 @@ function updateOutputs() {
   stopPlayback();
   const result = buildExports(melodyDocument,ui.variant.value,ui.timbre.value);
   if (eventURL) URL.revokeObjectURL(eventURL);
-  const inputEvent = hummingEvent(result.document, {sessionId, startedAt:0, eventId:`evt_${sourceInfo.id}_${ui.variant.value}`});
+  const inputEvent = hummingEvent(result.document, {sessionId:sourceInfo.sessionId, startedAt:0, eventId:`evt_${sourceInfo.id}_${ui.variant.value}`});
   eventURL = URL.createObjectURL(new Blob([JSON.stringify(inputEvent,null,2)],{type:'application/json'}));
   $('download-event').href = eventURL;
   $('download-event').download = `humming-${sourceInfo.id}.input-event.json`;
