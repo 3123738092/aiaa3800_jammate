@@ -4,6 +4,10 @@
 
 可信度评估、设计取舍、研究问题和下一步见 [docs/PLAN.md](docs/PLAN.md)。
 
+最新诊断：已完成失败重规划、回执/日志一致性、上下文预算和历史快照内存修复；300 轮受控故障测试通过，真实连续 26 轮为 25/26，哼唱候选参数仍待真人验证。详细证据见 [诊断报告](docs/DIAGNOSTIC_ITERATION_20261031.md)，下一阶段分工和验收条件见 [项目完善计划](docs/PROJECT_IMPROVEMENT_PLAN.md)。
+
+最新接口工作：已提供 [InputEvent 接收契约](docs/INPUT_EVENT_V1.md)、[状态与 BandPlan 闭环](docs/AGENT_V1.md)、[LLM 主导的 Agent](docs/LLM_AGENT.md) 和 [Kevin MIDI / SoundFont 执行端](docs/KEVIN_RENDERER.md)。已运行新的文字/原始合成 WAV 批次、Basic Pitch 推理、真实 LLM 和 FluidSynth 导出，结果及失败记录见 [测试报告](docs/ACCEPTANCE_20261031.md)。真人录音和声卡实时联调仍待完成。
+
 ## 环境
 
 - Windows 10/11，Python 3.11（已在 conda 环境 `jammate` 中验证）。
@@ -31,9 +35,33 @@ python -m jammate live --tempo 96 --log demo_out\live.jsonl        :: 实时模�
 - `jam.mid`：乐队的多轨 MIDI，可以导入 DAW 换音色；
 - `session.jsonl`：分析结果，以及每个决定和它的理由。
 
-同一个 `--seed` 每次跑出的结果完全一样。
+上述规则离线入口使用同一个 `--seed` 可复现生成结果。后面的 LLM Agent 输出不受这个随机种子完全控制；它只固定执行端的规则变奏。
+
+## InputEvent 接口验证（2026-10-31）
+
+不需要录音或云模型即可检查接口：
+
+```bat
+python -m jammate.contracts validate examples/input_events/speech.json examples/input_events/rhythm.json examples/input_events/humming.json
+python examples/input_event_demo.py --preview
+```
+
+第二条命令生成三类事件并通过旧指挥/编排器输出兼容试听，保存在 `demo_out/input_events/`。这个兼容试听不执行文本要求。字段、时间原点、未知值和转换命令见 [完整契约](docs/INPUT_EVENT_V1.md)。
+
+## LLM Agent 多轮演示（2026-10-31）
+
+```bat
+python examples/agent_demo.py --scenario expressive
+python examples/agent_demo.py --text "别加速，只让鼓更有冲击力，贝斯和和弦照旧" --text "把刚才加强的那个声部调回最开始的力度"
+```
+
+新入口默认调用 OpenAI API。本机私有凭据已在仓库外配置；新机器的配置方式见 [LLM_AGENT.md](docs/LLM_AGENT.md)。八轮验证节奏与哼唱同轮输入、只加强鼓、减少鼓点、按历史恢复力度、主动后等待和通过指代恢复声部。输出在 `demo_out/agent_llm/<时间>/`，包含全段及逐轮 WAV/MIDI、BandPlan、状态快照、agent_decision.json 和 trace.jsonl。
+
+建议先比较 `turn_02/state_observed.json → plan.json → state_applied.json`，再看第四轮怎样依据历史恢复初始力度。使用 `python examples/agent_demo.py --agent rule` 可运行不调用 API 的旧规则基线。加 `--renderer kevin --fluidsynth <程序路径> --soundfont <sf2路径>` 可走 Kevin 的 MIDI 和 SoundFont 合成，命令及乐器调整见 [KEVIN_RENDERER.md](docs/KEVIN_RENDERER.md)。音符仍由现有编排器生成；公共状态与计划约定见 [AGENT_V1.md](docs/AGENT_V1.md)。
 
 ## 节奏驱动伴奏（更新于 2026-10-23）
+
+2026-10-31 新链路已接通：原始节奏 WAV → 分析 → InputEvent → LLM/BandPlan → Kevin MIDI / SoundFont WAV。哼唱与节奏也可在同一轮输入；新批次、已发现问题与试听产物见 [测试报告](docs/ACCEPTANCE_20261031.md)，下游乐器配置见 [Kevin Renderer 指引](docs/KEVIN_RENDERER.md)。下面的旧节奏 CLI 保留为独立分析/调试入口。
 
 现在可以直接把一小节节奏交给生成器，生成鼓、贝斯、键盘三个声部。当前范围是 **4/4、一小节循环、16 分音符网格**。`follow` 保留输入位置，`vary` 保留位置并加入少量装饰，`simplify` 保留最多两个相隔至少一拍的主要重音。`energy` 控制力度和变化模式的装饰数量；0 为只有铺底的 break，不改变 BPM。
 

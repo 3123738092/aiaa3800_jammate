@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JamMate InputEvent 1.0.0 / 1.1.0",
+  "description": "Downstream contract baseline. Cross-field time and note invariants are additionally checked by the Python validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "session_id", "source", "event_type", "started_at", "ended_at", "confidence", "payload"],
+  "properties": {
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
+    "event_id": {"$ref": "#/$defs/id"},
+    "session_id": {"$ref": "#/$defs/id"},
+    "source": {"enum": ["text", "speech", "rhythm", "humming", "system"]},
+    "event_type": {"enum": ["speech", "rhythm_seed", "musical_phrase", "session_control"]},
+    "started_at": {"type": ["number", "null"], "minimum": 0},
+    "ended_at": {"type": ["number", "null"], "minimum": 0},
+    "confidence": {"$ref": "#/$defs/optionalScore"},
+    "payload": {"type": "object"},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "producer": {"$ref": "#/$defs/id"},
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_schema_version": {"$ref": "#/$defs/id"},
+        "audio_ref": {"$ref": "#/$defs/id"},
+        "analysis_ref": {"$ref": "#/$defs/id"},
+        "confidence_method": {"$ref": "#/$defs/id"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.0.0"}}},
+      "then": {"properties": {"source": {"enum": ["text", "speech", "rhythm", "humming"]}, "event_type": {"enum": ["speech", "rhythm_seed", "musical_phrase"]}}}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "session_control"}}},
+      "then": {"properties": {"source": {"const": "system"}, "payload": {"$ref": "#/$defs/controlPayload"}}}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "speech"}}},
+      "then": {"properties": {
+        "source": {"enum": ["text", "speech"]},
+        "payload": {"$ref": "#/$defs/speechPayload"}
+      }}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "rhythm_seed"}}},
+      "then": {"properties": {
+        "source": {"const": "rhythm"},
+        "payload": {"$ref": "#/$defs/rhythmPayload"}
+      }}
+    },
+    {
+      "if": {"properties": {"event_type": {"const": "musical_phrase"}}},
+      "then": {"properties": {
+        "source": {"const": "humming"},
+        "payload": {"$ref": "#/$defs/hummingPayload"}
+      }}
+    }
+  ],
+  "$defs": {
+    "controlPayload": {
+      "type": "object", "additionalProperties": false, "required": ["command"],
+      "properties": {"command": {"enum": ["stop", "start", "user_activity", "idle"]}, "active": {"type": "boolean"}, "bars": {"type": "integer", "minimum": 0}},
+      "allOf": [
+        {"if": {"properties": {"command": {"const": "user_activity"}}}, "then": {"required": ["active"]}, "else": {"properties": {"active": false}}},
+        {"if": {"properties": {"command": {"const": "idle"}}}, "then": {"required": ["bars"]}, "else": {"properties": {"bars": false}}}
+      ]
+    },
+    "id": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "score": {"type": "number", "minimum": 0, "maximum": 1},
+    "optionalScore": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "speechPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "language": {"type": ["string", "null"], "minLength": 1},
+        "alternatives": {"type": "array", "items": {"type": "string", "minLength": 1, "pattern": "\\S"}}
+      }
+    },
+    "rhythmPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "audio_duration_s", "tempo_source", "confidence_kind", "rhythm"],
+      "properties": {
+        "status": {"enum": ["ready", "no_onsets"]},
+        "audio_duration_s": {"type": "number", "exclusiveMinimum": 0},
+        "tempo_source": {"enum": ["detected", "manual", "session"]},
+        "confidence_kind": {"enum": ["grid_alignment_heuristic", "manual", "unspecified"]},
+        "rhythm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tempo_bpm", "onset_beats", "accents", "beat_origin_s", "beats_per_bar", "confidence"],
+          "properties": {
+            "tempo_bpm": {"type": "number", "minimum": 60, "maximum": 180},
+            "onset_beats": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}},
+            "accents": {"type": "array", "maxItems": 16, "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}},
+            "beat_origin_s": {"type": "number", "minimum": 0},
+            "beats_per_bar": {"const": 4},
+            "confidence": {"$ref": "#/$defs/score"}
+          }
+        }
+      }
+    },
+    "hummingPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["melody"],
+      "properties": {"melody": {"$ref": "#/$defs/melody"}}
+    },
+    "note": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pitchMidi", "startSec", "durationSec", "velocity01", "sourceNoteIds"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "pitchMidi": {"type": "integer", "minimum": 0, "maximum": 127},
+        "startSec": {"type": "number", "minimum": 0},
+        "durationSec": {"type": "number", "exclusiveMinimum": 0},
+        "velocity01": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "modelActivation": {"$ref": "#/$defs/optionalScore"},
+        "onsetActivation": {"$ref": "#/$defs/optionalScore"},
+        "sourceNoteIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "notes": {"type": "array", "items": {"$ref": "#/$defs/note"}},
+    "melodyResult": {
+      "type": "object",
+      "required": ["notes"],
+      "properties": {"notes": {"$ref": "#/$defs/notes"}},
+      "additionalProperties": true
+    },
+    "melody": {
+      "type": "object",
+      "description": "Preserved upstream Melody v1 document, including raw/cleaned results and model/processing evidence. Its MIDI tempo is not the session tempo.",
+      "additionalProperties": true,
+      "required": ["schemaVersion", "id", "status", "source", "timebase", "tempo", "key", "timeSignature", "results", "selectedResult", "notes"],
+      "properties": {
+        "schemaVersion": {"const": "1.0.0"},
+        "id": {"$ref": "#/$defs/id"},
+        "status": {"enum": ["ready", "no_notes"]},
+        "source": {
+          "type": "object", "required": ["id", "durationSec"], "additionalProperties": true,
+          "properties": {"id": {"$ref": "#/$defs/id"}, "durationSec": {"type": "number", "exclusiveMinimum": 0}}
+        },
+        "timebase": {"const": {"unit": "seconds", "origin": "original_audio_start"}},
+        "tempo": {
+          "type": "object", "additionalProperties": false,
+          "required": ["bpm", "source", "mode", "quantized"],
+          "properties": {"bpm": {"type": "null"}, "source": {"const": "unknown"}, "mode": {"const": "free"}, "quantized": {"const": false}}
+        },
+        "key": {"type": "null"},
+        "timeSignature": {"type": "null"},
+        "selectedResult": {"enum": ["raw", "cleaned"]},
+        "notes": {"$ref": "#/$defs/notes"},
+        "results": {
+          "type": "object", "additionalProperties": false, "required": ["raw", "cleaned"],
+          "properties": {"raw": {"$ref": "#/$defs/melodyResult"}, "cleaned": {"$ref": "#/$defs/melodyResult"}}
+        }
+      }
+    }
+  }
+}

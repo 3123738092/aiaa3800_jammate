@@ -1,0 +1,17 @@
+{
+  "confidence": null,
+  "ended_at": null,
+  "event_id": "idle_example",
+  "event_type": "session_control",
+  "payload": {
+    "bars": 2,
+    "command": "idle"
+  },
+  "provenance": {
+    "producer": "runtime"
+  },
+  "schema_version": "1.1.0",
+  "session_id": "jam_demo",
+  "source": "system",
+  "started_at": null
+}

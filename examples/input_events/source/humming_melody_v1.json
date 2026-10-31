@@ -1,0 +1,622 @@
+{
+  "schemaVersion": "1.0.0",
+  "appVersion": "1.1.0",
+  "id": "5f5746af-7d20-41e6-ad64-30bcd187e6ac",
+  "createdAt": "2026-10-23T20:09:35.198Z",
+  "status": "ready",
+  "source": {
+    "id": "5f5746af-7d20-41e6-ad64-30bcd187e6ac",
+    "name": "合成旋律示例",
+    "kind": "example",
+    "mimeType": "audio/wav",
+    "byteLength": 194086,
+    "durationSec": 4.400041666666667,
+    "decodedSampleRateHz": 48000,
+    "decodedChannels": 1
+  },
+  "timebase": {
+    "unit": "seconds",
+    "origin": "original_audio_start"
+  },
+  "tempo": {
+    "bpm": null,
+    "source": "unknown",
+    "mode": "free",
+    "quantized": false
+  },
+  "key": null,
+  "timeSignature": null,
+  "input": {
+    "sampleRateHz": 22050,
+    "channels": 1,
+    "sampleFormat": "float32",
+    "processing": {
+      "version": "1.0.0",
+      "normalizeEnabled": true,
+      "gain": 1.4539355749891487,
+      "trimEnabled": false,
+      "trimStartSec": 0,
+      "trimEndSec": 0,
+      "processedDurationSec": 4.400045351473923,
+      "trimThresholdRms": 0.005988030987968397,
+      "policy": {
+        "version": "1.0.0",
+        "silencePeak": 0.003,
+        "silenceRms": 0.0006,
+        "quietRms": 0.01,
+        "quietPeak": 0.05,
+        "targetPeak": 0.35,
+        "maxGain": 4,
+        "clippingLevel": 0.999,
+        "clippingRatio": 0.001,
+        "clippingRunSamples": 3,
+        "trimWindowSec": 0.01,
+        "trimPaddingSec": 0.15,
+        "trimFloorRms": 0.0008,
+        "trimRelativeRms": 0.05,
+        "minimumRetainedSec": 0.5
+      },
+      "denoise": false,
+      "pitchCorrection": false,
+      "timeStretch": false
+    },
+    "quality": {
+      "status": "ok",
+      "sourceMetrics": {
+        "peak": 0.24073968827724457,
+        "rms": 0.11978137620267558,
+        "clippedSampleRatio": 0,
+        "longestClippedRunSamples": 0
+      },
+      "monoBeforeGain": {
+        "peak": 0.24072593450546265,
+        "rms": 0.11976061975936794,
+        "clippedSampleRatio": 0,
+        "longestClippedRunSamples": 0
+      },
+      "processed": {
+        "peak": 0.3499999940395355,
+        "rms": 0.17412422554475537,
+        "clippedSampleRatio": 0,
+        "longestClippedRunSamples": 0
+      },
+      "warnings": []
+    }
+  },
+  "model": {
+    "name": "@spotify/basic-pitch",
+    "version": "1.0.1",
+    "decoding": {
+      "onsetThreshold": 0.25,
+      "frameThreshold": 0.25,
+      "minimumNoteFrames": 9,
+      "inferOnsets": true,
+      "maximumFrequencyHz": 1046.502,
+      "minimumFrequencyHz": 65.406,
+      "melodiaTrick": true,
+      "energyToleranceFrames": 11,
+      "pitchMin": 36,
+      "pitchMax": 84
+    },
+    "scoreMeaning": "Mean frame activation and onset activation; not calibrated confidence or measured loudness.",
+    "pitchBendsIncluded": false
+  },
+  "analysisElapsedMs": 9084,
+  "results": {
+    "raw": {
+      "notes": [
+        {
+          "id": "n14",
+          "pitchMidi": 60,
+          "startSec": 0.325079,
+          "durationSec": 0.452789,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7841860575553699,
+          "onsetActivation": 0.695737361907959,
+          "sourceNoteIds": [
+            "n14"
+          ]
+        },
+        {
+          "id": "n13",
+          "pitchMidi": 72,
+          "startSec": 0.325079,
+          "durationSec": 0.1161,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.30622049868106843,
+          "onsetActivation": 0.34433650970458984,
+          "sourceNoteIds": [
+            "n13"
+          ]
+        },
+        {
+          "id": "n12",
+          "pitchMidi": 60,
+          "startSec": 0.777868,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6222010336138986,
+          "onsetActivation": 0.6290901899337769,
+          "sourceNoteIds": [
+            "n12"
+          ]
+        },
+        {
+          "id": "n11",
+          "pitchMidi": 64,
+          "startSec": 1.044898,
+          "durationSec": 0.476009,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7977792707885184,
+          "onsetActivation": 0.7867953777313232,
+          "sourceNoteIds": [
+            "n11"
+          ]
+        },
+        {
+          "id": "n10",
+          "pitchMidi": 76,
+          "startSec": 1.044898,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.2744659043493725,
+          "onsetActivation": 0.28661152720451355,
+          "sourceNoteIds": [
+            "n10"
+          ]
+        },
+        {
+          "id": "n9",
+          "pitchMidi": 64,
+          "startSec": 1.520907,
+          "durationSec": 0.13932,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6044721802075704,
+          "onsetActivation": 0.33861130475997925,
+          "sourceNoteIds": [
+            "n9"
+          ]
+        },
+        {
+          "id": "n8",
+          "pitchMidi": 67,
+          "startSec": 1.834376,
+          "durationSec": 0.442463,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7961537257218972,
+          "onsetActivation": 0.6589578986167908,
+          "sourceNoteIds": [
+            "n8"
+          ]
+        },
+        {
+          "id": "n7",
+          "pitchMidi": 67,
+          "startSec": 2.276839,
+          "durationSec": 0.1161,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6166977494955063,
+          "onsetActivation": 0.48082590103149414,
+          "sourceNoteIds": [
+            "n7"
+          ]
+        },
+        {
+          "id": "n6",
+          "pitchMidi": 64,
+          "startSec": 2.532259,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.8009363299324399,
+          "onsetActivation": 0.766372561454773,
+          "sourceNoteIds": [
+            "n6"
+          ]
+        },
+        {
+          "id": "n5",
+          "pitchMidi": 76,
+          "startSec": 2.543869,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.28223068302585963,
+          "onsetActivation": 0.2911229729652405,
+          "sourceNoteIds": [
+            "n5"
+          ]
+        },
+        {
+          "id": "n4",
+          "pitchMidi": 64,
+          "startSec": 3.019878,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6464967808940194,
+          "onsetActivation": 0.32191023230552673,
+          "sourceNoteIds": [
+            "n4"
+          ]
+        },
+        {
+          "id": "n3",
+          "pitchMidi": 62,
+          "startSec": 3.298517,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7678320578166417,
+          "onsetActivation": 0.7573223114013672,
+          "sourceNoteIds": [
+            "n3"
+          ]
+        },
+        {
+          "id": "n2",
+          "pitchMidi": 74,
+          "startSec": 3.333347,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.2890112102031708,
+          "onsetActivation": 0.3027949631214142,
+          "sourceNoteIds": [
+            "n2"
+          ]
+        },
+        {
+          "id": "n1",
+          "pitchMidi": 62,
+          "startSec": 3.786137,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6298130262981761,
+          "onsetActivation": 0.5563948154449463,
+          "sourceNoteIds": [
+            "n1"
+          ]
+        }
+      ],
+      "meaning": "Decoded model notes with validity and original-timeline bounds checks; no musical cleanup."
+    },
+    "cleaned": {
+      "notes": [
+        {
+          "id": "n14",
+          "pitchMidi": 60,
+          "startSec": 0.325079,
+          "durationSec": 0.452789,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7841860575553699,
+          "onsetActivation": 0.695737361907959,
+          "sourceNoteIds": [
+            "n14"
+          ]
+        },
+        {
+          "id": "n13",
+          "pitchMidi": 72,
+          "startSec": 0.325079,
+          "durationSec": 0.1161,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.30622049868106843,
+          "onsetActivation": 0.34433650970458984,
+          "sourceNoteIds": [
+            "n13"
+          ]
+        },
+        {
+          "id": "n12",
+          "pitchMidi": 60,
+          "startSec": 0.777868,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6222010336138986,
+          "onsetActivation": 0.6290901899337769,
+          "sourceNoteIds": [
+            "n12"
+          ]
+        },
+        {
+          "id": "n11",
+          "pitchMidi": 64,
+          "startSec": 1.044898,
+          "durationSec": 0.615329,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7977792707885184,
+          "onsetActivation": 0.7867953777313232,
+          "sourceNoteIds": [
+            "n11",
+            "n9"
+          ]
+        },
+        {
+          "id": "n10",
+          "pitchMidi": 76,
+          "startSec": 1.044898,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.2744659043493725,
+          "onsetActivation": 0.28661152720451355,
+          "sourceNoteIds": [
+            "n10"
+          ]
+        },
+        {
+          "id": "n8",
+          "pitchMidi": 67,
+          "startSec": 1.834376,
+          "durationSec": 0.442463,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7961537257218972,
+          "onsetActivation": 0.6589578986167908,
+          "sourceNoteIds": [
+            "n8"
+          ]
+        },
+        {
+          "id": "n7",
+          "pitchMidi": 67,
+          "startSec": 2.276839,
+          "durationSec": 0.1161,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6166977494955063,
+          "onsetActivation": 0.48082590103149414,
+          "sourceNoteIds": [
+            "n7"
+          ]
+        },
+        {
+          "id": "n6",
+          "pitchMidi": 64,
+          "startSec": 2.532259,
+          "durationSec": 0.615329,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.8009363299324399,
+          "onsetActivation": 0.766372561454773,
+          "sourceNoteIds": [
+            "n6",
+            "n4"
+          ]
+        },
+        {
+          "id": "n5",
+          "pitchMidi": 76,
+          "startSec": 2.543869,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.28223068302585963,
+          "onsetActivation": 0.2911229729652405,
+          "sourceNoteIds": [
+            "n5"
+          ]
+        },
+        {
+          "id": "n3",
+          "pitchMidi": 62,
+          "startSec": 3.298517,
+          "durationSec": 0.487619,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7678320578166417,
+          "onsetActivation": 0.7573223114013672,
+          "sourceNoteIds": [
+            "n3"
+          ]
+        },
+        {
+          "id": "n2",
+          "pitchMidi": 74,
+          "startSec": 3.333347,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.2890112102031708,
+          "onsetActivation": 0.3027949631214142,
+          "sourceNoteIds": [
+            "n2"
+          ]
+        },
+        {
+          "id": "n1",
+          "pitchMidi": 62,
+          "startSec": 3.786137,
+          "durationSec": 0.12771,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.6298130262981761,
+          "onsetActivation": 0.5563948154449463,
+          "sourceNoteIds": [
+            "n1"
+          ]
+        }
+      ],
+      "edits": [
+        {
+          "type": "merge_weak_tail",
+          "targetId": "n11",
+          "sourceId": "n9",
+          "gapSec": 0,
+          "onsetActivation": 0.33861130475997925
+        },
+        {
+          "type": "merge_weak_tail",
+          "targetId": "n6",
+          "sourceId": "n4",
+          "gapSec": 0,
+          "onsetActivation": 0.32191023230552673
+        }
+      ],
+      "policy": {
+        "version": "1.0.0",
+        "maximumGapSec": 0.06,
+        "maximumOverlapSec": 0.01,
+        "maximumFragmentSec": 0.18,
+        "minimumPreviousSec": 0.25,
+        "maximumOnsetActivation": 0.35
+      },
+      "octaveCorrection": false,
+      "forceMonophonic": false
+    }
+  },
+  "selectedResult": "cleaned",
+  "notes": [
+    {
+      "id": "n14",
+      "pitchMidi": 60,
+      "startSec": 0.325079,
+      "durationSec": 0.452789,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.7841860575553699,
+      "onsetActivation": 0.695737361907959,
+      "sourceNoteIds": [
+        "n14"
+      ]
+    },
+    {
+      "id": "n13",
+      "pitchMidi": 72,
+      "startSec": 0.325079,
+      "durationSec": 0.1161,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.30622049868106843,
+      "onsetActivation": 0.34433650970458984,
+      "sourceNoteIds": [
+        "n13"
+      ]
+    },
+    {
+      "id": "n12",
+      "pitchMidi": 60,
+      "startSec": 0.777868,
+      "durationSec": 0.12771,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.6222010336138986,
+      "onsetActivation": 0.6290901899337769,
+      "sourceNoteIds": [
+        "n12"
+      ]
+    },
+    {
+      "id": "n11",
+      "pitchMidi": 64,
+      "startSec": 1.044898,
+      "durationSec": 0.615329,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.7977792707885184,
+      "onsetActivation": 0.7867953777313232,
+      "sourceNoteIds": [
+        "n11",
+        "n9"
+      ]
+    },
+    {
+      "id": "n10",
+      "pitchMidi": 76,
+      "startSec": 1.044898,
+      "durationSec": 0.487619,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.2744659043493725,
+      "onsetActivation": 0.28661152720451355,
+      "sourceNoteIds": [
+        "n10"
+      ]
+    },
+    {
+      "id": "n8",
+      "pitchMidi": 67,
+      "startSec": 1.834376,
+      "durationSec": 0.442463,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.7961537257218972,
+      "onsetActivation": 0.6589578986167908,
+      "sourceNoteIds": [
+        "n8"
+      ]
+    },
+    {
+      "id": "n7",
+      "pitchMidi": 67,
+      "startSec": 2.276839,
+      "durationSec": 0.1161,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.6166977494955063,
+      "onsetActivation": 0.48082590103149414,
+      "sourceNoteIds": [
+        "n7"
+      ]
+    },
+    {
+      "id": "n6",
+      "pitchMidi": 64,
+      "startSec": 2.532259,
+      "durationSec": 0.615329,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.8009363299324399,
+      "onsetActivation": 0.766372561454773,
+      "sourceNoteIds": [
+        "n6",
+        "n4"
+      ]
+    },
+    {
+      "id": "n5",
+      "pitchMidi": 76,
+      "startSec": 2.543869,
+      "durationSec": 0.487619,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.28223068302585963,
+      "onsetActivation": 0.2911229729652405,
+      "sourceNoteIds": [
+        "n5"
+      ]
+    },
+    {
+      "id": "n3",
+      "pitchMidi": 62,
+      "startSec": 3.298517,
+      "durationSec": 0.487619,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.7678320578166417,
+      "onsetActivation": 0.7573223114013672,
+      "sourceNoteIds": [
+        "n3"
+      ]
+    },
+    {
+      "id": "n2",
+      "pitchMidi": 74,
+      "startSec": 3.333347,
+      "durationSec": 0.12771,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.2890112102031708,
+      "onsetActivation": 0.3027949631214142,
+      "sourceNoteIds": [
+        "n2"
+      ]
+    },
+    {
+      "id": "n1",
+      "pitchMidi": 62,
+      "startSec": 3.786137,
+      "durationSec": 0.12771,
+      "velocity01": 0.7086614173228346,
+      "modelActivation": 0.6298130262981761,
+      "onsetActivation": 0.5563948154449463,
+      "sourceNoteIds": [
+        "n1"
+      ]
+    }
+  ],
+  "playback": {
+    "timbreId": "soft",
+    "gmProgramNumber": 80,
+    "gmProgramNumberBase": 0,
+    "velocityPolicy": "fixed_audition_level",
+    "velocity01": 0.7086614173228346,
+    "timbreNote": "Browser synthesizer approximations; external MIDI instruments may sound different."
+  },
+  "midiExport": {
+    "referenceBpm": 120,
+    "tempoMeaning": "serialization_reference_only",
+    "ppq": 480,
+    "timeRoundingToleranceSec": 0.0010416666666666667,
+    "originalEndMarker": "JamMate original audio end",
+    "timeSignature": null,
+    "quantized": false
+  }
+}

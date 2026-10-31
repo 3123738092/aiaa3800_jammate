@@ -1,5 +1,7 @@
 # JamMate Renderer Experiments
 
+2026-10-31：新增 [BandPlan / JamState 接入](../docs/KEVIN_RENDERER.md)，实现于 `app/band_plan.py`。正式协作入口为仓库根目录的 `examples/agent_demo.py --renderer kevin`；直接消费 Agent 计划，生成可核验的 MIDI / FluidSynth WAV 并返回状态回执。新批次实测见 [验收记录](../docs/ACCEPTANCE_20261031.md)。下面的 MusicIntent / pattern 对照实验仍保留，不能与公共 JamState 混作两份权威状态。
+
 这个目录是 JamMate 的实验性 renderer 实现与代表性样例。它比较两条路径：
 
 ```text
