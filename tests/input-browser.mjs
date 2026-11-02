@@ -75,6 +75,26 @@ try{
     report.versions[version]={raw:doc.results.raw.notes.length,selected:doc.notes.length,eventValid:true,midiConsistent:true};
     if(version==='optimized'){
       report.hummingBand = await checkBand('humming');
+      const bandAudio = page.locator('#band-panel audio');
+      const preview = page.locator('#play-midi');
+      await bandAudio.evaluate(a => a.play());
+      await preview.click();
+      await page.waitForFunction(()=>document.querySelector('#play-midi').textContent.includes('停止'));
+      assert(await bandAudio.evaluate(a=>a.paused), 'MIDI preview stops band playback');
+      await bandAudio.evaluate(a => a.play());
+      await page.waitForFunction(()=>document.querySelector('#play-midi').textContent.includes('听 MIDI'));
+      await page.locator('#original').evaluate(a=>a.play());
+      assert(await bandAudio.evaluate(a=>a.paused), 'original stops band playback');
+      await bandAudio.evaluate(a => a.play());
+      assert(await page.locator('#original').evaluate(a=>a.paused), 'band stops original playback');
+      await bandAudio.evaluate(a => a.pause());
+      const bandWav = await page.locator('[data-wav]').getAttribute('href');
+      await page.selectOption('#timbre','bright');
+      assert(await page.locator('[data-wav]').isVisible());
+      assert.equal(await page.locator('[data-wav]').getAttribute('href'), bandWav);
+      await page.selectOption('#variant','raw');
+      assert(await page.locator('[data-output]').isHidden(), 'changing the notes invalidates the old band');
+      await page.selectOption('#variant','cleaned');
       assert.deepEqual(doc.notes.map(n=>n.pitchMidi),[60,64,67,64,62],'recover all five expected pitches');
       assert.equal(doc.model.executionBackend,'cpu');
       await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
@@ -98,6 +118,12 @@ try{
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
   const event=JSON.parse(await download('[data-event]',path.join(root,'tmp/browser/rhythm.event.json')));
   assert.equal(event.event_type,'rhythm_seed');assert.deepEqual(event.payload.rhythm.onset_beats,[0,1,1.5,3]);
+  await page.route('**/api/band', route => route.fulfill({
+    status:503, contentType:'application/json', body:JSON.stringify({error:'测试：渲染暂不可用'})
+  }), {times:1});
+  await page.click('[data-render]');
+  await page.waitForFunction(()=>document.querySelector('[data-status]').textContent.includes('渲染暂不可用'));
+  assert(await page.locator('[data-render]').isEnabled(), 'failed renders can be retried');
   report.rhythmBand = await checkBand('rhythm');
   await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
@@ -110,6 +136,7 @@ try{
   faster.writeUInt32LE(hz * faster.readUInt16LE(32), 28);
   await page.locator('#file').setInputFiles({name:'faster.wav', mimeType:'audio/wav', buffer:faster});
   await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
+  assert.equal(await page.locator('#download-original').getAttribute('download'),'faster.wav');
   assert(await page.locator('[data-output]').isHidden());
   await page.locator('#analyze').click();
   await page.locator('#band-panel').waitFor({state:'visible',timeout:90000});

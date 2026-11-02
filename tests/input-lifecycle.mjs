@@ -1,7 +1,9 @@
 import {createRequire}from'node:module';import{readFile,writeFile,mkdir}from'node:fs/promises';import path from'node:path';import assert from'node:assert/strict';
 const require=createRequire(import.meta.url);const{chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const root=path.resolve(import.meta.dirname,'..'),base=process.env.INPUT_LAB_URL||'http://127.0.0.1:4185';
-const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const browser=await chromium.launch({channel:'msedge',headless:true,args:[
+  '--use-fake-device-for-media-stream','--use-file-for-fake-audio-capture='+path.join(root,'web/fixtures/steps.wav')
+]});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try{
  await page.goto(`${base}/rhythm.html`);
  await page.evaluate(()=>{window.micRequests=0;window.micRejectors=[];navigator.mediaDevices.getUserMedia=()=>{window.micRequests++;return new Promise((resolve,reject)=>window.micRejectors.push(reject));};document.getElementById('record').click();document.getElementById('record').click();});
@@ -26,11 +28,34 @@ try{
  assert.equal(await page.locator('#original').getAttribute('src'),null,'stale original removed');assert(await page.locator('#result').isHidden());
  await page.locator('#example').click();await page.waitForFunction(()=>!document.getElementById('analyze').disabled);
  await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
- await page.locator('summary').filter({hasText:'已有明确速度'}).click();await page.locator('#tempo').fill('110');await page.locator('#tempo').blur();assert(await page.locator('#result').isHidden(),'changed settings invalidate old event');
+ await page.locator('summary').filter({hasText:'已有明确速度'}).click();
+ assert(await page.locator('#tempo').isDisabled(),'count-in infers its own tempo');
+ await page.selectOption('#count','0');
+ assert(await page.locator('#result').isHidden(),'changed settings invalidate old event');
+ await page.locator('#tempo').fill('0');await page.locator('#analyze').click();
+ assert(await page.locator('#tempo').evaluate(e=>e===document.activeElement&&!e.validity.valid));
+ await page.locator('#tempo').fill('110');await page.locator('#origin').fill('3');
  await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
+ assert.match(await page.locator('#summary').innerText(),/110\.0 BPM/);
  await page.screenshot({path:path.join(root,'tmp/browser/rhythm.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'rhythm mobile overflow');
  const invalid=await page.request.post(`${base}/api/validate`,{data:{source:'rhythm'}});assert.equal(invalid.status(),400);
+ await page.context().grantPermissions(['microphone'], {origin:base});
+ for (const version of ['baseline','optimized']) {
+   await page.goto(`${base}/${version}/dist/`);
+   await page.evaluate(()=>{
+     const acquire=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+     navigator.mediaDevices.getUserMedia=async constraints=>(window.testStream=await acquire(constraints));
+   });
+   for (const stopDevice of [true,false]) {
+     await page.click('#record');
+     await page.waitForFunction(()=>document.querySelector('#record-timer').textContent==='00:01');
+     if (stopDevice) await page.evaluate(()=>window.testStream.getTracks().forEach(track=>track.stop()));
+     else await page.click('#record');
+     await page.waitForFunction(()=>!document.querySelector('#convert').disabled);
+     assert(await page.locator('#download-original').getAttribute('href'), 'completed capture remains downloadable');
+   }
+ }
  assert.deepEqual(errors,[]);await writeFile(path.join(root,'docs/integration/round-4-browser.json'),JSON.stringify({permissionPendingLocked:true,permissionDenialRecovered:true,mockedRecordingReleasesTrack:true,brokenFileClearsOldAudio:true,settingsInvalidateResult:true,recoveryAnalysisPassed:true,mobileOverflow:false,pageErrors:errors},null,2)+'\n');
  console.log('Lifecycle regression passed; no physical microphone was used.');
 }finally{await browser.close();}

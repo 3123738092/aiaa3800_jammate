@@ -5,6 +5,7 @@ let buffer, sourceURL, recorder, stream, timer, phase='idle', startedAt=0, dispo
 let sessionId;
 function sync(){
   for(const id of ['file','example','count','tempo','origin'])$(id).disabled=phase!=='idle';
+  $('tempo').disabled=phase!=='idle'||$('count').value!=='0';
   $('record').disabled=!['idle','recording'].includes(phase);
   $('record').textContent=phase==='recording'?'停止录音':'开始录音';
   $('analyze').disabled=phase!=='idle'||!buffer;
@@ -21,7 +22,9 @@ async function load(blob){
   const ctx=new AudioContext();try{buffer=await ctx.decodeAudioData(await blob.arrayBuffer());}finally{await ctx.close();}
   if(buffer.duration<.5||buffer.duration>30){buffer=null;throw Error('录音需为 0.5–30 秒');}
   if(sourceURL)URL.revokeObjectURL(sourceURL);sourceURL=URL.createObjectURL(blob);$('original').src=sourceURL;
-  $('download-original').href=sourceURL;$('download-original').download=`rhythm-original.${blob.type.includes('wav')?'wav':blob.type.includes('mp4')?'m4a':'webm'}`;$('download-original').hidden=false;
+  $('download-original').href=sourceURL;
+  $('download-original').download=blob instanceof File ? blob.name : `rhythm-original.${blob.type.includes('wav')?'wav':blob.type.includes('mp4')?'m4a':blob.type.includes('ogg')?'ogg':'webm'}`;
+  $('download-original').hidden=false;
   sessionId=crypto.randomUUID();startedAt=0; $('status').textContent=`已载入 ${buffer.duration.toFixed(1)} 秒录音。`;sync();
 }
 function reportError(error){$('status').textContent=error.name==='NotAllowedError'?'麦克风权限未开启，可以允许权限或导入录音。':error.name==='EncodingError'?'无法解码这段音频，请使用有效的 WAV、MP3 或 WebM 文件。':error.message;}
@@ -53,16 +56,25 @@ $('record').onclick=async()=>{
     capture.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
     capture.onerror=()=>{failed=true;releaseMicrophone();recorder=null;setPhase('idle');$('status').textContent='录音中断，请重新录制或导入。';};
     capture.onstop=async()=>{
-      releaseMicrophone();recorder=null;if(failed||disposed)return;
+      if(failed||disposed||recorder!==capture)return;
+      releaseMicrophone();recorder=null;
       setPhase('loading');
       try{await load(new Blob(chunks,{type:capture.mimeType}));}catch(e){clearAudio();reportError(e);}finally{setPhase('idle');}
     };
-    clearAudio();capture.start();setPhase('recording');timer=setTimeout(stopRecording,20000);$('status').textContent='正在录音：四下均匀定速，接着一小节。';
+    clearAudio();capture.start();setPhase('recording');timer=setTimeout(stopRecording,20000);
+    $('status').textContent=$('count').value==='0'?'正在录音：按指定 BPM 拍一小节。':'正在录音：四下均匀定速，接着一小节。';
   }catch(e){releaseMicrophone();recorder=null;reportError(e);setPhase('idle');}
 };
-for(const id of ['count','tempo','origin'])$(id).onchange=clearResult;
+for(const id of ['count','tempo','origin'])$(id).onchange=()=>{clearResult();sync();};
 $('analyze').onclick=async()=>{
   if(phase!=='idle'||!buffer)return;
+  for(const field of [$('tempo'),$('origin')]){
+    if(!field.disabled&&!field.checkValidity()){
+      field.closest('details').open=true;
+      field.reportValidity();
+      return;
+    }
+  }
   setPhase('analyzing');clearResult();$('status').textContent='正在本机分析，首次调用可能需要稍等…';
   try{const r=await fetch('/api/rhythm/v1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wav:wavBase64(buffer),session_id:sessionId,started_at:startedAt,count_in:Number($('count').value),tempo:Number($('tempo').value),origin:$('origin').value===''?null:Number($('origin').value)})});
     const event=await r.json();if(!r.ok)throw Error(event.error);const rhythm=event.payload.rhythm;selectBandInput(event);

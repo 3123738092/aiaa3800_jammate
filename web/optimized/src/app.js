@@ -13,7 +13,7 @@ let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
 let model = null, modelReady = false, busy = false, requestingMic = false;
-let recorder = null, recording = false, stream = null, chunks = [];
+let recorder = null, recording = false, stream = null;
 let audioCtx = null, analyser = null, micSource = null, meterFrame = 0, recordClock = 0, recordingStart = 0;
 let audioBuffer = null, audioURL = null, midiURL = null, midiBytes = null;
 let sourceInfo = null, sourceMetrics = null, monoSamples = null, prepared = null, melodyDocument = null, jsonURL = null;
@@ -175,15 +175,19 @@ async function toggleRecording() {
     const ctx = await getContext();
     stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
     const type = ['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg;codecs=opus'].find(value => MediaRecorder.isTypeSupported(value));
-    recorder = new MediaRecorder(stream, type ? {mimeType:type} : undefined);
-    chunks = [];
-    recorder.addEventListener('dataavailable', event => { if (event.data.size) chunks.push(event.data); });
-    recorder.addEventListener('error', () => {
-      recording = false; busy = false; releaseMicrophone(); syncUI();
+    const capture = new MediaRecorder(stream, type ? {mimeType:type} : undefined);
+    recorder = capture;
+    const chunks = [];
+    capture.addEventListener('dataavailable', event => { if (event.data.size) chunks.push(event.data); });
+    capture.addEventListener('error', () => {
+      if (recorder !== capture) return;
+      recorder = null; recording = false; busy = false; releaseMicrophone(); syncUI();
       status('录音中断了，请检查麦克风后重试。', true);
     });
-    recorder.addEventListener('stop', async () => {
-      const blob = new Blob(chunks, {type:recorder.mimeType || 'audio/webm'});
+    capture.addEventListener('stop', async () => {
+      if (recorder !== capture) return;
+      recorder = null; recording = false; busy = true; syncUI();
+      const blob = new Blob(chunks, {type:capture.mimeType || 'audio/webm'});
       releaseMicrophone();
       try { await setAudio(blob, '你的哼唱'); }
       catch (error) { status(error.message || '没有读到录音，请重新录一段。', true); }
@@ -206,6 +210,7 @@ async function toggleRecording() {
       if (seconds >= MAX_RECORD_SECONDS) stopRecording();
     },100);
   } catch (error) {
+    recorder = null; recording = false;
     releaseMicrophone();
     const denied = error.name === 'NotAllowedError' || error.name === 'SecurityError';
     const missing = error.name === 'NotFoundError';
@@ -274,14 +279,14 @@ async function convert() {
   }
 }
 
-function updateOutputs() {
+function updateOutputs({preserveBand = false} = {}) {
   if (!melodyDocument) return;
   stopPlayback();
   const result = buildExports(melodyDocument,ui.variant.value,ui.timbre.value);
   if (eventURL) URL.revokeObjectURL(eventURL);
   const inputEvent = hummingEvent(result.document, {sessionId:sourceInfo.sessionId, startedAt:0, eventId:`evt_${sourceInfo.id}_${ui.variant.value}`});
   // A new export can reflect re-analysis or another variant of the same recording.
-  selectBandInput({
+  if (!preserveBand) selectBandInput({
     schema_version:'1.2.0', event_id:crypto.randomUUID(), session_id:inputEvent.session_id,
     source:'humming', event_type:'musical_phrase', started_at:inputEvent.started_at,
     ended_at:inputEvent.ended_at, confidence:null, payload:{melody:result.document},
@@ -366,6 +371,7 @@ async function playMidi() {
   if (playing) { stopPlayback(); return; }
   if (!playbackNotes.length) return;
   ui.original.pause();
+  document.querySelector('#band-panel audio').pause();
   const request = ++playRequest;
   const ctx = await getContext();
   if (request !== playRequest) return;
@@ -406,7 +412,8 @@ ui.convert.addEventListener('click',convert);
 ui['retry-model'].addEventListener('click',loadModel);
 ui['play-midi'].addEventListener('click',() => playMidi().catch(error=>{stopPlayback();status('音频播放没有启动，请再点一次“听 MIDI”。',true);console.error(error);}));
 ui.original.addEventListener('play',stopPlayback);
-ui.timbre.addEventListener('change',updateOutputs);
+document.querySelector('#band-panel audio').addEventListener('play',stopPlayback);
+ui.timbre.addEventListener('change',()=>updateOutputs({preserveBand:true}));
 ui.variant.addEventListener('change',updateOutputs);
 for (const control of [ui.normalize,ui.trim]) control.addEventListener('change',()=>{
   refreshPreparation();

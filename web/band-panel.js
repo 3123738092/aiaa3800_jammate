@@ -10,6 +10,9 @@ export function attachBandPanel(panel) {
       <a data-midi download="band.mid">下载伴奏 MIDI</a></p></div>`;
   const find = selector => panel.querySelector(selector);
   const button = find('[data-render]'), audio = find('audio');
+  const original = document.getElementById('original');
+  audio.addEventListener('play', () => original.pause());
+  original.addEventListener('play', () => audio.pause());
   let current, pending;
   const urls = [];
 
