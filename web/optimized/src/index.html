@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ed">
+  <meta name="description" content="JamMate 哼唱实验：录一段旋律，用 Spotify Basic Pitch 转成 MIDI，回放并下载。录音在浏览器内处理。">
+  <title>JamMate · 哼唱转 MIDI</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <a class="brand" href="./" aria-label="JamMate 首页"><span class="brand-mark" aria-hidden="true">j<span>m</span></span>JamMate<span class="lab">HUM LAB</span></a>
+      <span class="local-badge"><span aria-hidden="true"></span>声音留在你的浏览器</span>
+    </header>
+
+    <main><nav><a href="/">← 统一输入工作台</a> · <a href="/rhythm.html">节拍输入</a> · <a href="/appendix.html">对比附录</a></nav><p class="status">优化版 · 持续音分段 · 每次导入是从 0 秒开始的独立片段</p>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">一个小小的音乐实验 / 02</p>
+        <h1 id="page-title">哼个小灵感。<br><span>听它变成音符。</span></h1>
+        <p class="intro-copy">录下几秒旋律，让 Basic Pitch 把它转成 MIDI。<br class="desktop-break">听听回放，看看它有没有接住你的想法。</p>
+      </section>
+
+      <section class="workspace" aria-label="哼唱转 MIDI 工作台">
+        <div class="capture">
+          <div class="panel-heading"><span class="step">01</span><h2>你的哼唱</h2><span id="model-badge" class="model-badge" role="status"><span class="spinner" aria-hidden="true"></span><span id="model-label">加载 Basic Pitch…</span></span></div>
+          <div class="recording-zone">
+            <div class="record-rings" id="record-rings">
+              <button id="record" class="record-button" aria-label="开始录音" type="button">
+                <svg id="mic-icon" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="12" y="4" width="8" height="15" rx="4" stroke="currentColor" stroke-width="2"/><path d="M8 14v2a8 8 0 0016 0v-2M16 24v5M11 29h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span id="stop-icon" class="stop-icon" hidden></span>
+              </button>
+            </div>
+            <span id="record-timer" class="record-timer">00:00</span>
+            <p id="record-prompt" class="record-prompt">点一下，开始哼唱</p>
+            <div class="level-wrap"><span class="level-caption">麦克风音量</span><meter id="input-level" min="0" max="1" value="0" aria-label="麦克风输入音量"></meter></div>
+          </div>
+          <div class="source-actions"><button id="example" class="text-button" type="button">用示例试试 <span aria-hidden="true">↗</span></button><span aria-hidden="true">/</span><button id="import" class="text-button" type="button">导入录音</button><input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" hidden></div>
+          <div id="original-track" class="original-track" hidden><div class="track-caption"><span id="source-name">原始录音</span><span id="source-duration"></span></div><audio id="original" controls preload="metadata" aria-label="播放原始录音"></audio><a id="download-original" class="download-button original-download" download>下载原录音 ↓</a></div>
+          <fieldset class="processing-options"><legend>转换前的小整理</legend><label><input id="normalize" type="checkbox" checked> 适度放大小音量</label><label><input id="trim" type="checkbox"> 裁掉首尾静音</label><p>原录音保持完整，不改变音高、速度或句中停顿。若裁剪后少了轻声开头或尾音，请关闭后重试。</p></fieldset>
+          <div id="quality-panel" class="quality-panel" hidden aria-live="polite"><p id="quality-summary"></p><details><summary>查看音频与处理信息</summary><p id="quality-metrics"></p><p id="processing-summary"></p><p>音量检查不能判断旋律是否清晰，也不能修复已录入的失真。声音偏小不一定是噪声。</p></details></div>
+          <button id="convert" class="primary-button" type="button" disabled><span>转成 MIDI</span><span aria-hidden="true">→</span></button>
+          <button id="retry-model" class="text-button retry" type="button" hidden>重新加载模型</button>
+          <p id="status" class="status" role="status" aria-live="polite">建议先录 3–8 秒；戴上耳机，清楚地哼一条旋律。</p>
+          <progress id="progress" max="1" value="0" aria-label="转换进度" hidden></progress>
+        </div>
+
+        <div class="result">
+          <div class="panel-heading"><span class="step">02</span><h2>听见你的旋律</h2><span id="note-count" class="note-count" hidden></span></div>
+          <div id="empty" class="empty-state"><div class="empty-score" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i><i></i><i></i><i></i></div><p>你的音符会出现在这里</p><span>每一格，都是从哼唱里听到的一个音。</span></div>
+          <div id="result-content" hidden>
+            <p id="result-state" class="result-state">自由哼唱 · BPM 未指定 · 保留原节奏</p>
+            <label class="variant-label">对比版本<select id="variant"><option value="cleaned">连贯哼唱</option><option value="raw">原始识别</option></select></label>
+            <p id="cleanup-summary" class="cleanup-summary"></p>
+            <p id="overlap-hint" class="overlap-hint" hidden>有不同音高重叠，可能包含误识别。已保留，方便你对照原声判断。</p>
+            <div class="score-top"><span>音符预览</span><span id="result-time"></span></div>
+            <canvas id="piano-roll" aria-label="音符图：横轴为时间，纵轴为音高。" role="img"></canvas>
+            <div class="playback-controls"><button id="play-midi" class="play-button" type="button"><span aria-hidden="true">▶</span> 听 MIDI</button><label class="tone-label">音色<select id="timbre"><option value="soft">柔和合成器</option><option value="bright">明亮合成器</option><option value="pluck">短促拨弦</option></select></label></div>
+            <div class="result-bottom"><div class="export-actions"><a id="download-midi" class="download-button" download="jammate-hum.mid">下载 MIDI ↓</a><a id="download-event" class="download-button" download>旧版输入 JSON ↓</a><a id="download-json" class="download-button" download="jammate-hum.json">下载 JSON ↓</a></div><span id="conversion-time"></span></div>
+            <section id="band-panel" hidden></section>
+            <p class="result-hint">试听与下载使用当前版本，时间从原录音开始。<br>试听统一力度，方便比较旋律；外部 MIDI 音源可能不同。</p>
+            <details class="export-help"><summary>这些文件有什么用？</summary><p>MIDI 用于音乐软件；JSON 包含两版音符、当前选择、音频检查及处理记录，方便接入 JamMate。</p><p>MIDI 内的 120 BPM 只用于记录时间，并非检测到的速度；没有对齐节拍。JSON 中保留 BPM 未知。原录音请单独下载，刷新页面后需重新导入。</p></details>
+          </div>
+        </div>
+      </section>
+
+      <aside class="tips" aria-label="录音建议"><p><span>录得清楚一点</span>试试「嗯——」或「da-da」，一次哼一条旋律。</p><p><span>留一点呼吸</span>音与音之间稍微分开，有助于识别起止。</p><p><span>随时重新来</span>识别可能多出碎音；再录一次，比较不同的唱法。</p></aside>
+    </main>
+    <footer><span>JamMate / 把小灵感，交给乐队。</span><a href="https://github.com/spotify/basic-pitch-ts" target="_blank" rel="noreferrer">Powered by Spotify Basic Pitch ↗</a></footer>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

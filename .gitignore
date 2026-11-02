@@ -12,3 +12,9 @@ demo_out/
 !.env.example
 *.secrets.json
 openai.local.json
+.venv/
+node_modules/
+dist/
+tmp/
+*.log
+/recordings/

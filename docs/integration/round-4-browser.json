@@ -1,0 +1,10 @@
+{
+  "permissionPendingLocked": true,
+  "permissionDenialRecovered": true,
+  "mockedRecordingReleasesTrack": true,
+  "brokenFileClearsOldAudio": true,
+  "settingsInvalidateResult": true,
+  "recoveryAnalysisPassed": true,
+  "mobileOverflow": false,
+  "pageErrors": []
+}

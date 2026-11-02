@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from jammate.rhythm import RhythmContext
 
-from .input_event import VERSION, InputEvent, InputEventError
+from .input_event import FRAME_EVENT_VERSION, VERSION, InputEvent, InputEventError
 
 
 def _capture_end(started_at: float | None, duration: float) -> float | None:
@@ -23,9 +23,9 @@ def _capture_end(started_at: float | None, duration: float) -> float | None:
 
 def _event(*, session_id: str, event_id: str | None, source: str, event_type: str,
            started_at: float | None, ended_at: float | None, payload: dict[str, Any],
-           provenance: dict[str, Any]) -> InputEvent:
+           provenance: dict[str, Any], schema_version: str = VERSION) -> InputEvent:
     return InputEvent.from_dict({
-        "schema_version": VERSION,
+        "schema_version": schema_version,
         "event_id": event_id if event_id is not None else f"evt_{uuid4().hex}",
         "session_id": session_id, "source": source, "event_type": event_type,
         "started_at": started_at, "ended_at": ended_at, "confidence": None,
@@ -93,9 +93,12 @@ def from_humming(document: dict[str, Any], *, session_id: str, event_id: str | N
     ended_at = _capture_end(started_at, duration)
     provenance = _provenance("melody_v1", audio_ref, analysis_ref)
     provenance.update(source_id=document.get("id"), source_schema_version=document.get("schemaVersion"))
+    results = document.get("results")
+    cleaned = results.get("cleaned") if isinstance(results, dict) else None
+    frame_decoder = isinstance(cleaned, dict) and cleaned.get("forceMonophonic") is True
     return _event(session_id=session_id, event_id=event_id, source="humming", event_type="musical_phrase",
                   started_at=started_at, ended_at=ended_at, payload={"melody": document},
-                  provenance=provenance)
+                  provenance=provenance, schema_version=FRAME_EVENT_VERSION if frame_decoder else VERSION)
 
 
 def to_legacy_rhythm(event: InputEvent):

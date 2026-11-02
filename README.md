@@ -1,5 +1,18 @@
 # JamMate：会接你话的 AI 乐队（AIAA 3800 课程项目原型）
 
+## 从网页听乐队回应
+
+在本机双击 `start-input-lab.cmd`，打开 [JamMate 工作台](http://127.0.0.1:4185)。进入「哼唱与乐队回应」或「节拍与乐队回应」，载入示例或导入自己的录音，完成识别后点击「生成伴奏」。页面可试听、下载多轨 MIDI 和 WAV，也可单独下载本次交给 Agent 的 JSON。新机器先按[安装与启动说明](docs/integration/RUN.md)准备环境。
+
+这个集成分支以队友的 Agent 和渲染器为底座，使用 10 月 28 日的优化版哼唱和节拍输入。每次录音单独生成一段回应。网页用本地规则 Agent，配置 FluidSynth 时调用 Kevin 渲染器；没有配置时使用项目内置合成器。LLM 的多轮入口见下方原项目说明。
+
+| 浏览器验收样例 | 可试听的伴奏 | 多轨与输入 |
+|---|---|---|
+| 哼唱五个音，听主旋律在乐队里重现 | [哼唱 WAV](examples/web_band/humming.band.wav) | [MIDI](examples/web_band/humming.band.mid) · [识别事件](examples/web_band/humming.agent.json) |
+| 四下定速，拍出第 2 拍后的切分 | [节奏 WAV](examples/web_band/rhythm.band.wav) | [MIDI](examples/web_band/rhythm.band.mid) · [识别事件](examples/web_band/rhythm.agent.json) |
+
+
+
 对着麦克风拍几下定个速度，再哼一句。AI 乐队会听出你的速度和调，用你那句话的变形接回来（模进、倒影、逆行、错位）。你不出声，它就主动抛一个短动机等你接。也可以随时用文字指挥它："faster"、"更有力"、"停一下"、"your turn"。每个决定都附一句理由，告诉你它为什么这么做。
 
 可信度评估、设计取舍、研究问题和下一步见 [docs/PLAN.md](docs/PLAN.md)。

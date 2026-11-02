@@ -224,6 +224,21 @@ def test_audio_clock_mapping_cannot_silently_change_duration(melody):
         InputEvent.from_dict(data)
 
 
+def test_frame_decoder_can_retain_a_note_without_a_raw_note(melody):
+    note = dict(melody["results"]["cleaned"]["notes"][0], sourceNoteIds=[], frameRange=[7, 16])
+    melody["results"]["raw"]["notes"] = []
+    melody["results"]["cleaned"].update(notes=[note], forceMonophonic=True)
+    melody.update(notes=[note], selectedResult="cleaned", status="ready")
+    event = from_humming(melody, session_id="test")
+    assert event.schema_version == "1.2.0" and event.payload["melody"] == melody
+    with pytest.raises(InputEventError):
+        InputEvent.from_dict({**event.to_dict(), "schema_version": "1.0.0"})
+
+    note["frameRange"] = [16, 7]
+    with pytest.raises(InputEventError, match="frame range"):
+        from_humming(melody, session_id="test")
+
+
 def test_duplicate_json_keys_and_nonfinite_metadata_are_rejected(tmp_path, melody):
     path = tmp_path / "bad.json"
     path.write_text('{"schema_version":"1.0.0","schema_version":"2.0.0"}')

@@ -6,11 +6,15 @@
 
 本文定义 InputEvent 边界。后续已实现 [JamState / BandPlan / State Manager](AGENT_V1.md)，并接上 [LLM Agent](LLM_AGENT.md)：原文与音乐证据直接进入模型，额外提供状态和最近执行历史，未先压成关键词 Intent。旧 `rhythm`、`rhythm-audio`、`offline`、`live` 命令保持原行为，尚未迁移到新闭环。
 
+### 11 月 2 日网页集成
+
+优化版哼唱导出的乐队输入使用本分支新增的 `schema_version=1.2.0`。它保留完整的 Melody 文档，每个连贯音可以带半开帧区间 `frameRange=[first, stop]`；帧解码独立于 raw 音符，所以有帧证据时 `sourceNoteIds` 可以为空。`status` 与当前选中的版本一致。10 月 31 日的独立校验器不能直接读取 1.2.0。旧哼唱和节奏文件继续用 1.0.0，生命周期输入继续用 1.1.0。用本分支的 `python -m jammate.contracts validate <文件>` 检查三种版本。
+
 ## 1. 已确定的公共外层
 
 | 字段 | 类型 | 规则 |
 |---|---|---|
-| `schema_version` | string | 精确接受 `1.0.0` / `1.1.0`；1.1 增加 system 生命周期，原三类文件仍可用 1.0 |
+| `schema_version` | string | 接受 `1.0.0` / `1.1.0` / `1.2.0`；1.1 增加 system 生命周期，原三类文件仍可用 1.0 |
 | `event_id` | string | 非空；同一次事件的传输重试保留 ID；重新提交/重新识别形成新事件时使用新 ID |
 | `session_id` | string | 非空；由会话创建者提供，不从文件名或系统时间猜测 |
 | `source` | enum | `text`、`speech`、`rhythm`、`humming`；1.1 新增 `system` |

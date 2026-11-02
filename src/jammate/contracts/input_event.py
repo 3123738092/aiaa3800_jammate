@@ -17,6 +17,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 VERSION = "1.0.0"
+FRAME_EVENT_VERSION = "1.2.0"
 TIME_TOLERANCE_S = 1e-5  # JSON rounding only; not an audio synchronization budget.
 
 
@@ -121,16 +122,25 @@ def _cross_validate(data: dict[str, Any]) -> None:
         cleaned = melody["results"]["cleaned"]["notes"]
         if melody["notes"] != melody["results"][melody["selectedResult"]]["notes"]:
             raise InputEventError("payload.melody.notes: does not match selectedResult")
-        expected = "ready" if raw else "no_notes"
+        expected = "ready" if melody["notes"] else "no_notes"
         if melody["status"] != expected:
             raise InputEventError(f"payload.melody.status: expected {expected}")
-        if bool(raw) != bool(cleaned):
+        # The frame decoder reads activations directly. A pitch can have frame
+        # evidence even when the separate Basic Pitch note decoder is silent.
+        frame_decoder = data["schema_version"] == FRAME_EVENT_VERSION and melody["results"]["cleaned"].get("forceMonophonic") is True and all(
+            "frameRange" in note for note in cleaned
+        )
+        if not frame_decoder and bool(raw) != bool(cleaned):
             raise InputEventError("payload.melody.results: cleanup cannot invent or erase all notes")
         raw_ids = {note["id"] for note in raw}
         for label, notes in (("raw", raw), ("cleaned", cleaned)):
             path = f"payload.melody.results.{label}.notes"
             _notes_in_bounds(notes, duration, path)
             for note in notes:
+                if "frameRange" in note:
+                    first, stop = note["frameRange"]
+                    if label != "cleaned" or not frame_decoder or first >= stop:
+                        raise InputEventError(f"{path}: invalid decoded frame range")
                 if not set(note["sourceNoteIds"]).issubset(raw_ids):
                     raise InputEventError(f"{path}: sourceNoteIds must reference raw notes")
     if start is not None and abs((end - start) - duration) > TIME_TOLERANCE_S:
