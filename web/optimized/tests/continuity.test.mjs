@@ -30,4 +30,10 @@ test('articulated short changes survive overlapping activation from the previous
   assert.deepEqual(r.notes.map(n=>n.startSec),[0,.3,.4]);
 });
 test('silence cannot create notes',()=>assert.equal(run(Array(300).fill(null)).notes.length,0));
+test('an audible weak pitch sustains an established note but cannot start one',()=>{
+  const f=fixture(Array(100).fill(60));
+  for(let i=0;i<100;i++)if(i<20 || (i>=50 && i<75))f.frames[i][60-21]=.15;
+  const result=decodeHumming(f.frames,f.onsets,f.times,{durationSec:1,rms:f.rms});
+  assert.deepEqual(result.notes.map(n=>[n.pitchMidi,n.startSec,n.durationSec]),[[60,.2,.8]]);
+});
 test('original timing offset and raw source are preserved',()=>{const f=fixture(Array(100).fill(60)),raw=[{id:'a',startSec:.8,durationSec:1,pitchMidi:60}];const before=structuredClone(raw);const r=decodeHumming(f.frames,f.onsets,f.times,{durationSec:2,offsetSec:.8,rms:f.rms,raw});assert.equal(r.notes[0].startSec,.8);assert.equal(r.notes[0].durationSec,1);assert.deepEqual(raw,before);assert.deepEqual(r.notes[0].sourceNoteIds,['a']);});

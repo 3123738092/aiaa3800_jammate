@@ -15,7 +15,7 @@
       <span class="local-badge"><span aria-hidden="true"></span>声音留在你的浏览器</span>
     </header>
 
-    <main><nav><a href="/">← 统一输入工作台</a> · <a href="/rhythm.html">节拍输入</a> · <a href="/appendix.html">对比附录</a></nav><p class="status">整合基线版 · 原识别算法保留 · 每次导入是从 0 秒开始的独立片段</p>
+    <main><nav><a href="/">← 统一输入工作台</a> · <a href="/rhythm.html">节拍输入</a> · <a href="/appendix.html">对比附录</a></nav><p class="status">旧版哼唱对照 · <a href="/optimized/dist/" target="_blank" rel="noopener">在新标签页试用连贯哼唱</a></p>
       <section class="intro" aria-labelledby="page-title">
         <p class="eyebrow">一个小小的音乐实验 / 02</p>
         <h1 id="page-title">哼个小灵感。<br><span>听它变成音符。</span></h1>
@@ -53,6 +53,7 @@
             <p id="result-state" class="result-state">自由哼唱 · BPM 未指定 · 保留原节奏</p>
             <label class="variant-label">对比版本<select id="variant"><option value="cleaned">保守整理</option><option value="raw">原始识别</option></select></label>
             <p id="cleanup-summary" class="cleanup-summary"></p>
+            <p>如果你听到的是一个长音，图上却分成几段，可以下载左侧原录音，再导入<a href="/optimized/dist/" target="_blank" rel="noopener">连贯哼唱页</a>对比。</p>
             <p id="overlap-hint" class="overlap-hint" hidden>有不同音高重叠，可能包含误识别。已保留，方便你对照原声判断。</p>
             <div class="score-top"><span>音符预览</span><span id="result-time"></span></div>
             <canvas id="piano-roll" aria-label="音符图：横轴为时间，纵轴为音高。" role="img"></canvas>
