@@ -2,7 +2,7 @@ import {attachBandPanel} from './band-panel.js';
 const $=id=>document.getElementById(id);
 const selectBandInput=attachBandPanel($('band-panel'));
 let buffer, sourceURL, recorder, stream, timer, phase='idle', startedAt=0, disposed=false;
-let sessionId;
+let sessionId, captureEpoch=0;
 function sync(){
   for(const id of ['file','example','count','tempo','origin'])$(id).disabled=phase!=='idle';
   $('tempo').disabled=phase!=='idle'||$('count').value!=='0';
@@ -48,10 +48,12 @@ $('record').onclick=async()=>{
   if(phase==='recording'){stopRecording();return;}
   if(phase!=='idle')return;
   setPhase('requesting');clearResult();
+  const epoch=captureEpoch;
   try{
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error('浏览器无法录音，请在本机 Chrome／Edge 中打开，或导入音频。');
-    stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    if(disposed){releaseMicrophone();return;}
+    const acquired=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(disposed||epoch!==captureEpoch){acquired.getTracks().forEach(t=>t.stop());return;}
+    stream=acquired;
     const capture=new MediaRecorder(stream),chunks=[];let failed=false;recorder=capture;
     capture.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
     capture.onerror=()=>{failed=true;releaseMicrophone();recorder=null;setPhase('idle');$('status').textContent='录音中断，请重新录制或导入。';};
@@ -82,5 +84,6 @@ $('analyze').onclick=async()=>{
     $('result').hidden=false;$('status').textContent='已生成独立的 rhythm_seed InputEvent。';
   }catch(e){$('status').textContent=`分析失败：${e.message}`;}finally{setPhase('idle');}
 };
-window.addEventListener('pagehide',()=>{disposed=true;releaseMicrophone();if(sourceURL)URL.revokeObjectURL(sourceURL);});
+window.addEventListener('pagehide',event=>{disposed=true;captureEpoch++;recorder=null;releaseMicrophone();$('original').pause();if(!event.persisted&&sourceURL)URL.revokeObjectURL(sourceURL);setPhase('idle');});
+window.addEventListener('pageshow',()=>{disposed=false;sync();});
 sync();

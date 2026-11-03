@@ -12,6 +12,7 @@ const ui = Object.fromEntries(['record','record-rings','mic-icon','stop-icon','r
 let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
+let captureEpoch = 0;
 let model = null, modelReady = false, busy = false, requestingMic = false;
 let recorder = null, recording = false, stream = null;
 let audioCtx = null, analyser = null, micSource = null, meterFrame = 0, recordClock = 0, recordingStart = 0;
@@ -170,10 +171,13 @@ async function toggleRecording() {
   if (busy || requestingMic) return;
   ui.original.pause(); stopPlayback();
   requestingMic = true; syncUI();
+  const epoch = captureEpoch;
   try {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('当前浏览器无法录音。请在 Chrome／Edge 中打开，或使用“导入录音”。');
     const ctx = await getContext();
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    const acquired = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    if (epoch !== captureEpoch) { acquired.getTracks().forEach(track => track.stop()); return; }
+    stream = acquired;
     const type = ['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg;codecs=opus'].find(value => MediaRecorder.isTypeSupported(value));
     const capture = new MediaRecorder(stream, type ? {mimeType:type} : undefined);
     recorder = capture;
@@ -435,6 +439,15 @@ ui.example.addEventListener('click',async()=>{
   finally{busy=false;syncUI();}
 });
 new ResizeObserver(()=>drawRoll(playing?Math.max(0,audioCtx.currentTime-playStart):-1)).observe(ui['piano-roll']);
-window.addEventListener('pagehide',()=>{releaseMicrophone();stopPlayback();if(audioURL)URL.revokeObjectURL(audioURL);if(midiURL)URL.revokeObjectURL(midiURL);if(jsonURL)URL.revokeObjectURL(jsonURL);audioCtx?.close();});
+window.addEventListener('pagehide',event=>{
+  captureEpoch++; recorder = null; recording = false; busy = false; requestingMic = false;
+  releaseMicrophone(); stopPlayback(); ui.original.pause();
+  if (!event.persisted) {
+    if(audioURL)URL.revokeObjectURL(audioURL);if(midiURL)URL.revokeObjectURL(midiURL);if(jsonURL)URL.revokeObjectURL(jsonURL);
+    audioCtx?.close();
+  }
+  syncUI();
+});
+window.addEventListener('pageshow',()=>syncUI());
 syncUI();
 loadModel();

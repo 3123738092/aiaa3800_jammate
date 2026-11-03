@@ -4,7 +4,7 @@ const root=path.resolve(import.meta.dirname,'..');await mkdir(path.join(root,'tm
 const expected=JSON.parse(await readFile(path.join(root,'web/fixtures/expected.json')));
 const browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({acceptDownloads:true});const report={type:'synthetic harmonic audio; not human accuracy',cases:{}};
 try{
-for(const version of ['baseline','optimized']){
+for(const version of (process.env.HUM_BENCHMARK_VERSIONS||'baseline,optimized').split(',')){
  await page.goto(`${process.env.INPUT_LAB_URL||'http://127.0.0.1:4185'}/${version}/dist/`);
  await page.waitForFunction(()=>document.querySelector('#model-badge.ready'),null,{timeout:90000});
  for(const[name,golden]of Object.entries(expected)){
@@ -18,8 +18,8 @@ for(const version of ['baseline','optimized']){
   report.cases[`${version}-${name}`]=entry;console.log(version,name,entry.count,entry.pitchSequenceCorrect,entry.maxBoundaryErrorSec);
  }
 }
-await writeFile(path.join(root,'docs/integration/humming-benchmark.json'),JSON.stringify(report,null,2)+'\n');
+await writeFile(path.join(root,process.env.HUM_BENCHMARK_REPORT||'docs/integration/humming-benchmark.json'),JSON.stringify(report,null,2)+'\n');
 // Sustained-tone and rest preservation are the core acceptance gates. Short
 // notes remain an explicit exploratory case, not a silently relaxed assertion.
-for(const name of ['sustain','repeated','steps','rest']){const e=report.cases[`optimized-${name}`];assert(e.pitchSequenceCorrect,name);assert(e.maxBoundaryErrorSec<.13,name+' timing');}
+for(const name of ['sustain','repeated','steps','rest','short','quiet','noisy']){const e=report.cases[`optimized-${name}`];assert(e.pitchSequenceCorrect,name);assert(e.maxBoundaryErrorSec<.13,name+' timing');}
 }finally{await browser.close();}

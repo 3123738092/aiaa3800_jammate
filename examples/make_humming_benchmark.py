@@ -29,5 +29,10 @@ for name,notes in cases.items():
         audio[round(start*SR):round(start*SR)+len(t)]+=signal
     sf.write(OUT/f'{name}.wav',audio,SR)
     expected[name]={'notes':[{'pitch':p,'start':s,'duration':d} for p,s,d in notes],'duration':duration}
+# Fixed low-volume and background-noise variants of the same known melody.
+base,_=sf.read(OUT/'steps.wav',dtype='float32')
+for name,signal in [('quiet',base*.1),('noisy',base+np.random.default_rng(3800).normal(0,.003,len(base)))]:
+    sf.write(OUT/f'{name}.wav',signal,SR)
+    expected[name]=expected['steps']
 (OUT/'expected.json').write_text(json.dumps(expected,indent=2)+'\n',encoding='utf-8')
-print('Generated five synthetic humming fixtures')
+print('Generated seven synthetic humming fixtures')

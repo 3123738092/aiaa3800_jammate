@@ -66,7 +66,10 @@ export function attachBandPanel(panel) {
       }
     }
   };
-  window.addEventListener('pagehide', () => select(null), {once:true});
+  window.addEventListener('pagehide', event => {
+    pending?.abort(); audio.pause();
+    if (!event.persisted) select(null);
+  });
   select(null);
   return select;
 }

@@ -88,5 +88,55 @@
       }
     ],
     "duration": 1.52
+  },
+  "quiet": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.45
+      },
+      {
+        "pitch": 62,
+        "start": 0.85,
+        "duration": 0.45
+      },
+      {
+        "pitch": 64,
+        "start": 1.4,
+        "duration": 0.45
+      },
+      {
+        "pitch": 67,
+        "start": 1.95,
+        "duration": 0.45
+      }
+    ],
+    "duration": 2.8
+  },
+  "noisy": {
+    "notes": [
+      {
+        "pitch": 60,
+        "start": 0.3,
+        "duration": 0.45
+      },
+      {
+        "pitch": 62,
+        "start": 0.85,
+        "duration": 0.45
+      },
+      {
+        "pitch": 64,
+        "start": 1.4,
+        "duration": 0.45
+      },
+      {
+        "pitch": 67,
+        "start": 1.95,
+        "duration": 0.45
+      }
+    ],
+    "duration": 2.8
   }
 }
