@@ -1,0 +1,519 @@
+{
+  "schema_version": "1.2.0",
+  "event_id": "f958710a-f4b7-4ab5-b808-8ba13343cf39",
+  "session_id": "e22fd4a5-c859-4087-a5e1-23fdd4339c55",
+  "source": "humming",
+  "event_type": "musical_phrase",
+  "started_at": 0,
+  "ended_at": 4.400041666666667,
+  "confidence": null,
+  "payload": {
+    "melody": {
+      "schemaVersion": "1.0.0",
+      "appVersion": "1.1.0",
+      "id": "19ed051d-d0c3-467e-863c-8eeb9225ecc3",
+      "createdAt": "2026-11-10T06:57:25.099Z",
+      "status": "ready",
+      "source": {
+        "id": "19ed051d-d0c3-467e-863c-8eeb9225ecc3",
+        "sessionId": "e22fd4a5-c859-4087-a5e1-23fdd4339c55",
+        "name": "合成旋律示例",
+        "kind": "example",
+        "mimeType": "audio/wav",
+        "byteLength": 194086,
+        "durationSec": 4.400041666666667,
+        "decodedSampleRateHz": 48000,
+        "decodedChannels": 1
+      },
+      "timebase": {
+        "unit": "seconds",
+        "origin": "original_audio_start"
+      },
+      "tempo": {
+        "bpm": null,
+        "source": "unknown",
+        "mode": "free",
+        "quantized": false
+      },
+      "key": null,
+      "timeSignature": null,
+      "input": {
+        "sampleRateHz": 22050,
+        "channels": 1,
+        "sampleFormat": "float32",
+        "processing": {
+          "version": "1.0.0",
+          "normalizeEnabled": true,
+          "gain": 1.4539355749891487,
+          "trimEnabled": false,
+          "trimStartSec": 0,
+          "trimEndSec": 0,
+          "processedDurationSec": 4.400045351473923,
+          "trimThresholdRms": 0.005988030987968397,
+          "policy": {
+            "version": "1.0.0",
+            "silencePeak": 0.003,
+            "silenceRms": 0.0006,
+            "quietRms": 0.01,
+            "quietPeak": 0.05,
+            "targetPeak": 0.35,
+            "maxGain": 4,
+            "clippingLevel": 0.999,
+            "clippingRatio": 0.001,
+            "clippingRunSamples": 3,
+            "trimWindowSec": 0.01,
+            "trimPaddingSec": 0.15,
+            "trimFloorRms": 0.0008,
+            "trimRelativeRms": 0.05,
+            "minimumRetainedSec": 0.5
+          },
+          "denoise": false,
+          "pitchCorrection": false,
+          "timeStretch": false
+        },
+        "quality": {
+          "status": "ok",
+          "sourceMetrics": {
+            "peak": 0.24073968827724457,
+            "rms": 0.11978137620267558,
+            "clippedSampleRatio": 0,
+            "longestClippedRunSamples": 0
+          },
+          "monoBeforeGain": {
+            "peak": 0.24072593450546265,
+            "rms": 0.11976061975936794,
+            "clippedSampleRatio": 0,
+            "longestClippedRunSamples": 0
+          },
+          "processed": {
+            "peak": 0.3499999940395355,
+            "rms": 0.17412422554475537,
+            "clippedSampleRatio": 0,
+            "longestClippedRunSamples": 0
+          },
+          "warnings": []
+        }
+      },
+      "model": {
+        "name": "@spotify/basic-pitch",
+        "version": "1.0.1",
+        "decoding": {
+          "onsetThreshold": 0.25,
+          "frameThreshold": 0.25,
+          "minimumNoteFrames": 9,
+          "inferOnsets": true,
+          "maximumFrequencyHz": 1046.502,
+          "minimumFrequencyHz": 65.406,
+          "melodiaTrick": true,
+          "energyToleranceFrames": 11,
+          "pitchMin": 36,
+          "pitchMax": 84
+        },
+        "scoreMeaning": "Mean frame activation and onset activation; not calibrated confidence or measured loudness.",
+        "pitchBendsIncluded": false,
+        "executionBackend": "cpu"
+      },
+      "analysisElapsedMs": 10612,
+      "results": {
+        "raw": {
+          "notes": [
+            {
+              "id": "n14",
+              "pitchMidi": 60,
+              "startSec": 0.325079,
+              "durationSec": 0.452789,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7841860881218543,
+              "onsetActivation": 0.695737361907959,
+              "sourceNoteIds": [
+                "n14"
+              ]
+            },
+            {
+              "id": "n13",
+              "pitchMidi": 72,
+              "startSec": 0.325079,
+              "durationSec": 0.1161,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.3062205582857132,
+              "onsetActivation": 0.34433671832084656,
+              "sourceNoteIds": [
+                "n13"
+              ]
+            },
+            {
+              "id": "n12",
+              "pitchMidi": 60,
+              "startSec": 0.777868,
+              "durationSec": 0.12771,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.6222010173580863,
+              "onsetActivation": 0.629089891910553,
+              "sourceNoteIds": [
+                "n12"
+              ]
+            },
+            {
+              "id": "n11",
+              "pitchMidi": 64,
+              "startSec": 1.044898,
+              "durationSec": 0.476009,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7977792969564113,
+              "onsetActivation": 0.7867953181266785,
+              "sourceNoteIds": [
+                "n11"
+              ]
+            },
+            {
+              "id": "n10",
+              "pitchMidi": 76,
+              "startSec": 1.044898,
+              "durationSec": 0.487619,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.2744659274106934,
+              "onsetActivation": 0.2866116762161255,
+              "sourceNoteIds": [
+                "n10"
+              ]
+            },
+            {
+              "id": "n9",
+              "pitchMidi": 64,
+              "startSec": 1.520907,
+              "durationSec": 0.13932,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.6044721702734629,
+              "onsetActivation": 0.3386113941669464,
+              "sourceNoteIds": [
+                "n9"
+              ]
+            },
+            {
+              "id": "n8",
+              "pitchMidi": 67,
+              "startSec": 1.834376,
+              "durationSec": 0.442463,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7961537578167059,
+              "onsetActivation": 0.658957839012146,
+              "sourceNoteIds": [
+                "n8"
+              ]
+            },
+            {
+              "id": "n7",
+              "pitchMidi": 67,
+              "startSec": 2.276839,
+              "durationSec": 0.1161,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.6166978299617767,
+              "onsetActivation": 0.4808260500431061,
+              "sourceNoteIds": [
+                "n7"
+              ]
+            },
+            {
+              "id": "n6",
+              "pitchMidi": 64,
+              "startSec": 2.532259,
+              "durationSec": 0.487619,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.8009363270941234,
+              "onsetActivation": 0.7663726210594177,
+              "sourceNoteIds": [
+                "n6"
+              ]
+            },
+            {
+              "id": "n5",
+              "pitchMidi": 76,
+              "startSec": 2.543869,
+              "durationSec": 0.487619,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.28223068373543875,
+              "onsetActivation": 0.2911228835582733,
+              "sourceNoteIds": [
+                "n5"
+              ]
+            },
+            {
+              "id": "n4",
+              "pitchMidi": 64,
+              "startSec": 3.019878,
+              "durationSec": 0.12771,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.6464968513358723,
+              "onsetActivation": 0.32191023230552673,
+              "sourceNoteIds": [
+                "n4"
+              ]
+            },
+            {
+              "id": "n3",
+              "pitchMidi": 62,
+              "startSec": 3.298517,
+              "durationSec": 0.487619,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7678321344511849,
+              "onsetActivation": 0.7573224306106567,
+              "sourceNoteIds": [
+                "n3"
+              ]
+            },
+            {
+              "id": "n2",
+              "pitchMidi": 74,
+              "startSec": 3.333347,
+              "durationSec": 0.12771,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.289011305028742,
+              "onsetActivation": 0.30279505252838135,
+              "sourceNoteIds": [
+                "n2"
+              ]
+            },
+            {
+              "id": "n1",
+              "pitchMidi": 62,
+              "startSec": 3.786137,
+              "durationSec": 0.12771,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.6298131590539758,
+              "onsetActivation": 0.5563947558403015,
+              "sourceNoteIds": [
+                "n1"
+              ]
+            }
+          ],
+          "meaning": "Decoded model notes with validity and original-timeline bounds checks; no musical cleanup."
+        },
+        "cleaned": {
+          "notes": [
+            {
+              "id": "h1",
+              "pitchMidi": 60,
+              "startSec": 0.301859,
+              "durationSec": 0.568889,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7704470948297151,
+              "onsetActivation": 0.6684508919715881,
+              "sourceNoteIds": [
+                "n14",
+                "n13",
+                "n12"
+              ],
+              "frameRange": [
+                26,
+                75
+              ]
+            },
+            {
+              "id": "h2",
+              "pitchMidi": 64,
+              "startSec": 1.044898,
+              "durationSec": 0.580499,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7793828153610229,
+              "onsetActivation": 0.7867953181266785,
+              "sourceNoteIds": [
+                "n11",
+                "n10",
+                "n9"
+              ],
+              "frameRange": [
+                90,
+                140
+              ]
+            },
+            {
+              "id": "h3",
+              "pitchMidi": 67,
+              "startSec": 1.799546,
+              "durationSec": 0.570173,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7705714654922485,
+              "onsetActivation": 0.6815361976623535,
+              "sourceNoteIds": [
+                "n8",
+                "n7"
+              ],
+              "frameRange": [
+                155,
+                205
+              ]
+            },
+            {
+              "id": "h4",
+              "pitchMidi": 64,
+              "startSec": 2.543869,
+              "durationSec": 0.580499,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7895802009105682,
+              "onsetActivation": 0.7663726210594177,
+              "sourceNoteIds": [
+                "n6",
+                "n5",
+                "n4"
+              ],
+              "frameRange": [
+                220,
+                270
+              ]
+            },
+            {
+              "id": "h5",
+              "pitchMidi": 62,
+              "startSec": 3.298517,
+              "durationSec": 0.568889,
+              "velocity01": 0.7086614173228346,
+              "modelActivation": 0.7634312656460976,
+              "onsetActivation": 0.7573224306106567,
+              "sourceNoteIds": [
+                "n3",
+                "n2",
+                "n1"
+              ],
+              "frameRange": [
+                285,
+                334
+              ]
+            }
+          ],
+          "edits": [],
+          "policy": {
+            "version": "1.1.1",
+            "activation": 0.18,
+            "holdActivation": 0.12,
+            "pitchMin": 36,
+            "pitchMax": 84,
+            "holdRatio": 0.8,
+            "changeSec": 0.14,
+            "articulatedChangeSec": 0.035,
+            "minimumNoteSec": 0.07,
+            "bridgeGapSec": 0.09,
+            "strongOnset": 0.65,
+            "repeatSeparationSec": 0.14
+          },
+          "octaveCorrection": false,
+          "forceMonophonic": true,
+          "meaning": "Single-voice frame decoding with pitch persistence and acoustic rest protection; uncalibrated heuristic."
+        }
+      },
+      "selectedResult": "cleaned",
+      "notes": [
+        {
+          "id": "h1",
+          "pitchMidi": 60,
+          "startSec": 0.301859,
+          "durationSec": 0.568889,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7704470948297151,
+          "onsetActivation": 0.6684508919715881,
+          "sourceNoteIds": [
+            "n14",
+            "n13",
+            "n12"
+          ],
+          "frameRange": [
+            26,
+            75
+          ]
+        },
+        {
+          "id": "h2",
+          "pitchMidi": 64,
+          "startSec": 1.044898,
+          "durationSec": 0.580499,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7793828153610229,
+          "onsetActivation": 0.7867953181266785,
+          "sourceNoteIds": [
+            "n11",
+            "n10",
+            "n9"
+          ],
+          "frameRange": [
+            90,
+            140
+          ]
+        },
+        {
+          "id": "h3",
+          "pitchMidi": 67,
+          "startSec": 1.799546,
+          "durationSec": 0.570173,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7705714654922485,
+          "onsetActivation": 0.6815361976623535,
+          "sourceNoteIds": [
+            "n8",
+            "n7"
+          ],
+          "frameRange": [
+            155,
+            205
+          ]
+        },
+        {
+          "id": "h4",
+          "pitchMidi": 64,
+          "startSec": 2.543869,
+          "durationSec": 0.580499,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7895802009105682,
+          "onsetActivation": 0.7663726210594177,
+          "sourceNoteIds": [
+            "n6",
+            "n5",
+            "n4"
+          ],
+          "frameRange": [
+            220,
+            270
+          ]
+        },
+        {
+          "id": "h5",
+          "pitchMidi": 62,
+          "startSec": 3.298517,
+          "durationSec": 0.568889,
+          "velocity01": 0.7086614173228346,
+          "modelActivation": 0.7634312656460976,
+          "onsetActivation": 0.7573224306106567,
+          "sourceNoteIds": [
+            "n3",
+            "n2",
+            "n1"
+          ],
+          "frameRange": [
+            285,
+            334
+          ]
+        }
+      ],
+      "playback": {
+        "timbreId": "soft",
+        "gmProgramNumber": 80,
+        "gmProgramNumberBase": 0,
+        "velocityPolicy": "fixed_audition_level",
+        "velocity01": 0.7086614173228346,
+        "timbreNote": "Browser synthesizer approximations; external MIDI instruments may sound different."
+      },
+      "midiExport": {
+        "referenceBpm": 120,
+        "tempoMeaning": "serialization_reference_only",
+        "ppq": 480,
+        "timeRoundingToleranceSec": 0.0010416666666666667,
+        "originalEndMarker": "JamMate original audio end",
+        "timeSignature": null,
+        "quantized": false
+      }
+    }
+  },
+  "provenance": {
+    "producer": "melody_v1",
+    "source_id": "19ed051d-d0c3-467e-863c-8eeb9225ecc3",
+    "source_schema_version": "1.0.0"
+  }
+}

@@ -70,7 +70,7 @@ def _action(name, scope="band", strength=.5, **parameters):
 
 
 class RuleAgent:
-    def decide(self, events, state: JamState, *, plan_id: str | None = None, history=()) -> BandPlan:
+    def decide(self, events, state: JamState, *, plan_id: str | None = None, history=(), vary_input=False) -> BandPlan:
         events = tuple(events)
         if not events or any(e.session_id != state.session_id for e in events):
             raise ValueError("Agent requires an accepted, nonempty session batch")
@@ -161,10 +161,12 @@ class RuleAgent:
                 motif_id = f"motif_{phrases[-1].event_id}"
                 found = next((m for m in state.motifs if m.motif_id == motif_id), None)
                 if found is not None:
-                    actions.append(_action("ECHO_MOTIF", "lead", motif_id=motif_id))
+                    action = "VARY_MOTIF" if vary_input else "ECHO_MOTIF"
+                    actions.append(_action(action, "lead", motif_id=motif_id))
                     preserve = [p for p in preserve if not p.startswith("motif:")]
                     strategy = "RESPOND"
-                    reasons.append("Echo the latest observed phrase without removing its leading rest")
+                    reasons.append("Develop a variation of the observed phrase" if vary_input else
+                                   "Echo the latest observed phrase without removing its leading rest")
             if rhythms:
                 event, payload = rhythms[-1], rhythms[-1].payload
                 context = payload["rhythm"]

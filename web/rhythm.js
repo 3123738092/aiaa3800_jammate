@@ -2,7 +2,7 @@ import {attachBandPanel} from './band-panel.js';
 const $=id=>document.getElementById(id);
 const selectBandInput=attachBandPanel($('band-panel'));
 let buffer, sourceURL, recorder, stream, timer, phase='idle', startedAt=0, disposed=false;
-let sessionId, captureEpoch=0;
+let sessionId, captureEpoch=0, operation=0;
 function sync(){
   for(const id of ['file','example','count','tempo','origin'])$(id).disabled=phase!=='idle';
   $('tempo').disabled=phase!=='idle'||$('count').value!=='0';
@@ -17,9 +17,11 @@ function clearAudio(){
   if(sourceURL)URL.revokeObjectURL(sourceURL);sourceURL=null;
   $('download-original').hidden=true;$('download-original').removeAttribute('href');
 }
-async function load(blob){
+async function load(blob,token=operation){
+  if(token!==operation)return;
   if(blob.size>15*1024*1024)throw Error('请使用 15 MB 以内的音频');
-  const ctx=new AudioContext();try{buffer=await ctx.decodeAudioData(await blob.arrayBuffer());}finally{await ctx.close();}
+  let decoded;const ctx=new AudioContext();try{decoded=await ctx.decodeAudioData(await blob.arrayBuffer());}finally{await ctx.close();}
+  if(token!==operation)return;buffer=decoded;
   if(buffer.duration<.5||buffer.duration>30){buffer=null;throw Error('录音需为 0.5–30 秒');}
   if(sourceURL)URL.revokeObjectURL(sourceURL);sourceURL=URL.createObjectURL(blob);$('original').src=sourceURL;
   $('download-original').href=sourceURL;
@@ -30,8 +32,8 @@ async function load(blob){
 function reportError(error){$('status').textContent=error.name==='NotAllowedError'?'麦克风权限未开启，可以允许权限或导入录音。':error.name==='EncodingError'?'无法解码这段音频，请使用有效的 WAV、MP3 或 WebM 文件。':error.message;}
 async function replaceAudio(getBlob){
   if(phase!=='idle')return;
-  setPhase('loading');clearAudio();
-  try{await load(await getBlob());}catch(e){clearAudio();reportError(e);}finally{$('file').value='';setPhase('idle');}
+  const token=++operation;setPhase('loading');clearAudio();
+  try{await load(await getBlob(),token);}catch(e){if(token===operation){clearAudio();reportError(e);}}finally{if(token===operation){$('file').value='';setPhase('idle');}}
 }
 function releaseMicrophone(){clearTimeout(timer);stream?.getTracks().forEach(t=>t.stop());stream=null;}
 function stopRecording(){if(phase!=='recording'||recorder?.state!=='recording')return;setPhase('stopping');recorder.stop();}
@@ -56,16 +58,16 @@ $('record').onclick=async()=>{
     stream=acquired;
     const capture=new MediaRecorder(stream),chunks=[];let failed=false;recorder=capture;
     capture.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-    capture.onerror=()=>{failed=true;releaseMicrophone();recorder=null;setPhase('idle');$('status').textContent='录音中断，请重新录制或导入。';};
+    capture.onerror=()=>{if(recorder!==capture||disposed)return;failed=true;releaseMicrophone();recorder=null;setPhase('idle');$('status').textContent='录音中断，请重新录制或导入。';};
     capture.onstop=async()=>{
       if(failed||disposed||recorder!==capture)return;
       releaseMicrophone();recorder=null;
-      setPhase('loading');
-      try{await load(new Blob(chunks,{type:capture.mimeType}));}catch(e){clearAudio();reportError(e);}finally{setPhase('idle');}
+      const token=++operation;setPhase('loading');
+      try{await load(new Blob(chunks,{type:capture.mimeType}),token);}catch(e){if(token===operation){clearAudio();reportError(e);}}finally{if(token===operation)setPhase('idle');}
     };
-    clearAudio();capture.start();setPhase('recording');timer=setTimeout(stopRecording,20000);
+    operation++;clearAudio();capture.start();setPhase('recording');timer=setTimeout(stopRecording,20000);
     $('status').textContent=$('count').value==='0'?'正在录音：按指定 BPM 拍一小节。':'正在录音：四下均匀定速，接着一小节。';
-  }catch(e){releaseMicrophone();recorder=null;reportError(e);setPhase('idle');}
+  }catch(e){if(epoch!==captureEpoch)return;releaseMicrophone();recorder=null;reportError(e);setPhase('idle');}
 };
 for(const id of ['count','tempo','origin'])$(id).onchange=()=>{clearResult();sync();};
 $('analyze').onclick=async()=>{
@@ -77,13 +79,13 @@ $('analyze').onclick=async()=>{
       return;
     }
   }
-  setPhase('analyzing');clearResult();$('status').textContent='正在本机分析，首次调用可能需要稍等…';
+  const token=++operation;setPhase('analyzing');clearResult();$('status').textContent='正在本机分析，首次调用可能需要稍等…';
   try{const r=await fetch('/api/rhythm/v1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wav:wavBase64(buffer),session_id:sessionId,started_at:startedAt,count_in:Number($('count').value),tempo:Number($('tempo').value),origin:$('origin').value===''?null:Number($('origin').value)})});
-    const event=await r.json();if(!r.ok)throw Error(event.error);const rhythm=event.payload.rhythm;selectBandInput(event);
+    const event=await r.json();if(token!==operation)return;if(!r.ok)throw Error(event.error);const rhythm=event.payload.rhythm;selectBandInput(event);
     $('event').textContent=JSON.stringify(event,null,2);$('summary').textContent=`${rhythm.tempo_bpm.toFixed(1)} BPM · 拍点 [${rhythm.onset_beats.join(', ')}] · 网格贴合度 ${rhythm.confidence.toFixed(2)}`;
     $('result').hidden=false;$('status').textContent='已生成独立的 rhythm_seed InputEvent。';
-  }catch(e){$('status').textContent=`分析失败：${e.message}`;}finally{setPhase('idle');}
+  }catch(e){if(token===operation)$('status').textContent=`分析失败：${e.message}`;}finally{if(token===operation)setPhase('idle');}
 };
-window.addEventListener('pagehide',event=>{disposed=true;captureEpoch++;recorder=null;releaseMicrophone();$('original').pause();if(!event.persisted&&sourceURL)URL.revokeObjectURL(sourceURL);setPhase('idle');});
+window.addEventListener('pagehide',event=>{disposed=true;captureEpoch++;operation++;recorder=null;releaseMicrophone();$('original').pause();if(!event.persisted&&sourceURL)URL.revokeObjectURL(sourceURL);setPhase('idle');});
 window.addEventListener('pageshow',()=>{disposed=false;sync();});
 sync();

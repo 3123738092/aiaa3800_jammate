@@ -1,13 +1,13 @@
 // One render belongs to the selected input. Discard late responses after a new take.
 export function attachBandPanel(panel) {
-  panel.innerHTML = `<h3>听乐队回应</h3>
-    <p>用这段输入编排伴奏，生成后可以试听或下载。</p>
-    <button type="button" data-render>生成伴奏</button>
-    <a data-event download="band-input.json">下载乐队输入 JSON</a>
+  panel.innerHTML = `<h3>听创作结果</h3>
+    <p>从这次输入发展出一段新音乐，生成后可以试听或下载。</p>
+    <button type="button" data-render>生成音乐</button>
+    <a data-event download="band-input.json">下载创作输入 JSON</a>
     <p role="status" data-status></p>
-    <div data-output hidden><audio controls aria-label="乐队伴奏"></audio>
-      <p><a data-wav download="band.wav">下载伴奏 WAV</a> ·
-      <a data-midi download="band.mid">下载伴奏 MIDI</a></p></div>`;
+    <div data-output hidden><audio controls aria-label="创作结果"></audio>
+      <p><a data-wav download="band.wav">下载 WAV</a> ·
+      <a data-midi download="band.mid">下载 MIDI</a></p></div>`;
   const find = selector => panel.querySelector(selector);
   const button = find('[data-render]'), audio = find('audio');
   const original = document.getElementById('original');
@@ -27,6 +27,7 @@ export function attachBandPanel(panel) {
   }
   function select(event) {
     pending?.abort();
+    pending = null;
     current = event;
     audio.pause();
     audio.removeAttribute('src');
@@ -42,14 +43,15 @@ export function attachBandPanel(panel) {
   button.onclick = async () => {
     const event = current;
     if (!event || button.disabled) return;
-    pending = new AbortController();
+    const request = new AbortController();
+    pending = request;
     button.disabled = true;
     find('[data-status]').textContent = '乐队正在编排和渲染…';
     try {
-      const response = await fetch('/api/band', {method:'POST', signal:pending.signal,
+      const response = await fetch('/api/create', {method:'POST', signal:request.signal,
         headers:{'Content-Type':'application/json'}, body:JSON.stringify(event)});
       const result = await response.json();
-      if (event !== current) return;
+      if (request !== pending) return;
       if (!response.ok) throw new Error(result.error);
       const wav = media(result.wav, 'audio/wav');
       audio.src = wav;
@@ -60,14 +62,22 @@ export function attachBandPanel(panel) {
       if (result.warnings.length || result.manager_diagnostics.last_log_error)
         find('[data-status]').textContent += ' · 部分诊断记录未能保存';
     } catch (error) {
-      if (event === current) {
+      if (request === pending) {
         find('[data-status]').textContent = `生成失败：${error.message}`;
         button.disabled = false;
       }
+    } finally {
+      if (request === pending) pending = null;
     }
   };
   window.addEventListener('pagehide', event => {
-    pending?.abort(); audio.pause();
+    if (pending) {
+      pending.abort();
+      pending = null;
+      button.disabled = !current;
+      find('[data-status]').textContent = '';
+    }
+    audio.pause();
     if (!event.persisted) select(null);
   });
   select(null);

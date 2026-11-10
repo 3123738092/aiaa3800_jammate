@@ -15,7 +15,7 @@ async function download(id,destination){const next=page.waitForEvent('download')
 async function checkBand(kind, sample = kind) {
   const output = path.join(root, 'tmp/browser', sample);
   const event = JSON.parse(await download('[data-event]', output + '.agent.json'));
-  const received = page.waitForResponse(r => r.url() === base + '/api/band');
+  const received = page.waitForResponse(r => r.url() === base + '/api/create');
   await page.locator('[data-render]').click();
   const response = await received;
   const result = await response.json();
@@ -23,6 +23,7 @@ async function checkBand(kind, sample = kind) {
   assert.deepEqual(response.request().postDataJSON(), event);
   assert.equal(result.event_id, event.event_id);
   assert.equal(result.plan.strategy, 'RESPOND');
+  assert.deepEqual(result.plan.trigger_event_ids,[event.event_id]);
   assert.deepEqual(result.warnings, []);
   await page.locator('[data-output]').waitFor({state:'visible'});
   const wav = await download('[data-wav]', output + '.band.wav');
@@ -42,15 +43,20 @@ async function checkBand(kind, sample = kind) {
   if (kind === 'humming') {
     const lead = midi.tracks.find(t => t.channel === 4 || t.name === 'lead');
     const notes = event.payload.melody.notes;
-    assert.deepEqual(lead.notes.map(n=>n.midi), notes.map(n=>n.pitchMidi));
-    lead.notes.forEach((n,i) => {
-      assert(Math.abs(n.time-notes[i].startSec) < .003);
-      assert(Math.abs(n.duration-notes[i].durationSec) < .003);
-    });
+    assert(lead.notes.length > 0);
+    assert.notDeepEqual(lead.notes.map(n=>n.midi), notes.map(n=>n.pitchMidi),'the lead varies the input melody');
+    if (notes.length >= 5) {
+      const matchedGaps = lead.notes.slice(1).filter((n,i) => i+1 < notes.length &&
+        Math.abs(n.time-lead.notes[i].time-(notes[i+1].startSec-notes[i].startSec)) < .003);
+      assert(matchedGaps.length >= 2,'the answer retains part of the source rhythm');
+    }
   } else {
     const bass = midi.tracks.find(t => t.channel === 2 || t.name === 'bass');
     const firstBar = bass.notes.filter(n => n.ticks < midi.header.ppq * 4);
-    assert.deepEqual(firstBar.map(n=>n.ticks/midi.header.ppq), event.payload.rhythm.onset_beats);
+    const hits = firstBar.map(n=>n.ticks/midi.header.ppq);
+    assert(event.payload.rhythm.onset_beats.every(beat=>hits.includes(beat)), 'input anchors survive');
+    assert(hits.length > event.payload.rhythm.onset_beats.length, 'the arrangement adds rhythmic detail');
+    assert(Math.abs(result.tempo_bpm-event.payload.rhythm.tempo_bpm)<.001);
   }
   const {wav:unusedWav, midi:unusedMidi, ...summary} = result;
   await writeFile(output + '.plan.json', JSON.stringify(result.plan,null,2));
@@ -58,7 +64,8 @@ async function checkBand(kind, sample = kind) {
 }
 try{
   for(const version of (process.env.INPUT_VERSIONS||'baseline,optimized').split(',')){
-    await page.goto(`${base}/${version}/dist/`);
+    await page.goto(base);
+    await page.locator(`a[href="${version}/dist/"]`).click();
     await page.waitForFunction(()=>document.querySelector('#model-badge.ready'),null,{timeout:90000});
     await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#convert').disabled);
     await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
@@ -114,11 +121,13 @@ try{
     }
     console.log(version,report.versions[version]);
   }
-  await page.goto(`${base}/rhythm.html`);await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
+  await page.goto(base);await page.locator('a[href="rhythm.html"]').click();
+  assert(await page.locator('[data-output]').isHidden(),'switching from humming starts with no result');
+  await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
   const event=JSON.parse(await download('[data-event]',path.join(root,'tmp/browser/rhythm.event.json')));
   assert.equal(event.event_type,'rhythm_seed');assert.deepEqual(event.payload.rhythm.onset_beats,[0,1,1.5,3]);
-  await page.route('**/api/band', route => route.fulfill({
+  await page.route('**/api/create', route => route.fulfill({
     status:503, contentType:'application/json', body:JSON.stringify({error:'测试：渲染暂不可用'})
   }), {times:1});
   await page.click('[data-render]');

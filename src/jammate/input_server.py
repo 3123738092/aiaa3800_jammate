@@ -59,8 +59,9 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     event = validate_event(event)
                 self.json_response(200, event)
-            elif self.path == "/api/band":
+            elif self.path in ("/api/band", "/api/create"):
                 self.json_response(200, render_clip(json.loads(self.rfile.read(length)),
+                    creative=self.path == "/api/create",
                     fluidsynth=self.server.fluidsynth, soundfont=self.server.soundfont))
             else:
                 self.json_response(404, {"error": "unknown endpoint"})

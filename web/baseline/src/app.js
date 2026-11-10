@@ -11,7 +11,7 @@ sessionStorage.setItem('jammate-session', sessionId);
 let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
-let captureEpoch = 0;
+let captureEpoch = 0, operation = 0, inferenceRunning = false;
 let model = null, modelReady = false, busy = false, requestingMic = false;
 let recorder = null, recording = false, stream = null;
 let audioCtx = null, analyser = null, micSource = null, meterFrame = 0, recordClock = 0, recordingStart = 0;
@@ -33,7 +33,7 @@ function syncUI() {
   ui.record.disabled = busy || requestingMic;
   ui.example.disabled = busy || recording || requestingMic;
   ui.import.disabled = busy || recording || requestingMic;
-  ui.convert.disabled = busy || recording || requestingMic || !prepared || prepared.metadata.quality.status === 'rejected' || !modelReady;
+  ui.convert.disabled = inferenceRunning || busy || recording || requestingMic || !prepared || prepared.metadata.quality.status === 'rejected' || !modelReady;
   for (const key of ['normalize','trim','variant','timbre']) ui[key].disabled = busy || recording || requestingMic;
   ui['play-midi'].disabled = busy || recording || !playbackNotes.length;
   ui.convert.firstElementChild.textContent = busy ? '正在转换…' : '转成 MIDI';
@@ -118,17 +118,21 @@ function refreshPreparation() {
   syncUI();
 }
 
-async function setAudio(blob, name, sourceType = 'recording') {
+async function setAudio(blob, name, sourceType = 'recording', token = operation) {
+  if (token !== operation) return;
   clearAudio();
   const ctx = await getContext();
   const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
   if (decoded.duration < .5) throw new Error('录音太短了，试着哼 3–8 秒再转换。');
   if (decoded.duration > MAX_AUDIO_SECONDS + .2) throw new Error('请导入 30 秒以内的录音；短一点更方便比较效果。');
+  if (token !== operation) return;
+  const resampled = await monoResample(decoded);
+  if (token !== operation) return;
   audioBuffer = decoded;
   sourceInfo = {id:crypto.randomUUID(),name,kind:sourceType,mimeType:blob.type || 'application/octet-stream',
     byteLength:blob.size,durationSec:decoded.duration,decodedSampleRateHz:decoded.sampleRate,decodedChannels:decoded.numberOfChannels};
   sourceMetrics = measureAudio(Array.from({length:decoded.numberOfChannels},(_,index)=>decoded.getChannelData(index)));
-  monoSamples = await monoResample(decoded);
+  monoSamples = resampled;
   audioURL = URL.createObjectURL(blob);
   const extension = blob.type.includes('wav')?'wav':blob.type.includes('mp4')?'m4a':blob.type.includes('ogg')?'ogg':blob.type.includes('mpeg')?'mp3':'webm';
   ui['download-original'].href = audioURL;
@@ -190,14 +194,15 @@ async function toggleRecording() {
       recorder = null; recording = false; busy = true; syncUI();
       const blob = new Blob(chunks, {type:capture.mimeType || 'audio/webm'});
       releaseMicrophone();
-      try { await setAudio(blob, '你的哼唱'); }
-      catch (error) { status(error.message || '没有读到录音，请重新录一段。', true); }
-      finally { busy = false; syncUI(); }
+      const token = ++operation;
+      try { await setAudio(blob, '你的哼唱', 'recording', token); }
+      catch (error) { if (token === operation) status(error.message || '没有读到录音，请重新录一段。', true); }
+      finally { if (token === operation) { busy = false; syncUI(); } }
     }, { once: true });
     micSource = ctx.createMediaStreamSource(stream);
     analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
     micSource.connect(analyser);
-    clearAudio();
+    operation++; clearAudio();
     recording = true;
     recordingStart = performance.now();
     ui['record-timer'].textContent = '00:00';
@@ -211,12 +216,13 @@ async function toggleRecording() {
       if (seconds >= MAX_RECORD_SECONDS) stopRecording();
     },100);
   } catch (error) {
+    if (epoch !== captureEpoch) return;
     recorder = null; recording = false;
     releaseMicrophone();
     const denied = error.name === 'NotAllowedError' || error.name === 'SecurityError';
     const missing = error.name === 'NotFoundError';
     status(denied ? '麦克风权限没有开启。请在浏览器地址栏允许麦克风，或用“导入录音”。' : missing ? '没有找到麦克风。可以连接麦克风，或用“导入录音”。' : error.message || '无法开启麦克风，请稍后重试。', true);
-  } finally { requestingMic = false; syncUI(); }
+  } finally { if (epoch === captureEpoch) { requestingMic = false; syncUI(); } }
 }
 
 function stopRecording() {
@@ -237,21 +243,24 @@ async function monoResample(buffer) {
 }
 
 async function convert() {
-  if (!prepared || prepared.metadata.quality.status === 'rejected' || !modelReady || busy || recording) return;
+  if (!prepared || prepared.metadata.quality.status === 'rejected' || !modelReady || busy || recording || inferenceRunning) return;
+  const token = operation, preparation = prepared, sourceSnapshot = structuredClone(sourceInfo), duration = audioBuffer.duration;
+  inferenceRunning = true;
   busy = true; syncUI(); stopPlayback(); ui.original.pause(); clearResult();
   ui.progress.hidden = false; ui.progress.value = 0;
   status('正在听这段旋律…');
   const started = performance.now();
   let scoped = false;
   try {
-    const samples = prepared.samples;
+    const samples = preparation.samples;
     const frames = [], onsets = [];
     await new Promise(resolve => setTimeout(resolve,30));
     tf.engine().startScope(); scoped = true;
     await model.evaluateModel(samples,
       (nextFrames,nextOnsets) => { frames.push(...nextFrames); onsets.push(...nextOnsets); },
-      percent => { ui.progress.value = percent; ui.convert.firstElementChild.textContent = `正在转换 ${Math.round(percent*100)}%`; });
+      percent => { if (token !== operation) return; ui.progress.value = percent; ui.convert.firstElementChild.textContent = `正在转换 ${Math.round(percent*100)}%`; });
     tf.engine().endScope(); scoped = false;
+    if (token !== operation) return;
     if (!frames.length) throw new Error('这段录音没有产生可用结果，请再录一段。');
     const config = DECODING;
     const noteFrames = outputToNotesPoly(frames,onsets,config.onsetThreshold,config.frameThreshold,config.minimumNoteFrames,config.inferOnsets,config.maximumFrequencyHz,config.minimumFrequencyHz,config.melodiaTrick,config.energyToleranceFrames);
@@ -259,20 +268,23 @@ async function convert() {
       const evidence = [-1,0,1].map(delta=>onsets[noteFrames[index].startFrame+delta]?.[note.pitchMidi-21]).filter(Number.isFinite);
       return {...note,onsetActivation:evidence.length?Math.max(...evidence):null};
     });
-    const offset = prepared.metadata.processing.trimStartSec;
-    const raw = standardizeNotes(decoded,Math.min(audioBuffer.duration,offset+samples.length/SAMPLE_RATE),offset);
-    melodyDocument = createMelodyDocument(sourceInfo,prepared.metadata,raw,cleanNotes(raw),performance.now()-started);
-    trackDuration = audioBuffer.duration;
+    const offset = preparation.metadata.processing.trimStartSec;
+    const raw = standardizeNotes(decoded,Math.min(duration,offset+samples.length/SAMPLE_RATE),offset);
+    melodyDocument = createMelodyDocument(sourceSnapshot,preparation.metadata,raw,cleanNotes(raw),performance.now()-started);
+    trackDuration = duration;
     updateOutputs();
     ui['result-time'].textContent = `${trackDuration.toFixed(1)} 秒`;
     ui['conversion-time'].textContent = `转换用时 ${((performance.now()-started)/1000).toFixed(1)} 秒`;
     status(raw.length ? '转换完成。切换“原始识别 / 保守整理”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!raw.length);
   } catch (error) {
+    if (token !== operation) return;
     console.error('Transcription failed',error);
     status(error.message?.includes('录音') ? error.message : '转换没有完成。可以试一段更短、更清晰的录音，再点“转成 MIDI”。',true);
   } finally {
     if (scoped) tf.engine().endScope();
-    busy = false; ui.progress.hidden = true; syncUI();
+    inferenceRunning = false;
+    if (token === operation) { busy = false; ui.progress.hidden = true; }
+    syncUI();
   }
 }
 
@@ -404,26 +416,27 @@ ui.original.addEventListener('play',stopPlayback);
 ui.timbre.addEventListener('change',updateOutputs);
 ui.variant.addEventListener('change',updateOutputs);
 for (const control of [ui.normalize,ui.trim]) control.addEventListener('change',()=>{
-  refreshPreparation();
+  operation++; refreshPreparation();
   if (prepared) status(prepared.metadata.quality.status === 'rejected' ? '录音几乎没有声音，请重新录制。' : '处理设置已更新，请重新转换；原始录音保持完整。',prepared.metadata.quality.status === 'rejected');
 });
 ui.import.addEventListener('click',()=>ui.file.click());
 ui.file.addEventListener('change',async()=>{
   const file=ui.file.files[0]; if(!file)return;
   if(busy||recording){ui.file.value='';return;}
-  busy=true;syncUI();
-  try{clearAudio();if(file.size>15*1024*1024)throw new Error('请使用 15 MB 以内、30 秒以内的短录音。');await setAudio(file,file.name,'import');}
-  catch(error){status(error.name === 'EncodingError' ? '无法解码这段音频，请检查文件是否完整，或试试 WAV、MP3、M4A 文件。' : error.message||'无法读取这段音频，请试试 WAV、MP3 或 WebM 文件。',true);}
-  finally{busy=false;ui.file.value='';syncUI();}
+  const token=++operation; busy=true;syncUI();
+  try{clearAudio();if(file.size>15*1024*1024)throw new Error('请使用 15 MB 以内、30 秒以内的短录音。');await setAudio(file,file.name,'import',token);}
+  catch(error){if(token!==operation)return;status(error.name === 'EncodingError' ? '无法解码这段音频，请检查文件是否完整，或试试 WAV、MP3、M4A 文件。' : error.message||'无法读取这段音频，请试试 WAV、MP3 或 WebM 文件。',true);}
+  finally{if(token===operation){busy=false;ui.file.value='';syncUI();}}
 });
 ui.example.addEventListener('click',async()=>{
-  busy=true;syncUI();
-  try{const response=await fetch('./example.wav');if(!response.ok)throw new Error('示例加载失败，请稍后再试。');await setAudio(await response.blob(),'合成旋律示例','example');}
-  catch(error){status(error.message,true);}
-  finally{busy=false;syncUI();}
+  const token=++operation; busy=true;syncUI();
+  try{clearAudio();const response=await fetch('./example.wav');if(!response.ok)throw new Error('示例加载失败，请稍后再试。');const blob=await response.blob();await setAudio(blob,'合成旋律示例','example',token);}
+  catch(error){if(token===operation)status(error.message,true);}
+  finally{if(token===operation){busy=false;syncUI();}}
 });
 new ResizeObserver(()=>drawRoll(playing?Math.max(0,audioCtx.currentTime-playStart):-1)).observe(ui['piano-roll']);
 window.addEventListener('pagehide',event=>{
+  operation++; ui.progress.hidden = true;
   captureEpoch++; recorder = null; recording = false; busy = false; requestingMic = false;
   releaseMicrophone(); stopPlayback(); ui.original.pause();
   if (!event.persisted) {

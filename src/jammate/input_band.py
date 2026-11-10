@@ -14,10 +14,11 @@ from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import OfflineRuntime
 from jammate.render.midi_out import to_pretty_midi
+from jammate.rhythm import RhythmMode
 from jammate.state import JamState
 
 
-def render_clip(document, *, fluidsynth=None, soundfont=None):
+def render_clip(document, *, creative=False, fluidsynth=None, soundfont=None):
     event = InputEvent.from_dict(document)
     payload = event.payload
     if event.source == "rhythm":
@@ -31,10 +32,11 @@ def render_clip(document, *, fluidsynth=None, soundfont=None):
     else:
         raise ValueError("此入口需要哼唱或节奏事件。")
 
-    manager = StateManager(JamState(session_id=event.session_id, tempo_bpm=tempo))
+    rhythm_mode = RhythmMode.VARY if creative and event.source == "rhythm" else RhythmMode.FOLLOW
+    manager = StateManager(JamState(session_id=event.session_id, tempo_bpm=tempo, rhythm_mode=rhythm_mode))
     accepted = manager.ingest([event])
     state, history = manager.decision_snapshot()
-    plan = RuleAgent().decide(accepted, state, plan_id=f"band_{uuid4().hex}", history=history)
+    plan = RuleAgent().decide(accepted, state, plan_id=f"band_{uuid4().hex}", history=history, vary_input=creative)
     if plan.to_dict()["strategy"] != "RESPOND":
         raise ValueError("乐队无法用这段输入生成回应，请尝试更短的乐句或更清晰的节奏。")
     manager.stage(plan)
