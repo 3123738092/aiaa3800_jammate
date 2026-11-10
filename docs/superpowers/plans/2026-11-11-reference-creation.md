@@ -9,4 +9,4 @@
 - [x] Connect original rhythm analysis, follow/vary/simplify, energy and bar count. Keep microphone and source playback behavior. Keep local humming path unchanged.
 - [x] Use original text input, Agent, StateManager, plan validation and renderer. Keep state by work on the text page. Expose original starting BPM and supported instrument profiles; keep local rule mode explicit. Report missing model config honestly.
 - [x] Collect reference style examples with the original style pattern generator. No replacement of recorded source anchors with the standalone style patterns.
-- [ ] Verify actual browser playback/export, safe retries and input isolation. Verify the original LLM decision contract with a scripted provider if no authorized configuration exists. Provide handoff docs and push only to origin.
+- [x] Verify browser playback/export, safe retries and input isolation. Verify the original LLM decision contract with a scripted provider. Document the handoff and publish only to the user-owned origin.

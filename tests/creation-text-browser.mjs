@@ -97,6 +97,8 @@ try {
   await generate.click();
   await page.waitForFunction(() => document.querySelector('#text-status').textContent.includes('生成失败'));
   assert(await output.isVisible(), 'a lost response keeps the last playable clip');
+  const stale = await submit('鼓少一点', 400);
+  assert.match(stale.error, /已生成更新的段落/);
   const second = await submit('去掉贝斯', 200);
   assert.equal(second.request_id, completed.request_id);
   assert.equal(second.turn, 2);

@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 from tempfile import TemporaryDirectory
 from uuid import uuid4
@@ -73,10 +74,19 @@ def rhythm_clip(body):
 
 
 @dataclass
+class AppliedTurn:
+    directory: TemporaryDirectory
+    clip: object
+    artifacts: Path | None
+    result: dict
+
+
+@dataclass
 class TextWork:
     manager: StateManager
     settings: tuple
     pending: tuple | None = None
+    applied: AppliedTurn | None = None
     completed: dict = field(default_factory=dict)
     recent: dict = field(default_factory=dict)
 
@@ -131,6 +141,10 @@ class ReferenceService:
             raise ValueError("这个作品会话已结束，请开始新作品。")
         if work is not None and after_turn != len(work.completed):
             raise ValueError("作品已生成更新的段落，请重试原请求或开始新作品。")
+        if work is not None and work.applied is not None:
+            if work.pending != (rid, text):
+                raise ValueError("上一轮已执行。请保留上一条要求重试以取回文件，或开始新作品。")
+            return self.deliver(work)
 
         config = self.config() if mode == "llm" else None
         if work is None:
@@ -148,13 +162,14 @@ class ReferenceService:
             accepted = manager.current_batch()
         else:
             accepted = manager.ingest([from_text(text, session_id=sid, event_id=rid)])
-            work.pending = (rid, text)
-        if not accepted:
+        if len(accepted) != 1 or accepted[0].event_id != rid:
             raise ValueError("此请求已被新的指令替换。")
+        work.pending = (rid, text)
 
         snapshot, history = manager.decision_snapshot()
-        with TemporaryDirectory(prefix="render-") as output:
-            runtime = self.runtime(output, profile)
+        directory = TemporaryDirectory(prefix="render-", ignore_cleanup_errors=True)
+        try:
+            runtime = self.runtime(directory.name, profile)
             agent = LLMAgent(config, fallback="error", execution_validator=runtime.validate) if config else RuleAgent()
             plan = agent.decide(accepted, snapshot, plan_id=f"web_{uuid4().hex}", history=history)
             decision = plan.to_dict()
@@ -163,21 +178,40 @@ class ReferenceService:
             if not manager.stage(plan):
                 raise ValueError("当前计划已失效，请重试。")
             rendered = runtime.execute(manager, plan)
-            if self.fluidsynth:
-                files = runtime.last_artifacts
-                output_media = encode((files / "band.wav").read_bytes(), (files / "band.mid").read_bytes())
-            else:
-                local_notes = tuple(note.shifted(-rendered.start_bar * 4) for note in rendered.notes)
-                output_media = media(rendered.audio, rendered.sample_rate, local_notes, rendered.tempo_bpm)
-
-        result = {**output_media, "session_id": sid, "request_id": rid, "turn": len(work.completed) + 1,
+        except Exception:
+            directory.cleanup()
+            raise
+        result = {"session_id": sid, "request_id": rid, "turn": len(work.completed) + 1,
                   "tempo_bpm": rendered.tempo_bpm, "start_bar": rendered.start_bar, "bars": rendered.bars,
                   "plan": decision, "agent": mode, "renderer": "Kevin / FluidSynth" if self.fluidsynth else "原版合成器"}
+        artifacts = runtime.last_artifacts if self.fluidsynth else None
+        # The original runtime has already acknowledged the plan. Keep its
+        # output available for retry without deciding or applying it again.
+        work.applied = AppliedTurn(directory, rendered, artifacts, result)
+        return self.deliver(work)
+
+    @staticmethod
+    def deliver(work):
+        applied = work.applied
+        rid, text = work.pending
+        try:
+            if applied.artifacts is not None:
+                files = applied.artifacts
+                output_media = encode((files / "band.wav").read_bytes(), (files / "band.mid").read_bytes())
+            else:
+                clip = applied.clip
+                notes = tuple(note.shifted(-clip.start_bar * 4) for note in clip.notes)
+                output_media = media(clip.audio, clip.sample_rate, notes, clip.tempo_bpm)
+        except OSError:
+            raise ValueError("这一轮已生成，但暂时无法读取音频。请保留原要求重试。") from None
+        result = {**applied.result, **output_media}
         work.completed[rid] = text
         work.recent[rid] = result
         if len(work.recent) > 2:
             work.recent.pop(next(iter(work.recent)))
         work.pending = None
+        work.applied = None
+        applied.directory.cleanup()
         return result
 
     def runtime(self, output, profile):
@@ -220,6 +254,10 @@ def main(snapshot, fluidsynth, soundfont):
                 reply = {"result": routes[request["operation"]](request["body"])}
         except ProviderFailure as error:
             reply = {"error": f"大模型请求未完成（{error.kind}）。请重试或改用本地规则。"}
+        except subprocess.TimeoutExpired:
+            reply = {"error": "音频渲染超时，请重试。"}
+        except subprocess.SubprocessError:
+            reply = {"error": "音频渲染未完成，请重试。"}
         except (ValueError, RuntimeError, KeyError, TypeError, OSError) as error:
             reply = {"error": str(error) or "请求未完成。"}
         print(json.dumps(reply, ensure_ascii=False, allow_nan=False), flush=True)

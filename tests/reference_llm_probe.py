@@ -1,8 +1,12 @@
 """Isolated check of the pinned Agent with scripted provider replies."""
 import base64
+from contextlib import redirect_stdout
 from functools import partial
 import io
 import json
+from pathlib import Path
+import subprocess
+from unittest.mock import patch
 
 import pretty_midi
 
@@ -63,5 +67,43 @@ def main():
     assert service.text_turn(edit) == second and provider.calls == 3
 
 
+def check_applied_turn_media_retry():
+    service = reference_worker.ReferenceService(None, None)
+    original_media = reference_worker.media
+
+    def interrupt_once(*args):
+        reference_worker.media = original_media
+        raise OSError("temporary output read error")
+
+    reference_worker.media = interrupt_once
+    request = {"session_id": "recover-media", "agent": "rule", "profile": "electric", "bpm": 100,
+               "after_turn": 0, "request_id": "first", "text": "来一段，慢一点"}
+    try:
+        service.text_turn(request)
+    except (OSError, ValueError):
+        pass
+    else:
+        raise AssertionError("the fixture must interrupt packaging")
+    recovered = service.text_turn(request)
+    assert recovered["turn"] == 1 and recovered["start_bar"] == 0 and recovered["tempo_bpm"] == 92
+    assert service.text_turn(request) == recovered
+
+
+def check_render_timeout_keeps_the_worker_available():
+    requests = "\n".join(json.dumps({"operation": operation, "body": {}})
+                         for operation in ("text/turn", "text/status")) + "\n"
+    stdout = io.StringIO()
+    snapshot = Path(reference_worker.jammate.__file__).resolve().parents[2]
+    with patch("sys.stdin", io.StringIO(requests)), redirect_stdout(stdout), patch.object(
+        reference_worker.ReferenceService, "text_turn", side_effect=subprocess.TimeoutExpired("fluidsynth", 180)
+    ):
+        reference_worker.main(snapshot, "", "")
+    failed, next_reply = map(json.loads, stdout.getvalue().splitlines())
+    assert "error" in failed
+    assert "llm_ready" in next_reply["result"]
+
+
 if __name__ == "__main__":
     main()
+    check_applied_turn_media_retry()
+    check_render_timeout_keeps_the_worker_available()

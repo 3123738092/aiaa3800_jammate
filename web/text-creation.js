@@ -4,7 +4,8 @@ const bpm = $('text-bpm'), profile = $('text-profile');
 const audio = $('text-audio'), status = $('text-status');
 const example = document.querySelector('[data-prompt]');
 let session = crypto.randomUUID();
-let turn = 0, pending = null, attempt = null;
+let turn = 0, pending = null;
+const attempts = new Map();
 let urls = [];
 
 async function post(route, body, signal) {
@@ -42,7 +43,7 @@ function media(encoded, type) {
 function newWork() {
   session = crypto.randomUUID();
   turn = 0;
-  attempt = null;
+  attempts.clear();
   clearAudio();
   status.textContent = '';
   sync();
@@ -61,15 +62,16 @@ $('text-form').addEventListener('submit', async event => {
   const input = {session_id: session, after_turn: turn, agent: agent.value, bpm: Number(bpm.value),
     profile: profile.value, text: prompt.value.trim()};
   const signature = JSON.stringify(input);
-  if (attempt?.signature !== signature) {
-    attempt = {signature, body: {...input, request_id: crypto.randomUUID()}};
+  if (!attempts.has(signature)) {
+    attempts.set(signature, {...input, request_id: crypto.randomUUID()});
   }
+  const body = attempts.get(signature);
   const request = new AbortController();
   pending = request;
   sync();
   status.textContent = '正在编排和生成…';
   try {
-    const result = await post('turn', attempt.body, request.signal);
+    const result = await post('turn', body, request.signal);
     if (request !== pending) return;
     clearAudio();
     audio.src = media(result.wav, 'audio/wav');
@@ -77,7 +79,7 @@ $('text-form').addEventListener('submit', async event => {
     $('text-midi').href = media(result.midi, 'audio/midi');
     $('text-output').hidden = false;
     turn = result.turn;
-    attempt = null;
+    attempts.clear();
     const mode = result.agent === 'llm' ? '大模型' : '本地规则';
     status.textContent = `第 ${turn} 段 · ${result.bars} 小节 · ${result.tempo_bpm.toFixed(1)} BPM · ${mode}`;
     $('text-decision').textContent = [result.plan.reason, ...result.plan.unresolved].filter(Boolean).join('。');

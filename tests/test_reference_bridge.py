@@ -71,3 +71,15 @@ def test_pinned_llm_uses_the_original_context_validation_and_renderer(bridge):
     result = subprocess.run([sys.executable, "-B", str(ROOT / "tests/reference_llm_probe.py")],
                             cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_superseded_failed_request_cannot_execute_a_different_prompt(bridge):
+    base = {"session_id": "test-superseded", "agent": "rule", "bpm": 100, "profile": "electric", "after_turn": 0}
+    first = {**base, "request_id": "first", "text": "变成一只猫"}
+    second = {**base, "request_id": "second", "text": "变成一条鱼"}
+    for command in (first, second):
+        with pytest.raises(ValueError, match=command["text"]):
+            bridge.request("text/turn", command)
+    for _ in range(2):
+        with pytest.raises(ValueError, match="已被新的指令替换"):
+            bridge.request("text/turn", first)
