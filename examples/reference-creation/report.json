@@ -1,0 +1,19 @@
+{
+  "textTurns": [
+    1,
+    2
+  ],
+  "textTempo": 92,
+  "renderer": "Kevin / FluidSynth",
+  "provider": "rule",
+  "settings": "acoustic",
+  "responseRetryDeduped": true,
+  "independentFromRhythm": true,
+  "styleSamples": [
+    "lofi",
+    "warm_funk",
+    "indie_rock"
+  ],
+  "styleTempo": 100,
+  "pageErrors": []
+}

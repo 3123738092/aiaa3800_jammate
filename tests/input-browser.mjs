@@ -10,21 +10,29 @@ await mkdir(path.join(root,'tmp/browser'),{recursive:true});
 const browser=await chromium.launch({channel:'msedge',headless:true});
 const context=await browser.newContext({acceptDownloads:true,viewport:{width:1360,height:1000}});
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-const base=process.env.INPUT_LAB_URL||'http://127.0.0.1:4185';const report={versions:{}};
+const base=process.env.INPUT_LAB_URL||'http://127.0.0.1:4188';const report={versions:{}};
 async function download(id,destination){const next=page.waitForEvent('download');await page.locator(id).click();await(await next).saveAs(destination);return readFile(destination);}
 async function checkBand(kind, sample = kind) {
   const output = path.join(root, 'tmp/browser', sample);
   const event = JSON.parse(await download('[data-event]', output + '.agent.json'));
-  const received = page.waitForResponse(r => r.url() === base + '/api/create');
+  const rhythm = kind === 'rhythm';
+  const mode = rhythm ? await page.locator('#rhythm-mode').inputValue() : null;
+  const received = page.waitForResponse(r => r.url() === base + (rhythm ? '/api/reference/rhythm/create' : '/api/create'));
   await page.locator('[data-render]').click();
   const response = await received;
   const result = await response.json();
   assert.equal(response.status(), 200, result.error);
-  assert.deepEqual(response.request().postDataJSON(), event);
+  const request = response.request().postDataJSON();
+  assert.deepEqual(rhythm ? request.event : request, event);
   assert.equal(result.event_id, event.event_id);
-  assert.equal(result.plan.strategy, 'RESPOND');
-  assert.deepEqual(result.plan.trigger_event_ids,[event.event_id]);
-  assert.deepEqual(result.warnings, []);
+  if (rhythm) {
+    assert.equal(result.mode, mode);
+    assert.match(result.reference_commit, /^a63a0f5/);
+  } else {
+    assert.equal(result.plan.strategy, 'RESPOND');
+    assert.deepEqual(result.plan.trigger_event_ids,[event.event_id]);
+    assert.deepEqual(result.warnings, []);
+  }
   await page.locator('[data-output]').waitFor({state:'visible'});
   const wav = await download('[data-wav]', output + '.band.wav');
   assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
@@ -54,12 +62,18 @@ async function checkBand(kind, sample = kind) {
     const bass = midi.tracks.find(t => t.channel === 2 || t.name === 'bass');
     const firstBar = bass.notes.filter(n => n.ticks < midi.header.ppq * 4);
     const hits = firstBar.map(n=>n.ticks/midi.header.ppq);
-    assert(event.payload.rhythm.onset_beats.every(beat=>hits.includes(beat)), 'input anchors survive');
-    assert(hits.length > event.payload.rhythm.onset_beats.length, 'the arrangement adds rhythmic detail');
+    const anchors = event.payload.rhythm.onset_beats;
+    if (mode === 'simplify') {
+      assert(hits.every(beat => anchors.includes(beat)) && hits.length < anchors.length);
+    } else {
+      assert(anchors.every(beat => hits.includes(beat)), 'input anchors survive');
+      if (mode === 'follow') assert.deepEqual(hits, anchors);
+      else assert(hits.length > anchors.length, 'the arrangement adds rhythmic detail');
+    }
     assert(Math.abs(result.tempo_bpm-event.payload.rhythm.tempo_bpm)<.001);
   }
   const {wav:unusedWav, midi:unusedMidi, ...summary} = result;
-  await writeFile(output + '.plan.json', JSON.stringify(result.plan,null,2));
+  await writeFile(output + '.plan.json', JSON.stringify(result.plan ?? summary,null,2));
   return {...audio, renderer:summary.renderer, bars:summary.bars, tempo:summary.tempo_bpm};
 }
 try{
@@ -127,13 +141,18 @@ try{
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
   const event=JSON.parse(await download('[data-event]',path.join(root,'tmp/browser/rhythm.event.json')));
   assert.equal(event.event_type,'rhythm_seed');assert.deepEqual(event.payload.rhythm.onset_beats,[0,1,1.5,3]);
-  await page.route('**/api/create', route => route.fulfill({
+  await page.route('**/api/reference/rhythm/create', route => route.fulfill({
     status:503, contentType:'application/json', body:JSON.stringify({error:'测试：渲染暂不可用'})
   }), {times:1});
   await page.click('[data-render]');
   await page.waitForFunction(()=>document.querySelector('[data-status]').textContent.includes('渲染暂不可用'));
   assert(await page.locator('[data-render]').isEnabled(), 'failed renders can be retried');
   report.rhythmBand = await checkBand('rhythm');
+  await page.selectOption('#rhythm-mode', 'follow');
+  report.rhythmFollow = await checkBand('rhythm', 'rhythm-follow');
+  await page.selectOption('#rhythm-mode', 'simplify');
+  report.rhythmSimplify = await checkBand('rhythm', 'rhythm-simplify');
+  await page.selectOption('#rhythm-mode', 'vary');
   await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#analyze').disabled);
   await page.locator('#analyze').click();await page.locator('#result').waitFor({state:'visible',timeout:90000});
   const nextEvent=JSON.parse(await download('[data-event]',path.join(root,'tmp/browser/rhythm-next.event.json')));

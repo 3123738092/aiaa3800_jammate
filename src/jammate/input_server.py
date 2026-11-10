@@ -16,6 +16,7 @@ from jammate.input_event import perceive_rhythm, validate_event
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_rhythm
 from jammate.input_band import render_clip
+from jammate.reference_bridge import ReferenceBridge
 from jammate.rhythm import RhythmContext
 
 ROOT = Path(__file__).resolve().parents[2] / "web"
@@ -24,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2] / "web"
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/ready":
-            self.json_response(200, {"service": "jammate-creation-v1", "root": str(ROOT.parent)})
+            self.json_response(200, {"service": "jammate-reference-workbench-v1", "root": str(ROOT.parent)})
         else:
             super().do_GET()
 
@@ -42,7 +43,24 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= 16 * 1024 * 1024:
                 raise ValueError("request must be 1 byte to 16 MB")
-            if self.path in ("/api/rhythm", "/api/rhythm/v1"):
+            if self.path.startswith("/api/reference/"):
+                port = self.server.server_port
+                origin = self.headers.get("Origin")
+                if origin not in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
+                    self.json_response(403, {"error": "请从本机工作台发起请求。"})
+                    return
+                if self.headers.get_content_type() != "application/json":
+                    self.json_response(415, {"error": "请提交 JSON。"})
+                    return
+                operation = self.path.removeprefix("/api/reference/")
+                if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
+                    self.json_response(404, {"error": "unknown reference endpoint"})
+                    return
+                body = json.loads(self.rfile.read(length))
+                if not isinstance(body, dict):
+                    raise ValueError("请求必须为 JSON 对象。")
+                self.json_response(200, self.server.reference.request(operation, body))
+            elif self.path in ("/api/rhythm", "/api/rhythm/v1"):
                 body = json.loads(self.rfile.read(length))
                 audio, sr = sf.read(io.BytesIO(base64.b64decode(body["wav"], validate=True)), dtype="float32", always_2d=True)
                 if len(audio)/sr > 30 or sr < 8000 or sr > 96000:
@@ -88,8 +106,11 @@ def main():
         parser.error("FluidSynth and SoundFont must be existing files")
     if args.soundfont and not args.fluidsynth:
         parser.error("a SoundFont requires FluidSynth")
-    with ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
+    with ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
+                         soundfont=args.soundfont) as reference, ThreadingHTTPServer(
+                             ("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
+        server.reference = reference
         print(f"JamMate Input Lab: http://127.0.0.1:{args.port}", flush=True)
         server.serve_forever()
 

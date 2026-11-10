@@ -1,0 +1,75 @@
+{
+  "versions": {
+    "baseline": {
+      "raw": 8,
+      "selected": 7,
+      "eventValid": true,
+      "midiConsistent": true
+    },
+    "optimized": {
+      "raw": 14,
+      "selected": 5,
+      "eventValid": true,
+      "midiConsistent": true,
+      "repeatable": true
+    }
+  },
+  "hummingBand": {
+    "duration": 11.853770833333334,
+    "rms": 0.06051903443045137,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 100
+  },
+  "uploadedSustain": {
+    "duration": 11.853770833333334,
+    "rms": 0.06176949864234761,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 100
+  },
+  "rhythmBand": {
+    "duration": 11.0573125,
+    "rms": 0.10376984909915488,
+    "renderer": "原版节拍编排",
+    "bars": 4,
+    "tempo": 100.44642857142858
+  },
+  "rhythmFollow": {
+    "duration": 11.0573125,
+    "rms": 0.0981728914552001,
+    "renderer": "原版节拍编排",
+    "bars": 4,
+    "tempo": 100.44642857142858
+  },
+  "rhythmSimplify": {
+    "duration": 11.0573125,
+    "rms": 0.07963837729600934,
+    "renderer": "原版节拍编排",
+    "bars": 4,
+    "tempo": 100.44642857142858
+  },
+  "uploadedRhythm": {
+    "duration": 9.5213125,
+    "rms": 0.10683261180267568,
+    "renderer": "原版节拍编排",
+    "bars": 4,
+    "tempo": 119.68085106382979
+  },
+  "rhythm": {
+    "bpm": 100.44642857142858,
+    "onsets": [
+      0,
+      1,
+      1.5,
+      3
+    ],
+    "independentClipSessions": true
+  },
+  "appendix": {
+    "cases": 5,
+    "comparisonSwitchWorks": true,
+    "mobileOverflow": false
+  },
+  "pageErrors": []
+}

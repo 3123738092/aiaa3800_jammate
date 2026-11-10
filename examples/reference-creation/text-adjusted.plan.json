@@ -1,0 +1,35 @@
+{
+  "actions": [
+    {
+      "action": "REMOVE_LAYER",
+      "parameters": {},
+      "scope": "bass",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 3,
+  "effective_at": {
+    "bar": 4,
+    "beat": 0
+  },
+  "plan_confidence": null,
+  "plan_id": "web_a795389059d84a6b87066ca4a99f01d0",
+  "preserve": [
+    "tempo",
+    "key",
+    "motif:motif_web_fc49cb6da33547da90cd879234899aad",
+    "layer:drums",
+    "layer:keys",
+    "layer:lead"
+  ],
+  "reason": "去掉贝斯",
+  "schema_version": "1.0.0",
+  "session_id": "782a7328-6e68-40a0-b90e-348a9fe27e96",
+  "strategy": "FOLLOW",
+  "transport": {},
+  "trigger_event_ids": [
+    "74bd821e-8b30-4e51-bfd0-7aef343b2cc6"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

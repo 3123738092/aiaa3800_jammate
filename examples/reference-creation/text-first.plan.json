@@ -1,0 +1,37 @@
+{
+  "actions": [
+    {
+      "action": "INTRODUCE_MOTIF",
+      "parameters": {
+        "motif_id": "motif_web_fc49cb6da33547da90cd879234899aad"
+      },
+      "scope": "lead",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0
+  },
+  "plan_confidence": null,
+  "plan_id": "web_fc49cb6da33547da90cd879234899aad",
+  "preserve": [
+    "key",
+    "layer:drums",
+    "layer:bass",
+    "layer:keys"
+  ],
+  "reason": "来一段; 慢一点",
+  "schema_version": "1.0.0",
+  "session_id": "782a7328-6e68-40a0-b90e-348a9fe27e96",
+  "strategy": "INITIATE",
+  "transport": {
+    "tempo_bpm": 92
+  },
+  "trigger_event_ids": [
+    "04c5b046-5287-4439-8be4-2aff79f3a946"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

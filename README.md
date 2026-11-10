@@ -2,15 +2,15 @@
 
 ## 从一种输入开始创作
 
-在本机双击 `start-input-lab.cmd`，打开 [JamMate 创作工作台](http://127.0.0.1:4187)。任选哼唱、节拍或文字，点击「生成音乐」。每次生成从这次选择的输入出发，交给同一套 Agent、编排和渲染流程。结果可试听并下载多轨 MIDI 和 WAV。新机器先按[安装与启动说明](docs/integration/RUN.md)准备环境。
+在本机双击 `start-input-lab.cmd`，打开 [JamMate 创作工作台](http://127.0.0.1:4188)。任选哼唱、节拍或文字，各自生成一段音乐并下载 WAV、MIDI。新机器先按[安装与启动说明](docs/integration/RUN.md)准备环境。
 
-哼唱生成旋律变奏，节拍沿原拍点加花，文字可以用「来一段，慢一点」从空白开始。网页用本地规则 Agent，配置 FluidSynth 时调用 Kevin 渲染器，否则使用内置合成器。下方保留原项目的多轮命令行说明。
+哼唱沿用我们的连贯识别和变奏。拍手和文字从 Git 历史加载队友的固定版本，分别调用他们原有的节拍编排和文字 Agent。首页也可以对比 Lo-fi、Funk 和 Indie Rock 的原版独立预设。[新版操作与验收](docs/integration/REFERENCE_WORKBENCH.md)
 
 | 浏览器验收样例 | 可试听的音乐 | 多轨与输入 |
 |---|---|---|
 | 从五音哼唱变奏 | [哼唱 WAV](examples/creation/humming.wav) | [MIDI](examples/creation/humming.mid) · [原录音](examples/creation/humming-source.wav) |
-| 沿切分节拍加花 | [节奏 WAV](examples/creation/rhythm.wav) | [MIDI](examples/creation/rhythm.mid) · [原录音](web/rhythm-example.wav) |
-| 「来一段，慢一点」 | [文字 WAV](examples/creation/text.wav) | [MIDI](examples/creation/text.mid) · [文字输入](examples/creation/text.input.json) |
+| 原版节拍编排 | [节拍示例](examples/reference-creation/) | [原录音](web/rhythm-example.wav) |
+| 用文字起稿后继续调整 | [文字示例](examples/reference-creation/) | 以队友本地规则生成 |
 
 
 

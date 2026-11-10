@@ -1,8 +1,14 @@
 import {attachBandPanel} from './band-panel.js';
 const $=id=>document.getElementById(id);
-const selectBandInput=attachBandPanel($('band-panel'));
+const selectBandInput = attachBandPanel($('band-panel'), {
+  endpoint: '/api/reference/rhythm/create',
+  payload: event => ({
+    event, mode: $('rhythm-mode').value, energy: Number($('rhythm-energy').value), bars: Number($('rhythm-bars').value)
+  })
+});
 let buffer, sourceURL, recorder, stream, timer, phase='idle', startedAt=0, disposed=false;
 let sessionId, captureEpoch=0, operation=0;
+let selectedRhythm = null;
 function sync(){
   for(const id of ['file','example','count','tempo','origin'])$(id).disabled=phase!=='idle';
   $('tempo').disabled=phase!=='idle'||$('count').value!=='0';
@@ -11,7 +17,7 @@ function sync(){
   $('analyze').disabled=phase!=='idle'||!buffer;
 }
 function setPhase(value){phase=value;sync();}
-function clearResult(){ selectBandInput(null);$('result').hidden=true; }
+function clearResult(){ selectedRhythm=null;selectBandInput(null);$('result').hidden=true; }
 function clearAudio(){
   clearResult();buffer=null;sessionId=null;$('original').pause();$('original').removeAttribute('src');$('original').load();
   if(sourceURL)URL.revokeObjectURL(sourceURL);sourceURL=null;
@@ -74,6 +80,9 @@ $('record').onclick=async()=>{
   }catch(e){if(epoch!==captureEpoch)return;releaseMicrophone();recorder=null;reportError(e);setPhase('idle');}
 };
 for(const id of ['count','tempo','origin'])$(id).onchange=()=>{clearResult();sync();};
+for (const id of ['rhythm-mode', 'rhythm-energy', 'rhythm-bars']) {
+  $(id).onchange = () => selectBandInput(selectedRhythm);
+}
 $('analyze').onclick=async()=>{
   if(phase!=='idle'||!buffer)return;
   for(const field of [$('tempo'),$('origin')]){
@@ -84,10 +93,10 @@ $('analyze').onclick=async()=>{
     }
   }
   const token=++operation;setPhase('analyzing');clearResult();$('status').textContent='正在本机分析，首次调用可能需要稍等…';
-  try{const r=await fetch('/api/rhythm/v1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wav:wavBase64(buffer),session_id:sessionId,started_at:startedAt,count_in:Number($('count').value),tempo:Number($('tempo').value),origin:$('origin').value===''?null:Number($('origin').value)})});
-    const event=await r.json();if(token!==operation)return;if(!r.ok)throw Error(event.error);const rhythm=event.payload.rhythm;selectBandInput(event);
+  try{const r=await fetch('/api/reference/rhythm/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wav:wavBase64(buffer),session_id:sessionId,started_at:startedAt,count_in:Number($('count').value),tempo:Number($('tempo').value),origin:$('origin').value===''?null:Number($('origin').value)})});
+    const event=await r.json();if(token!==operation)return;if(!r.ok)throw Error(event.error);const rhythm=event.payload.rhythm;selectedRhythm=event;selectBandInput(event);
     $('event').textContent=JSON.stringify(event,null,2);$('summary').textContent=`${rhythm.tempo_bpm.toFixed(1)} BPM · 拍点 [${rhythm.onset_beats.join(', ')}] · 网格贴合度 ${rhythm.confidence.toFixed(2)}`;
-    $('result').hidden=false;$('status').textContent='已生成独立的 rhythm_seed InputEvent。';
+    $('result').hidden=false;$('status').textContent='已识别节拍。你可以选择编排方式，再生成音乐。';
   }catch(e){if(token===operation)$('status').textContent=`分析失败：${e.message}`;}finally{if(token===operation)setPhase('idle');}
 };
 window.addEventListener('pagehide',event=>{disposed=true;captureEpoch++;operation++;recorder=null;releaseMicrophone();$('original').pause();if(!event.persisted&&sourceURL)URL.revokeObjectURL(sourceURL);setPhase('idle');});

@@ -1,5 +1,5 @@
 // One render belongs to the selected input. Discard late responses after a new take.
-export function attachBandPanel(panel) {
+export function attachBandPanel(panel, {endpoint = '/api/create', payload = event => event} = {}) {
   panel.innerHTML = `<h3>听创作结果</h3>
     <p>从这次输入发展出一段新音乐，生成后可以试听或下载。</p>
     <button type="button" data-render>生成音乐</button>
@@ -50,8 +50,8 @@ export function attachBandPanel(panel) {
     button.disabled = true;
     find('[data-status]').textContent = '乐队正在编排和渲染…';
     try {
-      const response = await fetch('/api/create', {method:'POST', signal:request.signal,
-        headers:{'Content-Type':'application/json'}, body:JSON.stringify(event)});
+      const response = await fetch(endpoint, {method:'POST', signal:request.signal,
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload(event))});
       const result = await response.json();
       if (request !== pending) return;
       if (!response.ok) throw new Error(result.error);
@@ -60,8 +60,9 @@ export function attachBandPanel(panel) {
       find('[data-wav]').href = wav;
       find('[data-midi]').href = media(result.midi, 'audio/midi');
       find('[data-output]').hidden = false;
-      find('[data-status]').textContent = `${result.bars} 小节 · ${result.tempo_bpm.toFixed(1)} BPM · 本地规则 Agent · ${result.renderer}`;
-      if (result.warnings.length || result.manager_diagnostics.last_log_error)
+      const agentLabel = result.agent === 'rule' ? ' · 本地规则 Agent' : '';
+      find('[data-status]').textContent = `${result.bars} 小节 · ${result.tempo_bpm.toFixed(1)} BPM${agentLabel} · ${result.renderer}`;
+      if (result.warnings?.length || result.manager_diagnostics?.last_log_error)
         find('[data-status]').textContent += ' · 部分诊断记录未能保存';
     } catch (error) {
       if (request === pending) {
