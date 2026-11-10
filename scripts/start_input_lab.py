@@ -1,10 +1,12 @@
 """Start the prepared local lab and open its workbench (no installation)."""
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import time
+from urllib.error import HTTPError
 from urllib.request import urlopen
 import webbrowser
 
@@ -18,12 +20,20 @@ def main():
         if not (root / 'web' / version / 'dist' / 'index.html').is_file():
             raise RuntimeError(f'Build web/{version} first. See docs/integration/RUN.md.')
     url = f'http://127.0.0.1:{args.port}'
+    expected = {'service': 'jammate-creation-v1', 'root': str(root)}
+    occupied = f'Port {args.port} is already serving another workbench. Stop it or choose a different --port.'
+
     def ready():
         try:
-            with urlopen(url, timeout=1) as response:
-                return b'Band Lab</title>' in response.read(10000)
+            with urlopen(f'{url}/api/ready', timeout=1) as response:
+                service = json.loads(response.read(4096))
+        except (HTTPError, ValueError) as exc:
+            raise RuntimeError(occupied) from exc
         except OSError:
             return False
+        if service != expected:
+            raise RuntimeError(occupied)
+        return True
     if not ready():
         logs = root / 'tmp'
         logs.mkdir(exist_ok=True)

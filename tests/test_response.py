@@ -82,6 +82,13 @@ def test_answer_is_deterministic_for_a_seed():
     assert a == b
 
 
+def test_random_variation_keeps_the_contour_of_a_short_three_note_phrase():
+    phrase = (Note(60, 0, .2), Note(64, .2, .2), Note(67, .4, .2))
+    answer = answer_motif(phrase, C_MAJOR, random.Random(1))
+    assert len(answer.notes) == 3
+    assert [note.pitch for note in answer.notes] != [60, 64, 67]
+
+
 def test_unknown_transform_and_empty_motif():
     with pytest.raises(ValueError):
         answer_motif(MOTIF, C_MAJOR, random.Random(0), transform="shuffle")

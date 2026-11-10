@@ -33,7 +33,7 @@ function reportError(error){$('status').textContent=error.name==='NotAllowedErro
 async function replaceAudio(getBlob){
   if(phase!=='idle')return;
   const token=++operation;setPhase('loading');clearAudio();
-  try{await load(await getBlob(),token);}catch(e){if(token===operation){clearAudio();reportError(e);}}finally{if(token===operation){$('file').value='';setPhase('idle');}}
+  try{await load(await getBlob(),token);}catch(e){if(token===operation){clearAudio();reportError(e);}}finally{if(token===operation)setPhase('idle');}
 }
 function releaseMicrophone(){clearTimeout(timer);stream?.getTracks().forEach(t=>t.stop());stream=null;}
 function stopRecording(){if(phase!=='recording'||recorder?.state!=='recording')return;setPhase('stopping');recorder.stop();}
@@ -44,7 +44,11 @@ function wavBase64(audio){
   for(let i=0;i<n;i++){let s=0;for(let c=0;c<audio.numberOfChannels;c++)s+=audio.getChannelData(c)[i]/audio.numberOfChannels;v.setInt16(44+i*2,Math.round(Math.max(-1,Math.min(1,s))*32767),true);}
   const bytes=new Uint8Array(data);let textData='';for(let i=0;i<bytes.length;i+=8192)textData+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(textData);
 }
-$('file').onchange=()=>{const file=$('file').files[0];if(file)replaceAudio(()=>file);};
+$('file').onchange = () => {
+  const file = $('file').files[0];
+  $('file').value = '';
+  if (file) replaceAudio(() => file);
+};
 $('example').onclick=()=>replaceAudio(async()=>{const r=await fetch('rhythm-example.wav');if(!r.ok)throw Error('示例未找到，请先生成示例音频。');return r.blob();});
 $('record').onclick=async()=>{
   if(phase==='recording'){stopRecording();return;}

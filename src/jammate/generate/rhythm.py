@@ -7,7 +7,7 @@ strongest, separated anchors. Tempo is applied only by the renderer.
 
 from __future__ import annotations
 
-from jammate.generate.patterns import BASS_LOW, CLOSED_HAT, COMP_LOW, KICK, SNARE
+from jammate.generate.patterns import BASS_LOW, CLOSED_HAT, COMP_LOW, KICK, OPEN_HAT, SNARE
 from jammate.music import BEATS_PER_BAR, Chord, Note
 from jammate.rhythm import RhythmContext, RhythmMode
 
@@ -51,6 +51,9 @@ def rhythm_parts(chord: Chord, context: RhythmContext, mode: RhythmMode,
         return ()
     root, _, fifth = chord.voicing(BASS_LOW)
     voicing = chord.voicing(COMP_LOW)
+    # A full grid leaves no room to insert notes. Change the color of the
+    # phrase ending while keeping every existing attack in place.
+    color_ending = mode == RhythmMode.VARY and len(hits) == len(context.onset_beats) and bar_index % 4 == 3
     notes: list[Note] = []
     for i, (beat, accent) in enumerate(hits):
         next_beat = hits[i + 1][0] if i + 1 < len(hits) else float(BEATS_PER_BAR)
@@ -58,7 +61,8 @@ def rhythm_parts(chord: Chord, context: RhythmContext, mode: RhythmMode,
         velocity = min(127, round((55 + 15 * energy) * (0.45 + 0.55 * accent)))
         drum = KICK if i % 2 == 0 else SNARE
         notes.append(Note(drum, beat, min(0.125, duration), velocity, "drums"))
-        notes.append(Note(CLOSED_HAT, beat, min(0.125, duration), max(1, velocity - 25), "drums"))
+        hat = OPEN_HAT if color_ending and i == len(hits) - 1 else CLOSED_HAT
+        notes.append(Note(hat, beat, min(0.125, duration), max(1, velocity - 25), "drums"))
         notes.append(Note(root if i % 2 == 0 else fifth, beat, duration, velocity, "bass"))
         notes.extend(Note(p, beat, min(duration, 0.5), max(1, velocity - 25), "keys") for p in voicing)
     return tuple(sorted(notes, key=lambda n: (n.start, n.instrument, n.pitch)))

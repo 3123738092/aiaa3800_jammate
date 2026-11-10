@@ -1,4 +1,5 @@
 import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const base=process.env.INPUT_LAB_URL||'http://127.0.0.1:4186';
@@ -25,8 +26,10 @@ try{
         return new Promise((resolve,reject)=>window.releaseDecode=async()=>{try{resolve(await decode.apply(this,args));}catch(e){reject(e);}finally{window.decodeReleased=true;}});
       };
     });
-    await page.click('#example');await page.waitForFunction(()=>window.releaseDecode);
+    const source=fileURLToPath(new URL('../web/rhythm-example.wav',import.meta.url));
+    await page.locator('#file').setInputFiles(source);await page.waitForFunction(()=>window.releaseDecode);
     await page.evaluate(()=>{dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
+    assert.equal(await page.locator('#file').inputValue(),'',route+' can select the same file again after cancellation');
     await page.locator('#file').setInputFiles({name:'invalid.wav',mimeType:'audio/wav',buffer:Buffer.from('bad audio')});
     await page.waitForFunction(()=>!document.querySelector('#record').disabled);
     await page.evaluate(async()=>{await window.releaseDecode();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});

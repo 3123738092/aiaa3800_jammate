@@ -437,12 +437,13 @@ for (const control of [ui.normalize,ui.trim]) control.addEventListener('change',
 });
 ui.import.addEventListener('click',()=>ui.file.click());
 ui.file.addEventListener('change',async()=>{
-  const file=ui.file.files[0]; if(!file)return;
-  if(busy||recording){ui.file.value='';return;}
+  const file = ui.file.files[0];
+  ui.file.value = '';
+  if (!file || busy || recording) return;
   const token=++operation; busy=true;syncUI();
   try{clearAudio();if(file.size>15*1024*1024)throw new Error('请使用 15 MB 以内、30 秒以内的短录音。');await setAudio(file,file.name,'import',token);}
   catch(error){if(token!==operation)return;status(error.name === 'EncodingError' ? '无法解码这段音频，请检查文件是否完整，或试试 WAV、MP3、M4A 文件。' : error.message||'无法读取这段音频，请试试 WAV、MP3 或 WebM 文件。',true);}
-  finally{if(token===operation){busy=false;ui.file.value='';syncUI();}}
+  finally{if(token===operation){busy=false;syncUI();}}
 });
 ui.example.addEventListener('click',async()=>{
   const token=++operation; busy=true;syncUI();

@@ -22,6 +22,12 @@ ROOT = Path(__file__).resolve().parents[2] / "web"
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/api/ready":
+            self.json_response(200, {"service": "jammate-creation-v1", "root": str(ROOT.parent)})
+        else:
+            super().do_GET()
+
     def json_response(self, status, data):
         body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode()
         self.send_response(status)
