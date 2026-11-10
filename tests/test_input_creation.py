@@ -50,3 +50,17 @@ def test_legacy_humming_preview_still_echoes_unchanged_notes():
     notes = event["payload"]["melody"]["notes"]
     assert [note.pitch for note in lead] == [note["pitchMidi"] for note in notes]
     assert [note.start for note in lead] == pytest.approx([note["startSec"] for note in notes], abs=.003)
+
+
+@pytest.mark.parametrize(("text", "tempo"), [("来一段，慢一点", 92), ("来一段，快一点", 108)])
+def test_text_starts_a_new_passage_at_the_requested_relative_speed(text, tempo):
+    result = render_clip({"text": text}, creative=True)
+    midi = read_midi(result)
+    assert midi.get_tempo_changes()[1][0] == pytest.approx(tempo, abs=.001)
+    assert next(part.notes for part in midi.instruments if part.name == "lead")
+    assert result["plan"]["trigger_event_ids"] == [result["event_id"]]
+
+
+def test_unsupported_text_is_not_rendered_as_a_generic_song():
+    with pytest.raises(ValueError, match="指令未执行"):
+        render_clip({"text": "来一段，变成一只猫"}, creative=True)

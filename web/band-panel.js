@@ -11,8 +11,10 @@ export function attachBandPanel(panel) {
   const find = selector => panel.querySelector(selector);
   const button = find('[data-render]'), audio = find('audio');
   const original = document.getElementById('original');
-  audio.addEventListener('play', () => original.pause());
-  original.addEventListener('play', () => audio.pause());
+  if (original) {
+    audio.addEventListener('play', () => original.pause());
+    original.addEventListener('play', () => audio.pause());
+  }
   let current, pending;
   const urls = [];
 

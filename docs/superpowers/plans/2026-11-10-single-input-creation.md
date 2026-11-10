@@ -32,9 +32,9 @@ Files: src/jammate/input_band.py, src/jammate/input_server.py, src/jammate/orche
 
 ## Task 2 — Independent text creation
 
-Files: src/jammate/input_band.py, src/jammate/input_server.py, web/text-creation.html, web/text-creation.js, web/band-panel.js, web/index.html, tests/test_input_creation.py, tests/creation-browser.mjs.
+Files: src/jammate/input_band.py, web/text-creation.html, web/text-creation.js, web/band-panel.js, web/index.html, tests/test_input_creation.py, tests/creation-text-browser.mjs.
 
-- [ ] After Task 1 passes, add failing tests for creation with just “来一段，慢一点” and “来一段，快一点”, plus explicit rejection of unsupported text. Compare the resulting MIDI tempos.
-- [ ] Let POST /api/create accept a text-only request and normalize it with from_text. Require INITIATE with no unresolved clauses. Render through the same staged plan executor.
-- [ ] Add the text page with clear supported examples and the same output panel. Exercise it after switching from an audio entry. Verify editing and retry cannot reuse old material.
+- [x] After Task 1 passes, add failing tests for creation with just “来一段，慢一点” and “来一段，快一点”, plus explicit rejection of unsupported text. Compare the resulting MIDI tempos.
+- [x] Let POST /api/create accept a text-only request and normalize it with from_text. Require INITIATE with no unresolved clauses. Render through the same staged plan executor.
+- [x] Add the text page with clear supported examples and the same output panel. Exercise it after switching from an audio entry. Verify editing and retry cannot reuse old material.
 - [ ] Save text and audio examples, add the operating instructions and validation evidence, and run full applicable regressions. Review and push the new branch. Verify the served preview.

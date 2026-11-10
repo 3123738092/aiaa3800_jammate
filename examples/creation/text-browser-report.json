@@ -1,0 +1,10 @@
+{
+  "slowTempo": 92,
+  "fastTempo": 108,
+  "renderer": "Kevin / FluidSynth",
+  "wavDuration": 12.6896875,
+  "rejectedUnsupported": true,
+  "retrySucceeded": true,
+  "independentFromRhythm": true,
+  "pageErrors": []
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JamMate · 文字创作</title>
+  <link rel="stylesheet" href="lab.css">
+</head>
+<body>
+  <main>
+    <nav><a href="/">← 创作工作台</a></nav>
+    <p class="eyebrow">JAMMATE / TEXT</p>
+    <h1>用一句话开始。</h1>
+    <p>给乐队一句提示，它会从头写一小段音乐。</p>
+    <section class="panel">
+      <label for="creation-prompt">创作提示</label>
+      <textarea id="creation-prompt" rows="3" maxlength="500" placeholder="来一段，慢一点" aria-describedby="prompt-help"></textarea>
+      <p id="prompt-help" class="muted">本地规则支持「来一段」，也可用逗号加上「快一点」或「慢一点」。</p>
+      <button type="button" data-prompt="来一段，慢一点">试试慢一点</button>
+      <button type="button" data-prompt="来一段，快一点">试试快一点</button>
+      <section id="band-panel" hidden></section>
+    </section>
+  </main>
+  <script type="module" src="text-creation.js"></script>
+</body>
+</html>

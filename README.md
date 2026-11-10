@@ -1,15 +1,16 @@
 # JamMate：会接你话的 AI 乐队（AIAA 3800 课程项目原型）
 
-## 从网页听乐队回应
+## 从一种输入开始创作
 
-在本机双击 `start-input-lab.cmd`，打开 [JamMate 工作台](http://127.0.0.1:4185)。进入「哼唱与乐队回应」或「节拍与乐队回应」，载入示例或导入自己的录音，完成识别后点击「生成伴奏」。页面可试听、下载多轨 MIDI 和 WAV，也可单独下载本次交给 Agent 的 JSON。新机器先按[安装与启动说明](docs/integration/RUN.md)准备环境。
+在本机双击 `start-input-lab.cmd`，打开 [JamMate 创作工作台](http://127.0.0.1:4187)。任选哼唱、节拍或文字，点击「生成音乐」。每次生成从这次选择的输入出发，交给同一套 Agent、编排和渲染流程。结果可试听并下载多轨 MIDI 和 WAV。新机器先按[安装与启动说明](docs/integration/RUN.md)准备环境。
 
-这个集成分支以队友的 Agent 和渲染器为底座，使用 10 月 28 日的优化版哼唱和节拍输入。每次录音单独生成一段回应。网页用本地规则 Agent，配置 FluidSynth 时调用 Kevin 渲染器；没有配置时使用项目内置合成器。LLM 的多轮入口见下方原项目说明。
+哼唱生成旋律变奏，节拍沿原拍点加花，文字可以用「来一段，慢一点」从空白开始。网页用本地规则 Agent，配置 FluidSynth 时调用 Kevin 渲染器，否则使用内置合成器。下方保留原项目的多轮命令行说明。
 
-| 浏览器验收样例 | 可试听的伴奏 | 多轨与输入 |
+| 浏览器验收样例 | 可试听的音乐 | 多轨与输入 |
 |---|---|---|
-| 哼唱五个音，听主旋律在乐队里重现 | [哼唱 WAV](examples/web_band/humming.band.wav) | [MIDI](examples/web_band/humming.band.mid) · [识别事件](examples/web_band/humming.agent.json) |
-| 四下定速，拍出第 2 拍后的切分 | [节奏 WAV](examples/web_band/rhythm.band.wav) | [MIDI](examples/web_band/rhythm.band.mid) · [识别事件](examples/web_band/rhythm.agent.json) |
+| 从五音哼唱变奏 | [哼唱 WAV](examples/creation/humming.wav) | [MIDI](examples/creation/humming.mid) · [原录音](examples/creation/humming-source.wav) |
+| 沿切分节拍加花 | [节奏 WAV](examples/creation/rhythm.wav) | [MIDI](examples/creation/rhythm.mid) · [原录音](web/rhythm-example.wav) |
+| 「来一段，慢一点」 | [文字 WAV](examples/creation/text.wav) | [MIDI](examples/creation/text.mid) · [文字输入](examples/creation/text.input.json) |
 
 
 

@@ -1,4 +1,4 @@
-"""Render one independent web clip through the team's versioned Agent loop."""
+"""Create a passage from one input through the team's versioned Agent loop."""
 from __future__ import annotations
 
 import base64
@@ -10,6 +10,7 @@ from uuid import uuid4
 import soundfile as sf
 
 from jammate.contracts import InputEvent
+from jammate.contracts.adapters import from_text
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import OfflineRuntime
@@ -19,8 +20,15 @@ from jammate.state import JamState
 
 
 def render_clip(document, *, creative=False, fluidsynth=None, soundfont=None):
-    event = InputEvent.from_dict(document)
+    if creative and isinstance(document, dict) and set(document) == {"text"}:
+        text = document["text"]
+        if not isinstance(text, str) or not text.strip() or len(text) > 500:
+            raise ValueError("请输入 1–500 字的创作提示。")
+        event = from_text(text, session_id=f"creation_{uuid4().hex}")
+    else:
+        event = InputEvent.from_dict(document)
     payload = event.payload
+    expected_strategy = "RESPOND"
     if event.source == "rhythm":
         tempo = payload["rhythm"]["tempo_bpm"]
         if payload["status"] != "ready" or payload["rhythm"]["confidence"] < 0.65:
@@ -29,6 +37,9 @@ def render_clip(document, *, creative=False, fluidsynth=None, soundfont=None):
         tempo = 100.0
         if not payload["melody"]["notes"]:
             raise ValueError("这段录音没有识别到音符，请重新哼唱或切换识别结果。")
+    elif creative and event.source == "text":
+        tempo = 100.0
+        expected_strategy = "INITIATE"
     else:
         raise ValueError("此入口需要哼唱或节奏事件。")
 
@@ -37,7 +48,12 @@ def render_clip(document, *, creative=False, fluidsynth=None, soundfont=None):
     accepted = manager.ingest([event])
     state, history = manager.decision_snapshot()
     plan = RuleAgent().decide(accepted, state, plan_id=f"band_{uuid4().hex}", history=history, vary_input=creative)
-    if plan.to_dict()["strategy"] != "RESPOND":
+    decision = plan.to_dict()
+    if decision["unresolved"]:
+        raise ValueError("指令未执行：" + "；".join(decision["unresolved"]))
+    if decision["strategy"] != expected_strategy:
+        if event.source == "text":
+            raise ValueError("请用「来一段」开始创作，可以加上「快一点」或「慢一点」。")
         raise ValueError("乐队无法用这段输入生成回应，请尝试更短的乐句或更清晰的节奏。")
     manager.stage(plan)
     if fluidsynth is not None:

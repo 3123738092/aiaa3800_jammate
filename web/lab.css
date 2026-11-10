@@ -5,3 +5,4 @@
 #band-panel button:disabled { opacity: .6; }
 #band-panel audio { width: 100%; max-width: 28rem; }
 #band-panel a { color: #315640; }
+#creation-prompt { width: 100%; padding: .7rem; font: inherit; color: inherit; border: 1px solid #c6cbbd; border-radius: .4rem; resize: vertical; }
