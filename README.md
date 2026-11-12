@@ -14,11 +14,11 @@ AIAA 3800 课程项目。JamMate 是一个本地音乐创作工作台，你可�
 
 ## 在 Windows 上运行
 
-已在 Python 3.12、Node.js 24 和 pnpm 11 上验证。装好 Git 和这些工具后，在 PowerShell 运行以下命令。工作台会从 Git 历史读取队友的固定版本，请保留克隆下来的历史。
+已在 Python 3.12、Node.js 24 和 pnpm 11 上验证。装好 Git 和这些工具后，在 PowerShell 运行以下命令。工作台从 Git 历史读取固定版本，请完整克隆。评审 PR 时，把第一行替换为 PR 描述里的分支克隆命令。
 
 ```powershell
-git clone https://github.com/Farewellxxxx/3800-HAI-Project.git
-cd 3800-HAI-Project
+git clone https://github.com/3123738092/aiaa3800_jammate.git
+cd aiaa3800_jammate
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]" -c requirements-input.lock.txt
 pnpm --dir web/baseline install --frozen-lockfile
@@ -38,4 +38,4 @@ pnpm --dir web/optimized run build
 
 ## 实现与来源
 
-哼唱由 Spotify Basic Pitch 提取音符，接上我们的单声部整理和变奏。拍手与文字调用队友 `a63a0f5` 版本的节拍编排和文字 Agent。三种入口都按小节生成乐器音符，拍手使用原版内置合成器，哼唱和文字可以用 Kevin 渲染器及 FluidSynth 发声。[实现与验收](docs/integration/REFERENCE_WORKBENCH.md) · [旧版命令行和研发记录](https://github.com/Farewellxxxx/3800-HAI-Project/blob/5b1eacad1de81df55c232cf0c17a0374f50a7865/README.md)
+哼唱由 Spotify Basic Pitch 提取音符，接上我们的单声部整理和变奏。拍手与文字调用队友 `a63a0f5` 版本的节拍编排和文字 Agent。三种入口都按小节生成乐器音符，拍手使用原版内置合成器，哼唱和文字可以用 Kevin 渲染器及 FluidSynth 发声。[实现与验收](docs/integration/REFERENCE_WORKBENCH.md) · [团队原版命令行和研发记录](https://github.com/3123738092/aiaa3800_jammate/blob/a63a0f5f579cbc36ed0dfa31874c8888e4873cbd/README.md)

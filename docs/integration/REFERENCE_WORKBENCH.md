@@ -1,6 +1,6 @@
 # JamMate 原版接入与验收
 
-克隆 `Farewellxxxx/3800-HAI-Project` 后，在配置好的工作区双击 `start-input-lab.cmd`，即可打开 [本机工作台](http://127.0.0.1:4188/)。
+克隆 `3123738092/aiaa3800_jammate` 并按 [项目 README](../../README.md) 配置环境后，双击 `start-input-lab.cmd`，即可打开 [本机工作台](http://127.0.0.1:4188/)。
 
 | 入口 | 操作 | 可调设置 |
 |---|---|---|
