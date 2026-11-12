@@ -17,7 +17,7 @@ AIAA 3800 课程项目。JamMate 是一个本地音乐创作工作台，你可�
 已在 Python 3.12、Node.js 24 和 pnpm 11 上验证。装好 Git 和这些工具后，在 PowerShell 运行以下命令。工作台会从 Git 历史读取队友的固定版本，请保留克隆下来的历史。
 
 ```powershell
-git clone --branch integration/style-llm-creation https://github.com/Farewellxxxx/3800-HAI-Project.git
+git clone https://github.com/Farewellxxxx/3800-HAI-Project.git
 cd 3800-HAI-Project
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]" -c requirements-input.lock.txt

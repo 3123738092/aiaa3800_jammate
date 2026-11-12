@@ -10,7 +10,7 @@
 
 ## 新电脑安装
 
-本次在 Windows、Python 3.12、Node 24 和 pnpm 11.25 上验证。在此集成分支根目录打开 PowerShell：
+本次在 Windows、Python 3.12、Node 24 和 pnpm 11.25 上验证。克隆仓库后，在仓库根目录打开 PowerShell 并运行以下命令。
 
 ```powershell
 python -m venv .venv
