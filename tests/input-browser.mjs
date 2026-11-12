@@ -27,7 +27,8 @@ async function checkBand(kind, sample = kind) {
   assert.equal(result.event_id, event.event_id);
   if (rhythm) {
     assert.equal(result.mode, mode);
-    assert.match(result.reference_commit, /^a63a0f5/);
+    assert.equal(result.implementation, 'workspace');
+    assert.equal(result.reference_commit, null);
   } else {
     assert.equal(result.plan.strategy, 'RESPOND');
     assert.deepEqual(result.plan.trigger_event_ids,[event.event_id]);

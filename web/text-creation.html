@@ -19,6 +19,11 @@
       </select></label>
       <p id="provider-state" class="muted" role="status">正在检查大模型配置…</p>
       <details><summary>高级设置</summary>
+        <label>生成后端 <select id="text-renderer">
+          <option value="default">精确编排（当前音源）</option>
+          <option value="mrt2">MRT2 生成试听</option>
+        </select></label>
+        <label><input id="text-preview" type="checkbox">允许生成试听：MRT2 无法保证逐音符或声部保留，试听不提交音乐状态。</label>
         <label>起始 BPM <input id="text-bpm" type="number" min="60" max="180" step="any" value="100" required></label>
         <label>音色 <select id="text-profile">
           <option value="electric">电钢琴 + 贝斯</option>

@@ -16,7 +16,7 @@ from jammate.input_event import perceive_rhythm, validate_event
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_rhythm
 from jammate.input_band import render_clip
-from jammate.reference_bridge import ReferenceBridge
+from jammate.reference_bridge import ReferenceBridge, SERVICE_ID
 from jammate.rhythm import RhythmContext
 
 ROOT = Path(__file__).resolve().parents[2] / "web"
@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parents[2] / "web"
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/ready":
-            self.json_response(200, {"service": "jammate-reference-workbench-v1", "root": str(ROOT.parent)})
+            self.json_response(200, {"service": SERVICE_ID, "root": str(ROOT.parent),
+                                     "implementation": self.server.reference.implementation})
         else:
             super().do_GET()
 
@@ -90,12 +91,17 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 self.json_response(404, {"error": "unknown endpoint"})
         except (ValueError, KeyError, TypeError, RuntimeError, OSError, subprocess.SubprocessError) as exc:
-            self.json_response(400, {"error": str(exc)})
+            reply = {"error": str(exc)}
+            if getattr(exc, "report", None) is not None:
+                reply["capabilities"] = exc.report
+            self.json_response(400, reply)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=4185)
+    parser.add_argument("--implementation", choices=("workspace", "pinned"), default="workspace",
+                        help="workspace loads new backends; pinned reproduces a63a0f5")
     parser.add_argument("--fluidsynth", default=os.environ.get("JAMMATE_FLUIDSYNTH") or shutil.which("fluidsynth"))
     parser.add_argument("--soundfont", default=os.environ.get("JAMMATE_SOUNDFONT"))
     args = parser.parse_args()
@@ -107,7 +113,7 @@ def main():
     if args.soundfont and not args.fluidsynth:
         parser.error("a SoundFont requires FluidSynth")
     with ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
-                         soundfont=args.soundfont) as reference, ThreadingHTTPServer(
+                         soundfont=args.soundfont, implementation=args.implementation) as reference, ThreadingHTTPServer(
                              ("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
         server.reference = reference

@@ -77,7 +77,8 @@ try {
   assert.equal(first.agent, 'rule');
   assert.equal(first.turn, 1);
   assert.equal(first.tempo_bpm, 92);
-  assert.match(first.reference_commit, /^a63a0f5/);
+  assert.equal(first.implementation, 'workspace');
+  assert.equal(first.reference_commit, null);
   assert.equal(first.plan.trigger_event_ids.length, 1);
   assert(await readWav(page.locator('#text-audio')) > 10);
   await download('#text-wav', 'text-first.wav');

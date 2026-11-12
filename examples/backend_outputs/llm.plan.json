@@ -1,0 +1,40 @@
+{
+  "actions": [
+    {
+      "action": "BUILD",
+      "parameters": {
+        "duration_bars": 4
+      },
+      "scope": "drums",
+      "strength": 0.4
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0.0
+  },
+  "plan_confidence": null,
+  "plan_id": "comparison_llm",
+  "preserve": [
+    "tempo",
+    "key",
+    "groove",
+    "playing",
+    "layer:bass",
+    "layer:keys",
+    "layer:lead"
+  ],
+  "reason": "把鼓推得更猛一点，其他声部先保持不变。",
+  "schema_version": "1.0.0",
+  "session_id": "backend_comparison",
+  "strategy": "FOLLOW",
+  "transport": {
+    "playing": true
+  },
+  "trigger_event_ids": [
+    "comparison_input"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

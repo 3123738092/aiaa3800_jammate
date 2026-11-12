@@ -1,0 +1,16 @@
+{
+  "confidence": null,
+  "ended_at": null,
+  "event_id": "comparison_input",
+  "event_type": "speech",
+  "payload": {
+    "text": "鼓更猛一点"
+  },
+  "provenance": {
+    "producer": "text"
+  },
+  "schema_version": "1.0.0",
+  "session_id": "backend_comparison",
+  "source": "text",
+  "started_at": null
+}

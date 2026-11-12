@@ -9,6 +9,7 @@ import time
 from urllib.error import HTTPError
 from urllib.request import urlopen
 import webbrowser
+from jammate.reference_bridge import SERVICE_ID
 
 def main():
     parser = argparse.ArgumentParser()
@@ -20,7 +21,7 @@ def main():
         if not (root / 'web' / version / 'dist' / 'index.html').is_file():
             raise RuntimeError(f'Build web/{version} first. See docs/integration/RUN.md.')
     url = f'http://127.0.0.1:{args.port}'
-    expected = {'service': 'jammate-reference-workbench-v1', 'root': str(root)}
+    expected = {'service': SERVICE_ID, 'root': str(root), 'implementation': 'workspace'}
     occupied = f'Port {args.port} is already serving another workbench. Stop it or choose a different --port.'
 
     def ready():

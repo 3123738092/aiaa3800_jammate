@@ -13,6 +13,7 @@ demo_out/
 *.secrets.json
 openai.local.json
 .venv/
+.venv-mrt2/
 node_modules/
 dist/
 tmp/

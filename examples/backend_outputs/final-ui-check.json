@@ -1,0 +1,56 @@
+{
+  "ready": {
+    "service": "jammate-workbench-backends-v2",
+    "root": "/mnt/d/桌面/学/a26-27 autumn/AIAA 3800/project/aiaa3800-jammate-mrt2",
+    "implementation": "workspace"
+  },
+  "strict_rejection": {
+    "error": "MRT2 cannot guarantee requested preserve/actions; use FluidSynth or explicitly request an uncommitted preview",
+    "capabilities": {
+      "preserve": [
+        {
+          "constraint": "tempo",
+          "guaranteed": false,
+          "evidence": "conditioning_only"
+        },
+        {
+          "constraint": "key",
+          "guaranteed": false,
+          "evidence": "conditioning_only"
+        },
+        {
+          "constraint": "layer:bass",
+          "guaranteed": false,
+          "evidence": "conditioning_only"
+        },
+        {
+          "constraint": "layer:keys",
+          "guaranteed": false,
+          "evidence": "conditioning_only"
+        },
+        {
+          "constraint": "layer:lead",
+          "guaranteed": false,
+          "evidence": "conditioning_only"
+        }
+      ],
+      "actions": [
+        {
+          "action": "BUILD",
+          "scope": "drums",
+          "guaranteed": false
+        }
+      ],
+      "exact_notes": false,
+      "exact_timbre": false,
+      "state_commit_allowed": false,
+      "limitations": [
+        "25 Hz pitch union; velocity, program and voice identity are lost",
+        "Binary drum condition cannot identify kick/snare/hi-hat",
+        "Generated audio is not a verification of pitch, tempo, key, layers or motif preservation",
+        "Each exported clip starts fresh model context; no physical playback receipt"
+      ]
+    }
+  },
+  "ui_case": "Replayed an already recorded REAL MRT2 artifact to verify new constraint labels; no fresh model inference"
+}

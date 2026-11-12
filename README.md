@@ -32,6 +32,8 @@ pnpm --dir web/optimized run build
 
 ## 文字入口的大模型选项
 
+本分支新增 FluidSynth / MRT2 执行适配与规则/LLM 共用入口。MRT2 生成试听会明确报告无法保证的保留约束，不提交未经验证的音乐状态；独立输入文件、运行命令和官方接口说明见 [MRT2 后端](docs/MRT2_BACKEND.md)。服务默认加载当前工作目录代码，使用 `--implementation pinned` 可复现历史版本。
+
 文字页默认用本地规则，装好环境后，三个入口都能在本地试用。开启「队友大模型 Agent」后，模型根据文字和作品状态给出编排动作，例如「移除贝斯」。JamMate 校验动作，再生成具体音符和音频。
 
 要启用大模型，在项目目录运行 `.\.venv\Scripts\python.exe -m pip install -e ".[llm]"`，配置自己的 `OPENAI_API_KEY`，或让 `JAMMATE_LLM_CONFIG` 指向仓库外的私有配置。重启服务后，在文字页选择「队友大模型 Agent」。[配置与验证说明](docs/integration/REFERENCE_WORKBENCH.md#大模型配置)

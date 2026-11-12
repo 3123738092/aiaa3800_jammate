@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "session_id": "backend_comparison",
+  "plan_id": "comparison_rule",
+  "based_on_state_version": 1,
+  "effective_bar": 0,
+  "completed_bar": 4,
+  "backend": "kevin_midi_fluidsynth",
+  "mode": "offline_export",
+  "succeeded": true,
+  "phase": "exported",
+  "artifact_generated": true,
+  "state_committed": true,
+  "capabilities": {
+    "preserve": [
+      {
+        "constraint": "tempo",
+        "guaranteed": true,
+        "evidence": "symbolic_note_checks"
+      },
+      {
+        "constraint": "key",
+        "guaranteed": true,
+        "evidence": "symbolic_note_checks"
+      },
+      {
+        "constraint": "layer:bass",
+        "guaranteed": true,
+        "evidence": "symbolic_note_checks"
+      },
+      {
+        "constraint": "layer:keys",
+        "guaranteed": true,
+        "evidence": "symbolic_note_checks"
+      },
+      {
+        "constraint": "layer:lead",
+        "guaranteed": true,
+        "evidence": "symbolic_note_checks"
+      }
+    ],
+    "actions": [
+      {
+        "action": "BUILD",
+        "scope": "drums",
+        "guaranteed": true
+      }
+    ],
+    "exact_notes": true,
+    "exact_timbre": false,
+    "state_commit_allowed": true,
+    "limitations": [
+      "MIDI note fidelity does not prove perceptual quality or physical playback"
+    ]
+  },
+  "midi_verification": {
+    "note_count": 44,
+    "max_time_error_s": 3.552713678800501e-15,
+    "tolerance_s": 0.0006250100000000001,
+    "duration_s": 9.600000000000003,
+    "programs": {
+      "1": 4,
+      "2": 33,
+      "4": 73
+    }
+  },
+  "wav": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "duration_s": 9.602902494331065,
+    "rms": 0.06982500264750292,
+    "peak": 0.59539794921875
+  },
+  "instrument_profile": "electric",
+  "lead_program": 73,
+  "soundfont_sha256": "c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854",
+  "midi_role": "performance",
+  "state_version_after": 2,
+  "manager_diagnostics": {
+    "log_write_failures": 0,
+    "last_log_error": null,
+    "event_count": 1,
+    "plan_count": 1,
+    "turn_count": 1
+  },
+  "persistence_warnings": []
+}

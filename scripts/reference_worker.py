@@ -105,11 +105,14 @@ class ReferenceService:
             raise ValueError("文字大模型尚未配置。可先选用原版本地规则。") from None
 
     def status(self):
+        capabilities = {"soundfont": bool(self.fluidsynth),
+                        "mrt2_installed": importlib.util.find_spec("magenta_rt") is not None
+                            and importlib.util.find_spec("jammate.render.runtime") is not None}
         try:
             self.config()
         except ValueError as error:
-            return {"llm_ready": False, "notice": str(error), "soundfont": bool(self.fluidsynth)}
-        return {"llm_ready": True, "notice": "", "soundfont": bool(self.fluidsynth)}
+            return {"llm_ready": False, "notice": str(error), **capabilities}
+        return {"llm_ready": True, "notice": "", **capabilities}
 
     def text_turn(self, body):
         sid, rid, text = body["session_id"], body["request_id"], body["text"]
@@ -125,7 +128,10 @@ class ReferenceService:
             raise ValueError("起始速度需在 60–180 BPM。")
         if profile != "electric" and not self.fluidsynth:
             raise ValueError("选择音色需要本机 FluidSynth。")
-        settings = (mode, bpm, profile)
+        backend, preview = body.get("renderer", "default"), body.get("allow_preview", False)
+        if backend not in {"default", "fluidsynth", "mrt2"} or type(preview) is not bool:
+            raise ValueError("无效的渲染后端或试听选项。")
+        settings = (mode, bpm, profile, backend, preview)
         work = self.works.get(sid)
         if work is not None:
             if settings != work.settings:
@@ -169,7 +175,8 @@ class ReferenceService:
         snapshot, history = manager.decision_snapshot()
         directory = TemporaryDirectory(prefix="render-", ignore_cleanup_errors=True)
         try:
-            runtime = self.runtime(directory.name, profile)
+            runtime = self.runtime(directory.name, profile) if backend == "default" else self.backend_runtime(
+                directory.name, profile, backend, preview)
             agent = LLMAgent(config, fallback="error", execution_validator=runtime.validate) if config else RuleAgent()
             plan = agent.decide(accepted, snapshot, plan_id=f"web_{uuid4().hex}", history=history)
             decision = plan.to_dict()
@@ -181,10 +188,15 @@ class ReferenceService:
         except Exception:
             directory.cleanup()
             raise
+        receipt = getattr(runtime, "last_receipt", None)
         result = {"session_id": sid, "request_id": rid, "turn": len(work.completed) + 1,
                   "tempo_bpm": rendered.tempo_bpm, "start_bar": rendered.start_bar, "bars": rendered.bars,
-                  "plan": decision, "agent": mode, "renderer": "Kevin / FluidSynth" if self.fluidsynth else "原版合成器"}
-        artifacts = runtime.last_artifacts if self.fluidsynth else None
+                  "plan": decision, "agent": mode,
+                  "decision_trace": getattr(agent, "last_trace", {"source": "rule"}),
+                  "receipt": receipt,
+                  "renderer": "MRT2 / generated preview" if backend == "mrt2" else (
+                      "Kevin / FluidSynth" if self.fluidsynth else "原版合成器")}
+        artifacts = getattr(runtime, "last_artifacts", None)
         # The original runtime has already acknowledged the plan. Keep its
         # output available for retry without deciding or applying it again.
         work.applied = AppliedTurn(directory, rendered, artifacts, result)
@@ -219,6 +231,16 @@ class ReferenceService:
             from renderer_experiments.app.band_plan import KevinRuntime
             return KevinRuntime(Path(output), executable=self.fluidsynth, soundfont=self.soundfont, profile=profile)
         return OfflineRuntime()
+
+    def backend_runtime(self, output, profile, backend, preview):
+        # Pinned a63a0f5 has no new runtime module. Never import a second copy
+        # of JamState beside it to make the backend seem available.
+        try:
+            from jammate.render.runtime import create_runtime
+        except ImportError:
+            raise ValueError("新后端需要 --implementation workspace；固定历史版本不包含 MRT2。") from None
+        return create_runtime(output, backend=backend, fluidsynth=self.fluidsynth,
+                              soundfont=self.soundfont, profile=profile, allow_preview=preview)
 
     def style_sample(self, body):
         from renderer_experiments.app.midi.files import render_with_fluidsynth, write_midi
@@ -260,6 +282,8 @@ def main(snapshot, fluidsynth, soundfont):
             reply = {"error": "音频渲染未完成，请重试。"}
         except (ValueError, RuntimeError, KeyError, TypeError, OSError) as error:
             reply = {"error": str(error) or "请求未完成。"}
+            if getattr(error, "report", None) is not None:
+                reply["capabilities"] = error.report
         print(json.dumps(reply, ensure_ascii=False, allow_nan=False), flush=True)
 
 

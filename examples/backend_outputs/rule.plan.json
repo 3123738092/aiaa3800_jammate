@@ -1,0 +1,36 @@
+{
+  "actions": [
+    {
+      "action": "BUILD",
+      "parameters": {
+        "duration_bars": 4
+      },
+      "scope": "drums",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0.0
+  },
+  "plan_confidence": null,
+  "plan_id": "comparison_rule",
+  "preserve": [
+    "tempo",
+    "key",
+    "layer:bass",
+    "layer:keys",
+    "layer:lead"
+  ],
+  "reason": "鼓更猛一点",
+  "schema_version": "1.0.0",
+  "session_id": "backend_comparison",
+  "strategy": "FOLLOW",
+  "transport": {},
+  "trigger_event_ids": [
+    "comparison_input"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

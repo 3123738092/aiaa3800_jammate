@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -12,10 +13,31 @@ from zipfile import ZipFile
 
 
 REFERENCE_COMMIT = "a63a0f5f579cbc36ed0dfa31874c8888e4873cbd"
+SERVICE_ID = "jammate-workbench-backends-v2"
+
+
+class ReferenceFailure(ValueError):
+    def __init__(self, message, report=None):
+        super().__init__(message)
+        self.report = report
+
+
+def archive_command(root):
+    """Read WSL-created worktree metadata from Windows without rewriting it."""
+    options = []
+    marker = Path(root) / ".git"
+    if os.name == "nt" and marker.is_file():
+        match = re.fullmatch(r"gitdir: /mnt/([a-z])/(.+)\s*", marker.read_text().strip())
+        if match:
+            options = ["--git-dir=" + match[1].upper() + ":/" + match[2]]
+    return ["git", *options, "archive", "--format=zip", REFERENCE_COMMIT, "src/jammate", "renderer_experiments/app"]
 
 
 class ReferenceBridge:
-    def __init__(self, root, *, scratch, fluidsynth=None, soundfont=None):
+    def __init__(self, root, *, scratch, fluidsynth=None, soundfont=None, implementation="pinned"):
+        if implementation not in {"pinned", "workspace"}:
+            raise ValueError("implementation must be pinned or workspace")
+        self.implementation = implementation
         self.root = Path(root).resolve()
         self.scratch = Path(scratch).resolve()
         self.fluidsynth = str(Path(fluidsynth).resolve()) if fluidsynth else ""
@@ -32,9 +54,11 @@ class ReferenceBridge:
         self.close()
 
     def _snapshot(self):
+        if self.implementation == "workspace":
+            return self.root
         if self._directory is None:
             archive = subprocess.run(
-                ["git", "archive", "--format=zip", REFERENCE_COMMIT, "src/jammate", "renderer_experiments/app"],
+                archive_command(self.root),
                 cwd=self.root, capture_output=True,
             )
             if archive.returncode:
@@ -79,10 +103,11 @@ class ReferenceBridge:
                     self._stop(process)
                 raise ValueError("队友版本的服务已中断，请重试。文字作品需要重新开始。") from None
         if "error" in reply:
-            raise ValueError(reply["error"])
+            raise ReferenceFailure(reply["error"], reply.get("capabilities"))
         if operation == "rhythm/analyze":
             return reply["result"]
-        return {**reply["result"], "reference_commit": REFERENCE_COMMIT}
+        return {**reply["result"], "reference_commit": REFERENCE_COMMIT if self.implementation == "pinned" else None,
+                "implementation": self.implementation}
 
     @staticmethod
     def _stop(process):

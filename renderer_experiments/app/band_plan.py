@@ -17,6 +17,7 @@ import soundfile as sf
 
 from jammate.contracts import PlanError
 from jammate.orchestration.offline import prepare_plan, RenderedPlan
+from jammate.render.capabilities import capability_report, segment_seconds
 from .midi.events import MidiEvent
 from .midi.files import write_midi, write_events, render_with_fluidsynth
 from .presets import get_instrument
@@ -27,12 +28,10 @@ CHANNELS = {"drums": 9, "bass": 2, "keys": 1, "lead": 4}
 def midi_events(performance):
     """Session beats -> segment seconds, retaining source rests and velocities."""
     events = []
-    origin = performance.start_bar * 4
-    scale = 60 / performance.tempo_bpm
     for note in performance.notes:
         channel = CHANNELS[note.instrument]
-        events.extend((MidiEvent((note.start - origin) * scale, "note_on", channel, note.pitch, note.velocity),
-                       MidiEvent((note.end - origin) * scale, "note_off", channel, note.pitch, 0)))
+        events.extend((MidiEvent(segment_seconds(note.start, performance), "note_on", channel, note.pitch, note.velocity),
+                       MidiEvent(segment_seconds(note.end, performance), "note_off", channel, note.pitch, 0)))
     return sorted(events, key=lambda event: (event.timestamp, event.type == "note_on"))
 
 
@@ -86,6 +85,8 @@ class KevinRuntime:
     One directory per execution; a failed/stale result remains diagnostic evidence
     and cannot mutate JamState. No program, file name or backend comes from LLM text.
     """
+    backend_name = "kevin_midi_fluidsynth"
+
     def __init__(self, output: Path, *, executable: Path, soundfont: Path,
                  profile="electric", lead_program=73, sample_rate=44100, seed=3800):
         self.output = Path(output)
@@ -100,6 +101,15 @@ class KevinRuntime:
         self.last_artifacts = None
         self.last_receipt = None
         self._execution_lock = threading.Lock()
+
+    def capabilities(self, plan, performance):
+        return capability_report(plan)
+
+    def render_audio(self, folder, performance):
+        render_with_fluidsynth(folder / "band.mid", folder / "band.wav", self.executable,
+                              self.soundfont, self.sample_rate)
+        return {"instrument_profile": self.profile, "lead_program": self.programs[4],
+                "soundfont_sha256": hashlib.sha256(self.soundfont.read_bytes()).hexdigest()}
 
     def validate(self, state, plan):
         performance = prepare_plan(state, plan, seed=self.seed)
@@ -137,7 +147,8 @@ class KevinRuntime:
         self.last_receipt = None
         receipt = {"schema_version": "1.0.0", "session_id": state.session_id, "plan_id": plan.plan_id,
                    "based_on_state_version": state.state_version, **bounds,
-                   "backend": "kevin_midi_fluidsynth", "mode": "offline_export", "succeeded": False}
+                   "backend": self.backend_name, "mode": "offline_export", "succeeded": False,
+                   "phase": "preparing", "artifact_generated": False, "state_committed": False}
         # A colliding directory may belong to another active exporter. Refuse
         # overwrite without failing that exporter's plan in the shared manager.
         folder.mkdir(parents=True, exist_ok=False)
@@ -145,13 +156,14 @@ class KevinRuntime:
             plan.write(folder / "plan.json")
             _write(folder / "state_observed.json", state.to_dict())
             performance = self.validate(state, plan)
+            capabilities = self.capabilities(plan, performance)
+            receipt["capabilities"] = capabilities
             events = midi_events(performance)
             duration = performance.bars * 4 * 60 / performance.tempo_bpm
             write_events(folder / "events.json", events)
             write_midi(folder / "band.mid", events, performance.tempo_bpm, self.programs, duration_s=duration)
             verification = verify_midi(folder / "band.mid", events, self.programs, duration)
-            render_with_fluidsynth(folder / "band.mid", folder / "band.wav", self.executable,
-                                  self.soundfont, self.sample_rate)
+            metadata = self.render_audio(folder, performance)
             audio, sr = sf.read(folder / "band.wav", dtype="float32", always_2d=True)
             if sr != self.sample_rate or len(audio) < round(duration * sr) - 2 or not np.isfinite(audio).all():
                 raise ValueError("invalid WAV duration, sample rate or samples")
@@ -161,16 +173,22 @@ class KevinRuntime:
             receipt.update(midi_verification=verification, wav={"sample_rate": sr, "channels": audio.shape[1],
                            "duration_s": len(audio) / sr, "rms": rms,
                            "peak": float(np.max(np.abs(audio))) if audio.size else 0.},
-                           instrument_profile=self.profile, lead_program=self.programs[4],
-                           soundfont_sha256=hashlib.sha256(self.soundfont.read_bytes()).hexdigest())
+                           **metadata)
+            receipt["artifact_generated"] = True
             # Save generated artifacts before acknowledging; a cancelled plan must
             # not become an applied state even if its offline export finished.
             _write(folder / "render_result.json", receipt)
-            accepted, committed = manager.acknowledge_and_snapshot(plan, succeeded=True, lead_notes=performance.lead_notes,
-                                                                 generated_motif=performance.generated_motif, **bounds)
+            can_commit = capabilities["state_commit_allowed"]
+            accepted, committed = manager.acknowledge_and_snapshot(plan, succeeded=can_commit,
+                reason="" if can_commit else "Unverified MRT2 audio preview; musical state was not applied",
+                lead_notes=performance.lead_notes if can_commit else (),
+                generated_motif=performance.generated_motif if can_commit else None, **bounds)
             if not accepted:
                 raise PlanError("execution receipt was not accepted; plan already reached a terminal status")
-            receipt.update(succeeded=True, state_version_after=committed.state_version,
+            receipt.update(succeeded=can_commit, state_committed=can_commit,
+                           phase="exported" if can_commit else "preview",
+                           midi_role="performance" if can_commit else "conditioning_not_transcription",
+                           state_version_after=committed.state_version,
                            manager_diagnostics=manager.diagnostics(), persistence_warnings=[])
             # Commit already happened. Report persistence failure separately;
             # never throw an apparent execution failure that invites replay.
@@ -183,6 +201,8 @@ class KevinRuntime:
             return RenderedPlan(performance.notes, performance.lead_notes, performance.generated_motif,
                                 performance.tempo_bpm, performance.start_bar, performance.bars, audio, sr)
         except Exception as exc:
+            if hasattr(exc, "report"):
+                receipt["capabilities"] = exc.report
             receipt.update(reason=type(exc).__name__ + ": " + str(exc), plan_status=manager.plan_status(plan.plan_id))
             if manager.plan_status(plan.plan_id) == "pending":
                 manager.acknowledge(plan, succeeded=False, reason=receipt["reason"], **bounds)
