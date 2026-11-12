@@ -1,6 +1,6 @@
 # MRT2 与 FluidSynth 后端接入
 
-基于 `codex/jammate-workbench` 的 `6571fa2`，在独立 `feat/mrt2-runtime` 分支开发。公共边界仍是 InputEvent、JamState 和 BandPlan；MRT2 tokens 是执行端内部格式。
+基于工作台基线 `6571fa2` 实现，现已合入 `codex/jammate-workbench`，后续直接在该分支维护。公共边界仍是 InputEvent、JamState 和 BandPlan；MRT2 tokens 是执行端内部格式。
 
 ## 运行路径与职责
 
@@ -46,7 +46,7 @@ InputEvent + JamState + history
 建议使用 Python 3.12 的独立 Linux/WSL 环境，不改已有 Windows 工作环境：
 
 ```bash
-git clone --branch feat/mrt2-runtime https://github.com/3123738092/aiaa3800_jammate.git aiaa3800-jammate-mrt2
+git clone --branch codex/jammate-workbench https://github.com/3123738092/aiaa3800_jammate.git aiaa3800-jammate-mrt2
 cd aiaa3800-jammate-mrt2
 python -m venv .venv-mrt2
 source .venv-mrt2/bin/activate
