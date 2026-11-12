@@ -1,0 +1,13 @@
+{
+  "inference": "real_magenta_rt",
+  "backend": "jax",
+  "model": "mrt2_small",
+  "prompt": "a warm acoustic jazz trio",
+  "frames": 60,
+  "duration_s": 2.4,
+  "elapsed_s": 22.908611347999795,
+  "midi_sha256": null,
+  "conditioning": "text_only",
+  "frame_quantization_s": 0.04,
+  "official_source": "https://github.com/magenta/magenta-realtime/tree/694a545e4ba0b88bf1150137b129582166d3e07f"
+}

@@ -1,0 +1,36 @@
+{
+  "actions": [
+    {
+      "action": "VARY_MOTIF",
+      "parameters": {
+        "motif_id": "motif_f958710a-f4b7-4ab5-b808-8ba13343cf39"
+      },
+      "scope": "lead",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0
+  },
+  "plan_confidence": null,
+  "plan_id": "band_e3cd615bd60e463cb643aeba5c3a585d",
+  "preserve": [
+    "tempo",
+    "key",
+    "layer:drums",
+    "layer:bass",
+    "layer:keys"
+  ],
+  "reason": "Develop a variation of the observed phrase",
+  "schema_version": "1.0.0",
+  "session_id": "e22fd4a5-c859-4087-a5e1-23fdd4339c55",
+  "strategy": "RESPOND",
+  "transport": {},
+  "trigger_event_ids": [
+    "f958710a-f4b7-4ab5-b808-8ba13343cf39"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

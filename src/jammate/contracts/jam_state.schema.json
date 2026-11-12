@@ -1,0 +1,565 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "state_version",
+    "transport",
+    "harmony",
+    "form",
+    "feel",
+    "motifs",
+    "arrangement",
+    "interaction",
+    "rhythm",
+    "rhythm_mode",
+    "rhythm_sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tempo_bpm",
+        "playing",
+        "bar",
+        "beat",
+        "next_bar"
+      ],
+      "properties": {
+        "tempo_bpm": {
+          "type": "number",
+          "minimum": 60,
+          "maximum": 180
+        },
+        "playing": {
+          "type": "boolean"
+        },
+        "bar": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beat": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 4
+        },
+        "next_bar": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "harmony": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "progression_variant"
+      ],
+      "properties": {
+        "key": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tonic",
+                "mode"
+              ],
+              "properties": {
+                "tonic": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 11
+                },
+                "mode": {
+                  "enum": [
+                    "major",
+                    "minor"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "progression_variant": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section",
+        "bars_elapsed"
+      ],
+      "properties": {
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bars_elapsed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "feel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy",
+        "density",
+        "brightness",
+        "tension",
+        "tags"
+      ],
+      "properties": {
+        "energy": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "density": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tension": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "motifs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_id",
+        "last_user",
+        "last_ai",
+        "items"
+      ],
+      "properties": {
+        "current_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_user": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pitch",
+              "start",
+              "duration",
+              "velocity",
+              "instrument"
+            ],
+            "properties": {
+              "pitch": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "velocity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "instrument": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "last_ai": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pitch",
+              "start",
+              "duration",
+              "velocity",
+              "instrument"
+            ],
+            "properties": {
+              "pitch": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "velocity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 127
+              },
+              "instrument": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "motif_id",
+              "owner",
+              "source_event_ids",
+              "notes"
+            ],
+            "properties": {
+              "motif_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner": {
+                "enum": [
+                  "user",
+                  "ai"
+                ]
+              },
+              "source_event_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "pitch",
+                    "start",
+                    "duration",
+                    "velocity",
+                    "instrument"
+                  ],
+                  "properties": {
+                    "pitch": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 127
+                    },
+                    "start": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "duration": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "velocity": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 127
+                    },
+                    "instrument": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "arrangement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layers"
+      ],
+      "properties": {
+        "layers": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "active",
+              "level",
+              "density",
+              "role"
+            ],
+            "properties": {
+              "name": {
+                "enum": [
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "level": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "density": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "initiative",
+        "current_lead",
+        "user_active",
+        "awaiting_user",
+        "last_feedback"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "LISTEN",
+            "FOLLOW",
+            "RESPOND",
+            "INITIATE"
+          ]
+        },
+        "initiative": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "current_lead": {
+          "enum": [
+            "user",
+            "ai",
+            null
+          ]
+        },
+        "user_active": {
+          "type": "boolean"
+        },
+        "awaiting_user": {
+          "type": "boolean"
+        },
+        "last_feedback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "rhythm": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tempo_bpm",
+            "onset_beats",
+            "accents",
+            "beat_origin_s",
+            "beats_per_bar",
+            "confidence"
+          ],
+          "properties": {
+            "tempo_bpm": {
+              "type": "number",
+              "minimum": 60,
+              "maximum": 180
+            },
+            "onset_beats": {
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 4
+              }
+            },
+            "accents": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              }
+            },
+            "beat_origin_s": {
+              "type": "number",
+              "minimum": 0
+            },
+            "beats_per_bar": {
+              "const": 4
+            },
+            "confidence": {
+              "$ref": "#/$defs/unit"
+            }
+          }
+        }
+      ]
+    },
+    "rhythm_mode": {
+      "enum": [
+        "follow",
+        "vary",
+        "simplify"
+      ]
+    },
+    "rhythm_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "context"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tempo_bpm",
+              "onset_beats",
+              "accents",
+              "beat_origin_s",
+              "beats_per_bar",
+              "confidence"
+            ],
+            "properties": {
+              "tempo_bpm": {
+                "type": "number",
+                "minimum": 60,
+                "maximum": 180
+              },
+              "onset_beats": {
+                "type": "array",
+                "maxItems": 16,
+                "uniqueItems": true,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "exclusiveMaximum": 4
+                }
+              },
+              "accents": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                }
+              },
+              "beat_origin_s": {
+                "type": "number",
+                "minimum": 0
+              },
+              "beats_per_bar": {
+                "const": 4
+              },
+              "confidence": {
+                "$ref": "#/$defs/unit"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JamMate JamState 1.0.0",
+  "$defs": {
+    "unit": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

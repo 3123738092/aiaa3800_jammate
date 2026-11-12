@@ -6,3 +6,16 @@ demo_out/
 # Personal microphone recordings; generate shareable fixtures with examples/.
 /my_rhythm.wav
 /headset_rhythm.wav
+# Local API credentials; use the user profile config or environment variables.
+.env
+.env.*
+!.env.example
+*.secrets.json
+openai.local.json
+.venv/
+.venv-mrt2/
+node_modules/
+dist/
+tmp/
+*.log
+/recordings/

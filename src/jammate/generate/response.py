@@ -10,7 +10,7 @@ so the user hears a clear end of the AI's turn.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from jammate.generate.harmony import triad
 from jammate.music import Key, Note
@@ -72,10 +72,19 @@ def _resolve(pitch: int, key: Key, low: int = LEAD_LOW, high: int = LEAD_HIGH) -
 def _finish(rhythm: list[tuple[float, float]], pitches: list[int], key: Key) -> tuple[Note, ...]:
     in_key = fit_register([key.snap(p) for p in pitches])
     in_key[-1] = _resolve(in_key[-1], key)
-    return tuple(
-        Note(pitch, start, duration, velocity=_LEAD_VELOCITY, instrument="lead")
-        for pitch, (start, duration) in zip(in_key, rhythm)
-    )
+    notes: list[Note] = []
+    last_by_pitch: dict[int, int] = {}
+    for pitch, (start, duration) in zip(in_key, rhythm):
+        index = last_by_pitch.get(pitch)
+        if index is not None and start < notes[index].end - 1e-9:
+            # Different source pitches can land on the same key tone. Keep
+            # one sustain so a note-off cannot cut the other voice in MIDI.
+            previous = notes[index]
+            notes[index] = replace(previous, duration=max(previous.end, start + duration) - previous.start)
+        else:
+            last_by_pitch[pitch] = len(notes)
+            notes.append(Note(pitch, start, duration, velocity=_LEAD_VELOCITY, instrument="lead"))
+    return tuple(notes)
 
 
 def _displace(rhythm: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -132,6 +141,8 @@ def answer_motif(
     rng.shuffle(candidates)
     for name in candidates:
         answer = _build(name, notes, key, rng)
+        if name == "displace" and len(answer.notes) < len(notes):
+            continue
         if _pitch_classes(answer.notes) != heard:
             return answer
     return _build("echo", notes, key, rng)

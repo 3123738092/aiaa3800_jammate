@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0.0",
+  "session_id": "backend_comparison",
+  "plan_id": "comparison_rule",
+  "based_on_state_version": 1,
+  "effective_bar": 0,
+  "completed_bar": 4,
+  "backend": "jax",
+  "mode": "offline_export",
+  "succeeded": false,
+  "phase": "preview",
+  "artifact_generated": true,
+  "state_committed": false,
+  "capabilities": {
+    "preserve": [
+      {
+        "constraint": "tempo",
+        "guaranteed": false,
+        "evidence": "conditioning_only"
+      },
+      {
+        "constraint": "key",
+        "guaranteed": false,
+        "evidence": "conditioning_only"
+      },
+      {
+        "constraint": "layer:bass",
+        "guaranteed": false,
+        "evidence": "conditioning_only"
+      },
+      {
+        "constraint": "layer:keys",
+        "guaranteed": false,
+        "evidence": "conditioning_only"
+      },
+      {
+        "constraint": "layer:lead",
+        "guaranteed": false,
+        "evidence": "conditioning_only"
+      }
+    ],
+    "actions": [
+      {
+        "action": "BUILD",
+        "scope": "drums",
+        "guaranteed": false
+      }
+    ],
+    "exact_notes": false,
+    "exact_timbre": false,
+    "state_commit_allowed": false,
+    "limitations": [
+      "25 Hz pitch union; velocity, program and voice identity are lost",
+      "Binary drum condition cannot identify kick/snare/hi-hat",
+      "Generated audio is not a verification of pitch, tempo, key, layers or motif preservation",
+      "Each exported clip starts fresh model context; no physical playback receipt"
+    ]
+  },
+  "midi_verification": {
+    "note_count": 44,
+    "max_time_error_s": 3.552713678800501e-15,
+    "tolerance_s": 0.0006250100000000001,
+    "duration_s": 9.600000000000003,
+    "programs": {
+      "1": 4,
+      "2": 33,
+      "4": 73
+    }
+  },
+  "wav": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "duration_s": 9.6,
+    "rms": 0.07352762599232572,
+    "peak": 0.545867919921875
+  },
+  "inference": "real_magenta_rt",
+  "model": "mrt2_small",
+  "prompt": "a warm instrumental band",
+  "frames": 240,
+  "duration_s": 9.6,
+  "elapsed_s": 21.31932236800003,
+  "midi_sha256": "5002d7b354783dba71c54ea48f060e32090aff2e87820a9a91e7653c6fd9303f",
+  "conditioning": "text_and_midi",
+  "frame_quantization_s": 0.04,
+  "official_source": "https://github.com/magenta/magenta-realtime/tree/694a545e4ba0b88bf1150137b129582166d3e07f",
+  "midi_role": "conditioning_not_transcription",
+  "state_version_after": 1,
+  "manager_diagnostics": {
+    "log_write_failures": 0,
+    "last_log_error": null,
+    "event_count": 1,
+    "plan_count": 1,
+    "turn_count": 1
+  },
+  "persistence_warnings": []
+}

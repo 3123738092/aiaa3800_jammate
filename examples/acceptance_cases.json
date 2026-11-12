@@ -1,0 +1,443 @@
+{
+  "version": "1.0.0",
+  "purpose": "Development batch of newly authored text and synthetic WAV inputs; not human-recording accuracy.",
+  "seed": 20261031,
+  "sample_rate": 22050,
+  "protocol": {
+    "rhythm_bpm_relative_tolerance": 0.05,
+    "rhythm_onsets": "exact sixteenth-note cells",
+    "hum_pitch_onset_tolerance_s": 0.12,
+    "hum_min_precision": 0.8,
+    "hum_min_recall": 0.8,
+    "hum_max_mean_duration_error_s": 0.25,
+    "require_llm": true,
+    "require_verified_midi_and_fluidsynth": true
+  },
+  "text_sessions": [
+    {
+      "id": "mix",
+      "turns": [
+        {
+          "text": "鼓的声音向前站一点，其他人保持原样，速度也别动。",
+          "expect": {
+            "increase": "drums.level",
+            "same": [
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "刚才鼓推得过头了，撤销那一步，回到最开始的力度。",
+          "expect": {
+            "value": {
+              "drums.level": 0.5,
+              "tempo_bpm": 100
+            }
+          }
+        },
+        {
+          "text": "让贝斯休息一下，鼓和键盘接着奏。",
+          "expect": {
+            "value": {
+              "bass.active": false,
+              "playing": true
+            },
+            "same": [
+              "drums",
+              "keys"
+            ]
+          }
+        },
+        {
+          "text": "把刚才休息的声部请回来，别碰鼓和键盘。",
+          "expect": {
+            "value": {
+              "bass.active": true,
+              "playing": true
+            },
+            "same": [
+              "drums",
+              "keys"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "space",
+      "turns": [
+        {
+          "text": "鼓敲得太密了，少敲几下；力度、BPM、贝斯和和弦都保持。",
+          "expect": {
+            "decrease": "drums.density",
+            "same": [
+              "drums.level",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "再只让键盘少弹些，鼓不用继续减了，贝斯也照旧。",
+          "expect": {
+            "decrease": "keys.density",
+            "same": [
+              "drums",
+              "bass",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "不要停，也不要再简化，保持刚才的伴奏。",
+          "expect": {
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ],
+            "value": {
+              "playing": true
+            }
+          }
+        },
+        {
+          "text": "速度设成 116 BPM，鼓贝斯键盘的密度和力度都不要改。",
+          "expect": {
+            "value": {
+              "tempo_bpm": 116
+            },
+            "same": [
+              "drums",
+              "bass",
+              "keys"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "transport",
+      "turns": [
+        {
+          "text": "我还在唱，音乐先不要停。",
+          "expect": {
+            "value": {
+              "playing": true
+            },
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "整支乐队暂停，我需要重新想一句。",
+          "expect": {
+            "value": {
+              "playing": false
+            }
+          }
+        },
+        {
+          "text": "继续刚才的伴奏，速度不变。",
+          "expect": {
+            "value": {
+              "playing": true
+            },
+            "same": [
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "整体轻一点，但不要减少音符或改变速度。",
+          "expect": {
+            "decrease": "drums.level",
+            "same": [
+              "drums.density",
+              "bass.density",
+              "keys.density",
+              "tempo_bpm"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "limits",
+      "turns": [
+        {
+          "text": "在原来的节奏上加一轨失真吉他，其他先不动。",
+          "expect": {
+            "unresolved": true,
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "把键盘音色换成管风琴，其余不用改。",
+          "expect": {
+            "unresolved": true,
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "这段很好，保持所有东西，不要因为我说了暂停这个词就暂停。",
+          "expect": {
+            "value": {
+              "playing": true
+            },
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ]
+          }
+        },
+        {
+          "text": "我想要更有月光的感觉，但暂时别改声音，先保留当前伴奏。",
+          "expect": {
+            "same": [
+              "drums",
+              "bass",
+              "keys",
+              "tempo_bpm"
+            ],
+            "value": {
+              "playing": true
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "rhythm": [
+    {
+      "id": "r_slow",
+      "bpm": 84,
+      "beats": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "accents": [
+        1,
+        0.5,
+        0.8,
+        0.5
+      ]
+    },
+    {
+      "id": "r_sync",
+      "bpm": 101,
+      "beats": [
+        0,
+        0.75,
+        1.5,
+        2.5,
+        3.25,
+        3.75
+      ],
+      "accents": [
+        1,
+        0.5,
+        0.7,
+        0.9,
+        0.5,
+        0.6
+      ]
+    },
+    {
+      "id": "r_fast",
+      "bpm": 132,
+      "beats": [
+        0,
+        0.5,
+        1,
+        1.75,
+        2,
+        3,
+        3.5
+      ],
+      "accents": [
+        1,
+        0.4,
+        0.6,
+        0.8,
+        1,
+        0.7,
+        0.4
+      ]
+    },
+    {
+      "id": "r_rest",
+      "bpm": 100,
+      "beats": [
+        1,
+        2.75
+      ],
+      "accents": [
+        0.8,
+        1
+      ]
+    },
+    {
+      "id": "r_noise",
+      "bpm": 110,
+      "beats": [
+        0,
+        0.75,
+        2,
+        2.5,
+        3.5
+      ],
+      "accents": [
+        1,
+        0.6,
+        0.8,
+        0.5,
+        0.7
+      ],
+      "noise": 0.002,
+      "jitter_s": 0.012
+    },
+    {
+      "id": "r_unsteady",
+      "bpm": 100,
+      "beats": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "accents": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "count_in_intervals": [
+        0.3,
+        0.9,
+        0.4
+      ],
+      "expect_rejected": true
+    },
+    {
+      "id": "r_silent",
+      "bpm": 100,
+      "beats": [],
+      "accents": [],
+      "silent": true,
+      "expect_rejected": true
+    }
+  ],
+  "humming": [
+    {
+      "id": "h_phrase",
+      "notes": [
+        [
+          57,
+          0.5,
+          0.65
+        ],
+        [
+          60,
+          1.45,
+          0.6
+        ],
+        [
+          62,
+          2.35,
+          0.75
+        ],
+        [
+          60,
+          3.4,
+          0.7
+        ]
+      ],
+      "duration_s": 4.6
+    },
+    {
+      "id": "h_long_rest",
+      "notes": [
+        [
+          60,
+          1.2,
+          1.1
+        ],
+        [
+          64,
+          3,
+          0.9
+        ]
+      ],
+      "duration_s": 4.6
+    },
+    {
+      "id": "h_sustain",
+      "notes": [
+        [
+          55,
+          0.35,
+          2.8
+        ]
+      ],
+      "duration_s": 3.8
+    },
+    {
+      "id": "h_quiet",
+      "notes": [
+        [
+          57,
+          0.6,
+          0.7
+        ],
+        [
+          60,
+          1.7,
+          0.8
+        ],
+        [
+          57,
+          2.9,
+          0.75
+        ]
+      ],
+      "duration_s": 4.2,
+      "gain": 0.06,
+      "noise": 0.0004
+    },
+    {
+      "id": "h_silent",
+      "notes": [],
+      "duration_s": 4.2,
+      "expect_rejected": true
+    }
+  ],
+  "simultaneous": {
+    "id": "multimodal",
+    "rhythm": "r_sync",
+    "humming": "h_phrase",
+    "text": "跟着这个节奏伴奏，原样回答我哼的旋律；沿用我们当前的 100 BPM。"
+  }
+}

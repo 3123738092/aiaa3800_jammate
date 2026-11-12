@@ -1,0 +1,361 @@
+{
+  "date": "2026-10-31",
+  "kind": "synthetic-input development batch; not human recording acceptance",
+  "manifest_sha256": "c6b9cb003a0ed3e18856267faba8684039218bab4a3ded0343652d6864c2b9ea",
+  "protocol": {
+    "rhythm_bpm_relative_tolerance": 0.05,
+    "rhythm_onsets": "exact sixteenth-note cells",
+    "hum_pitch_onset_tolerance_s": 0.12,
+    "hum_min_precision": 0.8,
+    "hum_min_recall": 0.8,
+    "hum_max_mean_duration_error_s": 0.25,
+    "require_llm": true,
+    "require_verified_midi_and_fluidsynth": true
+  },
+  "llm": {
+    "model": "gpt-5.4-mini",
+    "api": "responses",
+    "timeout_s": 20,
+    "max_output_tokens": 2400,
+    "reasoning_effort": "low"
+  },
+  "input_quality": [
+    {
+      "id": "r_slow",
+      "kind": "rhythm",
+      "passed": true,
+      "detected": {
+        "tempo_bpm": 83.35433467741937,
+        "onset_beats": [
+          0.0,
+          1.0,
+          2.0,
+          3.0
+        ],
+        "accents": [
+          0.665212869644165,
+          0.3153095245361328,
+          0.49655547738075256,
+          0.3708678185939789
+        ],
+        "beat_origin_s": 3.1624036281179135,
+        "beats_per_bar": 4,
+        "confidence": 0.9193548387096804
+      }
+    },
+    {
+      "id": "r_sync",
+      "kind": "rhythm",
+      "passed": true,
+      "detected": {
+        "tempo_bpm": 101.33272058823529,
+        "onset_beats": [
+          0.0,
+          0.75,
+          1.5,
+          2.5,
+          3.25,
+          3.75
+        ],
+        "accents": [
+          0.6459930539131165,
+          0.3887965679168701,
+          0.5510587096214294,
+          0.6904851198196411,
+          0.4388635754585266,
+          0.594371497631073
+        ],
+        "beat_origin_s": 2.674784580498866,
+        "beats_per_bar": 4,
+        "confidence": 0.9705882352941152
+      }
+    },
+    {
+      "id": "r_fast",
+      "kind": "rhythm",
+      "passed": true,
+      "detected": {
+        "tempo_bpm": 132.51201923076925,
+        "onset_beats": [
+          0.0,
+          0.5,
+          1.0,
+          1.75,
+          2.0,
+          3.0,
+          3.5
+        ],
+        "accents": [
+          1.0,
+          0.2066718190908432,
+          0.3715187907218933,
+          0.38230255246162415,
+          0.5632075667381287,
+          0.3374878168106079,
+          0.2673766314983368
+        ],
+        "beat_origin_s": 2.105895691609977,
+        "beats_per_bar": 4,
+        "confidence": 0.9010989010988985
+      }
+    },
+    {
+      "id": "r_rest",
+      "kind": "rhythm",
+      "passed": true,
+      "detected": {
+        "tempo_bpm": 99.38401442307692,
+        "onset_beats": [
+          1.0,
+          2.75
+        ],
+        "accents": [
+          0.6917077898979187,
+          0.8882168531417847
+        ],
+        "beat_origin_s": 2.6980045351473922,
+        "beats_per_bar": 4,
+        "confidence": 0.9230769230769238
+      }
+    },
+    {
+      "id": "r_noise",
+      "kind": "rhythm",
+      "passed": true,
+      "detected": {
+        "tempo_bpm": 109.95678191489364,
+        "onset_beats": [
+          0.0,
+          0.75,
+          2.0,
+          2.5,
+          3.5
+        ],
+        "accents": [
+          1.0,
+          0.6492640376091003,
+          0.7908374071121216,
+          0.4529466927051544,
+          0.4635867476463318
+        ],
+        "beat_origin_s": 2.4774149659863944,
+        "beats_per_bar": 4,
+        "confidence": 0.8595744680851057
+      }
+    },
+    {
+      "id": "r_unsteady",
+      "kind": "rhythm",
+      "passed": true,
+      "rejected": true,
+      "reason": "count-in is not steady; use --count-in 0 with --tempo"
+    },
+    {
+      "id": "r_silent",
+      "kind": "rhythm",
+      "passed": true,
+      "rejected": true,
+      "reason": "not enough count-in claps; use --count-in 0 with --tempo"
+    },
+    {
+      "id": "h_phrase",
+      "kind": "humming",
+      "quality": "ok",
+      "expected_notes": 4,
+      "detected_notes": 17,
+      "precision": 0.23529411764705882,
+      "recall": 1.0,
+      "mean_duration_error_s": 0.5472899999999999,
+      "pitch_frame_iou": 0.889261744966443,
+      "passed": false
+    },
+    {
+      "id": "h_long_rest",
+      "kind": "humming",
+      "quality": "ok",
+      "expected_notes": 2,
+      "detected_notes": 13,
+      "precision": 0.15384615384615385,
+      "recall": 1.0,
+      "mean_duration_error_s": 0.8839000000000001,
+      "pitch_frame_iou": 0.9299065420560748,
+      "passed": false
+    },
+    {
+      "id": "h_sustain",
+      "kind": "humming",
+      "quality": "ok",
+      "expected_notes": 1,
+      "detected_notes": 18,
+      "precision": 0.05555555555555555,
+      "recall": 1.0,
+      "mean_duration_error_s": 2.6606799999999997,
+      "pitch_frame_iou": 0.9587628865979382,
+      "passed": false
+    },
+    {
+      "id": "h_quiet",
+      "kind": "humming",
+      "quality": "ok",
+      "expected_notes": 3,
+      "detected_notes": 16,
+      "precision": 0.1875,
+      "recall": 1.0,
+      "mean_duration_error_s": 0.5719799999999999,
+      "pitch_frame_iou": 0.9253112033195021,
+      "passed": false
+    },
+    {
+      "id": "h_silent",
+      "kind": "humming",
+      "quality": "rejected",
+      "rejected": true,
+      "passed": true
+    }
+  ],
+  "first_run": {
+    "statistics": {
+      "input_cases": 12,
+      "input_passed": 8,
+      "agent_turns": 26,
+      "pipeline_passed": 26,
+      "semantic_passed": 25
+    },
+    "statistics_limit": "pipeline_passed means exported artifacts; semantic_passed was the initial state/action check, not full end-to-end acceptance",
+    "api_failure_ids": [
+      "mix/turn_02"
+    ],
+    "extra_sparse_density_failure_ids": [
+      "space/turn_02"
+    ],
+    "extra_tick_order_failure_ids": [
+      "h_phrase",
+      "h_long_rest",
+      "h_sustain",
+      "h_quiet",
+      "multimodal"
+    ]
+  },
+  "post_fix": {
+    "space_replay": [
+      {
+        "id": "space/turn_01",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_0b1bb4010df068f14966"
+      },
+      {
+        "id": "space/turn_02",
+        "original_artifact_failures": [
+          "keys: density decreased but actual MIDI onset count did not"
+        ],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_02/plan_4a1bc0aabb2d69419994"
+      },
+      {
+        "id": "space/turn_03",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_03/plan_7ba2f08f3d1a1cb68e0f"
+      },
+      {
+        "id": "space/turn_04",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_04/plan_854f82b4a03e019b2489"
+      }
+    ],
+    "tick_replay": [
+      {
+        "id": "h_long_rest",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_e4a19013ce6472e3c8ee"
+      },
+      {
+        "id": "h_phrase",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_754cbb3e104338abce91"
+      },
+      {
+        "id": "h_quiet",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_93202f5d1530ef696c87"
+      },
+      {
+        "id": "h_sustain",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_b46897b06213e92ed87f"
+      },
+      {
+        "id": "multimodal",
+        "original_artifact_failures": [],
+        "replay_failures": [],
+        "replay_passed": true,
+        "artifacts": "turn_01/plan_d33b1846bcef583cbfcb"
+      }
+    ],
+    "recovery": {
+      "kind": "separate recovery run; original failure retained",
+      "results": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": [],
+          "source": "llm"
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": [],
+          "source": "llm"
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": [],
+          "source": "llm"
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": [],
+          "source": "llm"
+        }
+      ]
+    }
+  },
+  "tests": {
+    "passed": 392,
+    "deselected": 1,
+    "warnings": 5,
+    "root_passed": 381,
+    "kevin_original_passed": 11,
+    "deselected_reason": "Lyria backend_input test requires absent Google SDK"
+  },
+  "remaining": [
+    "Humming long-note fragmentation on 4 synthetic clips",
+    "Human recording quality",
+    "Shared live transport and sound-card playback"
+  ],
+  "artifacts_local": "demo_out/acceptance_20261031_v1",
+  "audio_examples": {
+    "band_multimodal_after_fix.wav": {
+      "sha256": "781d86fd8fa9f6ae658d4b92d68ff1c90f084ac770f8ac3b1b5caf442145c1f7"
+    },
+    "band_text_conversation.wav": {
+      "sha256": "d0aad782175573b02d2bd9105f25fd49e8990a4d88f25eb4694845f63f435daa"
+    }
+  }
+}

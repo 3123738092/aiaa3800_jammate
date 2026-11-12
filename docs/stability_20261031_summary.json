@@ -1,0 +1,457 @@
+{
+  "kind": "development diagnostics; controlled soak and real API results are separate",
+  "baseline": {
+    "context_growth_before": [
+      {
+        "motifs": 32,
+        "context_chars": 52645,
+        "schema_chars": 5702
+      },
+      {
+        "motifs": 128,
+        "context_chars": 207001,
+        "schema_chars": 7802
+      },
+      {
+        "motifs": 512,
+        "context_chars": 825241,
+        "schema_chars": 17018
+      }
+    ],
+    "retry_after_failure_before": "PlanError: plan must reference the latest accepted batch in order"
+  },
+  "context_after": [
+    {
+      "motifs": 32,
+      "context_chars": 20221,
+      "schema_chars": 5282
+    },
+    {
+      "motifs": 128,
+      "context_chars": 20255,
+      "schema_chars": 5312
+    },
+    {
+      "motifs": 512,
+      "context_chars": 20255,
+      "schema_chars": 5312
+    }
+  ],
+  "controlled": {
+    "rounds": 300,
+    "passed": true,
+    "real_api_calls": 0,
+    "export_failures_recovered": 42,
+    "replaced_plans": 24,
+    "network_fallbacks": 23,
+    "invalid_responses_repaired": 16,
+    "stale_events": 15,
+    "initial_request_chars_max": 64076,
+    "diagnostics": {
+      "log_write_failures": 73,
+      "last_log_error": {
+        "event_type": "state_applied",
+        "error": "OSError",
+        "errno": 28
+      },
+      "event_count": 415,
+      "plan_count": 366,
+      "turn_count": 300
+    },
+    "final_state_version": 600,
+    "retained_python_bytes_before": 50317522,
+    "retained_python_bytes_after": 7286018,
+    "memory_limit": "tracemalloc retained Python allocations; not process RSS. Evidence and catalogs still grow linearly; not a bounded-memory production system."
+  },
+  "real_llm": {
+    "passed": 25,
+    "total": 26,
+    "cases_sha256": "17bef0cccbc2117a5c39d448919b8efe8615230a137b780c8572354c08bf4645",
+    "failed_turns": [
+      {
+        "turn": 7,
+        "passed": false,
+        "failures": [
+          "keys.level did not decrease",
+          "unexpected decision source"
+        ],
+        "source": "fallback",
+        "request_chars": 32129,
+        "decision_ms": 20000.0,
+        "attempts": 1
+      }
+    ],
+    "llm_decisions": 24,
+    "system_controls": 1,
+    "successful_decision_latency_ms": {
+      "min": 1594.0,
+      "median": 1992.0,
+      "max": 3719.0
+    },
+    "max_initial_request_chars": 34777
+  },
+  "humming": {
+    "manifest_sha256": "87d7ee75403cece8166a8e3f9d391b05af815196127bcb332f6cfd5fa96ba139",
+    "kind": "synthetic diagnostic, not a production threshold decision",
+    "variants": {
+      "baseline": {
+        "overrides": {
+          "disable_inferred_onsets": false,
+          "onset_threshold": null
+        },
+        "passed": 1,
+        "total": 7,
+        "original_bundle_sha256": "f5ee2ce689c05747cafab2ac7435e3a17844e563e5c34d292bf4a4c641aabc72",
+        "served_bundle_sha256": "f5ee2ce689c05747cafab2ac7435e3a17844e563e5c34d292bf4a4c641aabc72",
+        "model_sha256": {
+          "group1-shard1of1.bin": "b142a95737a52e1e412d5f92e73d8bb80dfe8d04941acc0702f11f4524fb377c",
+          "model.json": "1ed1aaee3409ec1dc098c8b01f430c0911f6fe9412e7af8086750f9e8f302f68"
+        },
+        "cases": [
+          {
+            "id": "h_phrase",
+            "expected_notes": 4,
+            "detected_notes": 17,
+            "precision": 0.23529411764705882,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.5472899999999999,
+            "pitch_frame_iou": 0.889261744966443,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_long_rest",
+            "expected_notes": 2,
+            "detected_notes": 13,
+            "precision": 0.15384615384615385,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.8839000000000001,
+            "pitch_frame_iou": 0.9299065420560748,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_sustain",
+            "expected_notes": 1,
+            "detected_notes": 18,
+            "precision": 0.05555555555555555,
+            "recall": 1.0,
+            "mean_duration_error_s": 2.6606799999999997,
+            "pitch_frame_iou": 0.9587628865979382,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_quiet",
+            "expected_notes": 3,
+            "detected_notes": 16,
+            "precision": 0.1875,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.5719799999999999,
+            "pitch_frame_iou": 0.9253112033195021,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_silent",
+            "rejected": true,
+            "passed": true
+          },
+          {
+            "id": "h_repeated",
+            "expected_notes": 5,
+            "detected_notes": 15,
+            "precision": 0.3333333333333333,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.26764600000000005,
+            "pitch_frame_iou": 0.8347457627118644,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_rearticulation",
+            "expected_notes": 6,
+            "detected_notes": 18,
+            "precision": 0.3333333333333333,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.21596100000000007,
+            "pitch_frame_iou": 0.8356643356643356,
+            "passed": false,
+            "cleanup_edits": 0
+          }
+        ]
+      },
+      "infer_off": {
+        "overrides": {
+          "disable_inferred_onsets": true,
+          "onset_threshold": null
+        },
+        "passed": 1,
+        "total": 7,
+        "original_bundle_sha256": "f5ee2ce689c05747cafab2ac7435e3a17844e563e5c34d292bf4a4c641aabc72",
+        "served_bundle_sha256": "e68e972e07e082138d11d3f8d30c2374225cceb16803de142c625067797e1429",
+        "model_sha256": {
+          "group1-shard1of1.bin": "b142a95737a52e1e412d5f92e73d8bb80dfe8d04941acc0702f11f4524fb377c",
+          "model.json": "1ed1aaee3409ec1dc098c8b01f430c0911f6fe9412e7af8086750f9e8f302f68"
+        },
+        "cases": [
+          {
+            "id": "h_phrase",
+            "expected_notes": 4,
+            "detected_notes": 17,
+            "precision": 0.23529411764705882,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.5472899999999999,
+            "pitch_frame_iou": 0.889261744966443,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_long_rest",
+            "expected_notes": 2,
+            "detected_notes": 13,
+            "precision": 0.15384615384615385,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.8780950000000001,
+            "pitch_frame_iou": 0.9120370370370371,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_sustain",
+            "expected_notes": 1,
+            "detected_notes": 18,
+            "precision": 0.05555555555555555,
+            "recall": 1.0,
+            "mean_duration_error_s": 2.6606799999999997,
+            "pitch_frame_iou": 0.9587628865979382,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_quiet",
+            "expected_notes": 3,
+            "detected_notes": 16,
+            "precision": 0.1875,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.5719799999999999,
+            "pitch_frame_iou": 0.9253112033195021,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_silent",
+            "rejected": true,
+            "passed": true
+          },
+          {
+            "id": "h_repeated",
+            "expected_notes": 5,
+            "detected_notes": 15,
+            "precision": 0.3333333333333333,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.26300200000000007,
+            "pitch_frame_iou": 0.8396624472573839,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_rearticulation",
+            "expected_notes": 6,
+            "detected_notes": 18,
+            "precision": 0.3333333333333333,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.21596100000000007,
+            "pitch_frame_iou": 0.8356643356643356,
+            "passed": false,
+            "cleanup_edits": 0
+          }
+        ]
+      },
+      "threshold_high": {
+        "overrides": {
+          "disable_inferred_onsets": false,
+          "onset_threshold": 0.5
+        },
+        "passed": 6,
+        "total": 7,
+        "original_bundle_sha256": "f5ee2ce689c05747cafab2ac7435e3a17844e563e5c34d292bf4a4c641aabc72",
+        "served_bundle_sha256": "5b2c460f6318eed06e107dd0adb9067cd2a65cdd73d5807085deb0e4e815cece",
+        "model_sha256": {
+          "group1-shard1of1.bin": "b142a95737a52e1e412d5f92e73d8bb80dfe8d04941acc0702f11f4524fb377c",
+          "model.json": "1ed1aaee3409ec1dc098c8b01f430c0911f6fe9412e7af8086750f9e8f302f68"
+        },
+        "cases": [
+          {
+            "id": "h_phrase",
+            "expected_notes": 4,
+            "detected_notes": 4,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.05416800000000002,
+            "pitch_frame_iou": 0.9050847457627119,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_long_rest",
+            "expected_notes": 2,
+            "detected_notes": 2,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.05134499999999992,
+            "pitch_frame_iou": 0.9295774647887324,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_sustain",
+            "expected_notes": 1,
+            "detected_notes": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.10377800000000015,
+            "pitch_frame_iou": 0.9655172413793104,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_quiet",
+            "expected_notes": 3,
+            "detected_notes": 4,
+            "precision": 0.75,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.12968733333333335,
+            "pitch_frame_iou": 0.9253112033195021,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_silent",
+            "rejected": true,
+            "passed": true
+          },
+          {
+            "id": "h_repeated",
+            "expected_notes": 5,
+            "detected_notes": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.06233379999999998,
+            "pitch_frame_iou": 0.8461538461538461,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_rearticulation",
+            "expected_notes": 6,
+            "detected_notes": 6,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.07428799999999998,
+            "pitch_frame_iou": 0.8356643356643356,
+            "passed": true,
+            "cleanup_edits": 0
+          }
+        ]
+      },
+      "both": {
+        "overrides": {
+          "disable_inferred_onsets": true,
+          "onset_threshold": 0.5
+        },
+        "passed": 6,
+        "total": 7,
+        "original_bundle_sha256": "f5ee2ce689c05747cafab2ac7435e3a17844e563e5c34d292bf4a4c641aabc72",
+        "served_bundle_sha256": "e8ac543c9f86639b09b479373584c66040354aea11f2f903aaf9592d56db975a",
+        "model_sha256": {
+          "group1-shard1of1.bin": "b142a95737a52e1e412d5f92e73d8bb80dfe8d04941acc0702f11f4524fb377c",
+          "model.json": "1ed1aaee3409ec1dc098c8b01f430c0911f6fe9412e7af8086750f9e8f302f68"
+        },
+        "cases": [
+          {
+            "id": "h_phrase",
+            "expected_notes": 4,
+            "detected_notes": 4,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.05416800000000002,
+            "pitch_frame_iou": 0.9050847457627119,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_long_rest",
+            "expected_notes": 2,
+            "detected_notes": 2,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.05134499999999992,
+            "pitch_frame_iou": 0.9295774647887324,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_sustain",
+            "expected_notes": 1,
+            "detected_notes": 1,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.06894800000000023,
+            "pitch_frame_iou": 0.975609756097561,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_quiet",
+            "expected_notes": 3,
+            "detected_notes": 4,
+            "precision": 0.75,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.12968733333333335,
+            "pitch_frame_iou": 0.9253112033195021,
+            "passed": false,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_silent",
+            "rejected": true,
+            "passed": true
+          },
+          {
+            "id": "h_repeated",
+            "expected_notes": 5,
+            "detected_notes": 5,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.05768979999999998,
+            "pitch_frame_iou": 0.8571428571428571,
+            "passed": true,
+            "cleanup_edits": 0
+          },
+          {
+            "id": "h_rearticulation",
+            "expected_notes": 6,
+            "detected_notes": 6,
+            "precision": 1.0,
+            "recall": 1.0,
+            "mean_duration_error_s": 0.07428799999999998,
+            "pitch_frame_iou": 0.8356643356643356,
+            "passed": true,
+            "cleanup_edits": 0
+          }
+        ]
+      }
+    }
+  },
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "407",
+    "time": "22.917",
+    "timestamp": "2026-10-31T15:38:48.983233+08:00",
+    "hostname": "Han"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "actions": [
+    {
+      "action": "ECHO_MOTIF",
+      "parameters": {
+        "motif_id": "motif_cac61ffc-d1d2-4866-bd66-54c58219b286"
+      },
+      "scope": "lead",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0
+  },
+  "plan_confidence": null,
+  "plan_id": "band_2275d94c84614c09a5afcde6465b8946",
+  "preserve": [
+    "tempo",
+    "key",
+    "layer:drums",
+    "layer:bass",
+    "layer:keys"
+  ],
+  "reason": "Echo the latest observed phrase without removing its leading rest",
+  "schema_version": "1.0.0",
+  "session_id": "3efd0ecd-5b4e-4f11-afea-d4fe2619f7af",
+  "strategy": "RESPOND",
+  "transport": {},
+  "trigger_event_ids": [
+    "cac61ffc-d1d2-4866-bd66-54c58219b286"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

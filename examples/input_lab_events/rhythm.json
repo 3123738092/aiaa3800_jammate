@@ -1,0 +1,42 @@
+{
+  "event_id": "evt_2c74aa2bb93c42b4820eafc916e269fb",
+  "session_id": "synthetic-example",
+  "source": "rhythm",
+  "event_type": "rhythm_seed",
+  "started_at": 0,
+  "ended_at": 6.0,
+  "payload": {
+    "timebase": "seconds_from_recording_start",
+    "rhythm": {
+      "tempo_bpm": 99.38401442307693,
+      "onset_beats": [
+        0.0,
+        1.0,
+        1.5,
+        3.0
+      ],
+      "accents": [
+        0.7474590539932251,
+        0.28893792629241943,
+        0.5092577338218689,
+        1.0
+      ],
+      "beat_origin_s": 2.999863945578231,
+      "beats_per_bar": 4,
+      "confidence": 0.9423076923076944
+    },
+    "onsets_sec": [
+      2.999863945578231,
+      3.603582766439909,
+      3.905442176870748,
+      4.811020408163265
+    ],
+    "status": "ready",
+    "quantized": true,
+    "analysis": {
+      "backend": "upstream-librosa",
+      "confidence_meaning": "grid-fit heuristic, not calibrated accuracy"
+    }
+  },
+  "confidence": 0.9423076923076944
+}

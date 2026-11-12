@@ -1,0 +1,9 @@
+{
+  "format": "Standard MIDI File + plain text; not a Magenta JSON protocol",
+  "duration_s": 2.4,
+  "files": {
+    "melody.mid": "01d730baea8424f51888752903e539cb5b1d63b0e3d5a75907bbe8c70f0ede77",
+    "prompt.txt": "48228181ea14fa3034af9934112402e477b7cbdec8bbef436367440b5b55127c",
+    "TimGM6mb.sf2": "c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854"
+  }
+}

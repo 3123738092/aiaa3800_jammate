@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JamMate · Band Lab</title>
+<link rel="stylesheet" href="lab.css"><main><p class="eyebrow">JAMMATE / CREATION</p><h1>给乐队一个灵感。</h1><p>选一种输入作为起点，听乐队怎么把它发展成一段音乐。</p>
+<div class="cards"><a href="optimized/dist/"><small>01 / 哼唱</small><h2>从旋律出发</h2><p>哼一句或载入示例，听乐队为这句旋律做变奏。</p></a><a href="rhythm.html"><small>02 / 节拍</small><h2>从律动出发</h2><p>先拍四下定速，再拍一小节，听乐队沿着你的拍点加花。</p></a><a href="text-creation.html"><small>03 / 文字</small><h2>从一句话出发</h2><p>写一句创作提示，让乐队按你指定的速度开始。</p></a></div>
+<details class="panel"><summary>试听队友的风格预设</summary>
+  <p>这些样段使用队友原有的风格生成器，试听需要本机 FluidSynth。哼唱、拍手和文字各自使用对应的编排设置。</p>
+  <label>风格 <select id="reference-style"><option value="lofi">Lo-fi</option><option value="warm_funk">Funk</option><option value="indie_rock">Indie Rock</option></select></label>
+  <section id="band-panel" hidden></section>
+</details>
+<p><a href="baseline/dist/">旧版哼唱对照</a> · <a href="appendix.html">识别测试与迭代附录</a></p><p class="muted">录音在本机处理，创作结果可以试听并下载 WAV 或 MIDI。</p></main><script type="module" src="style-preview.js"></script></html>

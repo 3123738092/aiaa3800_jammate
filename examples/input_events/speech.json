@@ -1,0 +1,17 @@
+{
+  "confidence": null,
+  "ended_at": 13.0,
+  "event_id": "evt_speech_001",
+  "event_type": "speech",
+  "payload": {
+    "language": "zh",
+    "text": "别停，鼓收一点，刚才那句保留。"
+  },
+  "provenance": {
+    "producer": "asr"
+  },
+  "schema_version": "1.0.0",
+  "session_id": "jam_demo",
+  "source": "speech",
+  "started_at": 12.0
+}

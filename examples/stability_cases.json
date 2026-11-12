@@ -1,0 +1,286 @@
+{
+  "version": "1.0.0",
+  "session_id": "long_llm",
+  "initial_bpm": 100,
+  "limits": "Single continuous development conversation, not human/live acceptance. Expectations authored before execution.",
+  "turns": [
+    {
+      "text": "让鼓稍微有力一点，其他声部和速度都不要动。",
+      "expect": {
+        "increase": "drums.level",
+        "same": [
+          "bass",
+          "keys",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "text": "鼓少敲一些，保留刚才的力度，别减速。",
+      "expect": {
+        "decrease": "drums.density",
+        "same": [
+          "drums.level",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "text": "把鼓的力度恢复到开场的 0.5，保留现在的敲击密度。",
+      "expect": {
+        "value": {
+          "drums.level": 0.5
+        },
+        "same": [
+          "drums.density"
+        ]
+      }
+    },
+    {
+      "text": "先请贝斯休息，其他继续。",
+      "expect": {
+        "value": {
+          "bass.active": false,
+          "playing": true
+        }
+      }
+    },
+    {
+      "text": "让刚才休息的低音声部回来。",
+      "expect": {
+        "value": {
+          "bass.active": true
+        }
+      }
+    },
+    {
+      "text": "接下来保持 112 BPM，配器不变。",
+      "expect": {
+        "value": {
+          "tempo_bpm": 112
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys"
+        ]
+      }
+    },
+    {
+      "text": "只把键盘弹轻一些，所有音符数量不变。",
+      "expect": {
+        "decrease": "keys.level",
+        "same": [
+          "keys.density",
+          "drums",
+          "bass"
+        ]
+      }
+    },
+    {
+      "text": "整队先暂停，保留现在的力度和配器设置。",
+      "expect": {
+        "value": {
+          "playing": false
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys"
+        ]
+      }
+    },
+    {
+      "text": "现在还别开始，继续保持暂停状态。",
+      "expect": {
+        "value": {
+          "playing": false
+        }
+      }
+    },
+    {
+      "text": "可以继续演奏了，沿用刚才的速度和各声部设置。",
+      "expect": {
+        "value": {
+          "playing": true,
+          "tempo_bpm": 112
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys"
+        ]
+      }
+    },
+    {
+      "text": "只有鼓再轻一点，拍点、密度、速度不变。",
+      "expect": {
+        "decrease": "drums.level",
+        "same": [
+          "drums.density",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "text": "整队恢复本会话开始时的 100 BPM，各声部照旧。",
+      "expect": {
+        "value": {
+          "tempo_bpm": 100
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys"
+        ]
+      }
+    },
+    {
+      "text": "加一轨失真吉他，如果目前做不了就先维持原样。",
+      "expect": {
+        "unresolved": true,
+        "same": [
+          "drums",
+          "bass",
+          "keys",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "text": "不要停，也不要再改配器，维持现在这样。",
+      "expect": {
+        "value": {
+          "playing": true
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "text": "把鼓的音量往前推一点，键盘和贝斯不变。",
+      "expect": {
+        "increase": "drums.level",
+        "same": [
+          "keys",
+          "bass"
+        ]
+      }
+    },
+    {
+      "text": "撤销上一轮推高鼓音量的那一步，回到它之前的力度。",
+      "expect": {
+        "same_as_turn": {
+          "turn": 14,
+          "paths": [
+            "drums"
+          ]
+        },
+        "same": [
+          "keys",
+          "bass"
+        ]
+      }
+    },
+    {
+      "command": "idle",
+      "bars": 2,
+      "expect": {
+        "strategy": "INITIATE",
+        "awaiting_user": true
+      }
+    },
+    {
+      "command": "idle",
+      "bars": 2,
+      "expect": {
+        "strategy": "LISTEN",
+        "no_motif": true,
+        "awaiting_user": true
+      }
+    },
+    {
+      "text": "这句不错，保留旋律记忆，只让贝斯轻一点。",
+      "expect": {
+        "decrease": "bass.level",
+        "same": [
+          "current_motif_id",
+          "drums",
+          "keys"
+        ]
+      }
+    },
+    {
+      "text": "原样重复你刚才主动给我的旋律，一音不改，速度不变。",
+      "expect": {
+        "action": "ECHO_MOTIF",
+        "same": [
+          "current_motif_id",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "command": "user_activity",
+      "active": true,
+      "expect": {
+        "no_motif": true
+      }
+    },
+    {
+      "command": "idle",
+      "bars": 2,
+      "expect": {
+        "no_motif": true
+      }
+    },
+    {
+      "command": "user_activity",
+      "active": false,
+      "expect": {
+        "no_motif": true
+      }
+    },
+    {
+      "text": "停止这个词只是说明，不要实际暂停，也不要改变伴奏。",
+      "expect": {
+        "value": {
+          "playing": true
+        },
+        "same": [
+          "drums",
+          "bass",
+          "keys",
+          "tempo_bpm"
+        ]
+      }
+    },
+    {
+      "command": "stop",
+      "expect": {
+        "value": {
+          "playing": false
+        },
+        "decision_source": "system_control"
+      }
+    },
+    {
+      "text": "继续，沿用现在的 BPM 和配器。",
+      "expect": {
+        "value": {
+          "playing": true
+        },
+        "same": [
+          "tempo_bpm",
+          "drums",
+          "bass",
+          "keys"
+        ]
+      }
+    }
+  ]
+}

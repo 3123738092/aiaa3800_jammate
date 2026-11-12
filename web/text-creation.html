@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JamMate · 文字创作</title>
+  <link rel="stylesheet" href="lab.css">
+</head>
+<body>
+  <main>
+    <nav><a href="/">← 创作工作台</a></nav>
+    <p class="eyebrow">JAMMATE / TEXT</p>
+    <h1>用一句话开始。</h1>
+    <p>用文字写出第一段，再继续指挥同一个作品。每轮生成可单独试听和下载。</p>
+    <form class="panel" id="text-form">
+      <label>文字处理 <select id="text-agent">
+        <option value="llm" disabled>队友大模型 Agent</option>
+        <option value="rule" selected>队友本地规则</option>
+      </select></label>
+      <p id="provider-state" class="muted" role="status">正在检查大模型配置…</p>
+      <details><summary>高级设置</summary>
+        <label>生成后端 <select id="text-renderer">
+          <option value="default">精确编排（当前音源）</option>
+          <option value="mrt2">MRT2 生成试听</option>
+        </select></label>
+        <label><input id="text-preview" type="checkbox">允许生成试听：MRT2 无法保证逐音符或声部保留，试听不提交音乐状态。</label>
+        <label>起始 BPM <input id="text-bpm" type="number" min="60" max="180" step="any" value="100" required></label>
+        <label>音色 <select id="text-profile">
+          <option value="electric">电钢琴 + 贝斯</option>
+          <option value="acoustic" disabled>原声钢琴 + 贝斯</option>
+          <option value="synth" disabled>合成器铺底 + 合成贝斯</option>
+        </select></label>
+        <p class="muted">开始作品时设定，后续可用文字调整速度和声部。</p>
+      </details>
+      <label for="creation-prompt">创作要求</label>
+      <textarea id="creation-prompt" rows="3" maxlength="500" required placeholder="来一段，慢一点" aria-describedby="prompt-help"></textarea>
+      <p id="prompt-help" class="muted">本地规则可以先用「来一段，慢一点」，再试「去掉贝斯」或「鼓少一点」。</p>
+      <button type="button" data-prompt="来一段，慢一点">填入创作示例</button>
+      <button type="submit" id="text-generate">生成第一段</button>
+      <button type="button" id="new-work">开始新作品</button>
+      <p id="text-status" role="status" aria-live="polite"></p>
+    </form>
+    <section id="text-output" class="panel" hidden>
+      <h2>听这一轮</h2>
+      <p id="text-decision"></p>
+      <audio id="text-audio" controls aria-label="文字创作结果"></audio>
+      <p><a id="text-wav" download="text.wav">下载 WAV</a> · <a id="text-midi" download="text.mid">下载 MIDI</a></p>
+    </section>
+  </main>
+  <script type="module" src="text-creation.js"></script>
+</body>
+</html>

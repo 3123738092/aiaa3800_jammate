@@ -1,0 +1,61 @@
+{
+  "versions": {
+    "baseline": {
+      "raw": 8,
+      "selected": 7,
+      "eventValid": true,
+      "midiConsistent": true
+    },
+    "optimized": {
+      "raw": 14,
+      "selected": 5,
+      "eventValid": true,
+      "midiConsistent": true,
+      "repeatable": true
+    }
+  },
+  "hummingBand": {
+    "duration": 11.853770833333334,
+    "rms": 0.06174341441493336,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 100
+  },
+  "uploadedSustain": {
+    "duration": 11.853770833333334,
+    "rms": 0.06176949864234761,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 100
+  },
+  "rhythmBand": {
+    "duration": 12.0163125,
+    "rms": 0.02194484137960763,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 100.44642857142858
+  },
+  "uploadedRhythm": {
+    "duration": 10.518625,
+    "rms": 0.02275412366531543,
+    "renderer": "Kevin / FluidSynth",
+    "bars": 4,
+    "tempo": 119.68085106382979
+  },
+  "rhythm": {
+    "bpm": 100.44642857142858,
+    "onsets": [
+      0,
+      1,
+      1.5,
+      3
+    ],
+    "independentClipSessions": true
+  },
+  "appendix": {
+    "cases": 5,
+    "comparisonSwitchWorks": true,
+    "mobileOverflow": false
+  },
+  "pageErrors": []
+}

@@ -1,0 +1,33 @@
+{
+  "actions": [
+    {
+      "action": "ADJUST_FEEL",
+      "parameters": {
+        "rhythm_event_id": "evt_59f507bcb9754b07975052123c1d05da"
+      },
+      "scope": "band",
+      "strength": 0.5
+    }
+  ],
+  "based_on_state_version": 1,
+  "effective_at": {
+    "bar": 0,
+    "beat": 0
+  },
+  "plan_confidence": null,
+  "plan_id": "band_694471c73af84e7090b6162f0110a926",
+  "preserve": [
+    "tempo",
+    "key"
+  ],
+  "reason": "Adopt rhythmic onsets at the existing session tempo",
+  "schema_version": "1.0.0",
+  "session_id": "753a5be9-d44b-47dd-8adf-9c413cd31142",
+  "strategy": "RESPOND",
+  "transport": {},
+  "trigger_event_ids": [
+    "evt_59f507bcb9754b07975052123c1d05da"
+  ],
+  "unresolved": [],
+  "valid_for_bars": 4
+}

@@ -1,0 +1,38 @@
+{
+  "confidence": null,
+  "ended_at": 14.4,
+  "event_id": "evt_rhythm_001",
+  "event_type": "rhythm_seed",
+  "payload": {
+    "audio_duration_s": 2.4,
+    "confidence_kind": "manual",
+    "rhythm": {
+      "accents": [
+        1.0,
+        0.5,
+        0.8,
+        1.0
+      ],
+      "beat_origin_s": 0.0,
+      "beats_per_bar": 4,
+      "confidence": 1.0,
+      "onset_beats": [
+        0.0,
+        1.0,
+        1.5,
+        3.0
+      ],
+      "tempo_bpm": 100.0
+    },
+    "status": "ready",
+    "tempo_source": "session"
+  },
+  "provenance": {
+    "analysis_ref": "examples/rhythm_a.json",
+    "producer": "legacy_rhythm"
+  },
+  "schema_version": "1.0.0",
+  "session_id": "jam_demo",
+  "source": "rhythm",
+  "started_at": 12.0
+}

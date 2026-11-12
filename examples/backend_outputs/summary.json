@@ -1,0 +1,578 @@
+{
+  "recorded_at": "2026-11-12T14:24:33.751731+00:00",
+  "hardware": "WSL Linux x86_64, NVIDIA RTX 4060 Laptop 8 GiB",
+  "real_model": "magenta-rt==2.0.3, mrt2_small, JAX/CUDA 12",
+  "python_tests": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "451",
+      "time": "37.645",
+      "timestamp": "2026-11-12T22:26:12.547754+08:00",
+      "hostname": "Han"
+    }
+  ],
+  "javascript_tests": {
+    "passed": 30,
+    "failed": 0
+  },
+  "limitations": [
+    "All source MIDI/inputs are synthetic/development inputs",
+    "Audio decoding/exports are not physical playback or blinded music quality evaluation",
+    "MRT2 preserve constraints and action effects are not verified in generated audio"
+  ],
+  "files": {
+    "browser-report.json": {
+      "sha256": "911956a0af895ba1d0d6a9aca18274eb011815b9be099783e7f77697b6b58adf",
+      "bytes": 9168
+    },
+    "direct-fluid.wav": {
+      "sha256": "e3e4c880d1071f84ae6c85957deca9b4f9ba458744d4c299d0d242ede4a5545c",
+      "bytes": 384812,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_s": 2.004,
+      "peak": 0.1339111328125,
+      "rms": 0.03859993715530017
+    },
+    "direct-midi.inference.json": {
+      "sha256": "0714383170930480512d4b080be59ecf6d52e850e9e9dff6bdb98351f2e309da",
+      "bytes": 461
+    },
+    "direct-midi.wav": {
+      "sha256": "990905aa2e8f552da9ef602b6c1078b4139607e14146ff30a1e673e8338f0d45",
+      "bytes": 460844,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_s": 2.4,
+      "peak": 0.232452392578125,
+      "rms": 0.02505395094755864
+    },
+    "direct-text.inference.json": {
+      "sha256": "41ddeccf35abf5f18ee23fda468a90b3e7c32a147f9dc823912a9354ab7dd0b4",
+      "bytes": 395
+    },
+    "direct-text.wav": {
+      "sha256": "9fc61ff2a3638f806d684f4a48610d0413b0cadfc7acaa43bb54a45b4e983f9a",
+      "bytes": 460844,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_s": 2.4,
+      "peak": 0.32830810546875,
+      "rms": 0.052349396854708526
+    },
+    "input.json": {
+      "sha256": "6e76b29f1aa0bb6bd5c5e38d5e0a7e3e104f80918c30479024c5ce6d84fae3ce",
+      "bytes": 310
+    },
+    "llm-fluidsynth.mid": {
+      "sha256": "dee31f76234d9fd11362ba16edbdc127bb66aef74e51cf034f1963c66964eda4",
+      "bytes": 389
+    },
+    "llm-fluidsynth.receipt.json": {
+      "sha256": "d235d99702f069ee4b0eb4ac355a5355195f53b5e5c343f1132ebb69b7018a6a",
+      "bytes": 2348
+    },
+    "llm-fluidsynth.wav": {
+      "sha256": "680b15b43b3ffa2e670df28a423d8707be6e9f01278a42318fe5b434223447c2",
+      "bytes": 1693996,
+      "sample_rate": 44100,
+      "channels": 2,
+      "duration_s": 9.602902494331065,
+      "peak": 0.58917236328125,
+      "rms": 0.06947954598050397
+    },
+    "llm-mobile.png": {
+      "sha256": "656f041ea277818eae0b03299277ea452557010414a2ffde106a5e7e4bcc566b",
+      "bytes": 109793
+    },
+    "llm-mrt2.mid": {
+      "sha256": "dee31f76234d9fd11362ba16edbdc127bb66aef74e51cf034f1963c66964eda4",
+      "bytes": 389
+    },
+    "llm-mrt2.receipt.json": {
+      "sha256": "7832600b066e0234e5cb8bd030041600cd381ccd2b63820ce817a3f282797dd1",
+      "bytes": 2854
+    },
+    "llm-mrt2.wav": {
+      "sha256": "4f6941498bb194f68d36de6b1b1e8140ad9750f15b59d51fc096b2f85c86ccdc",
+      "bytes": 1843244,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_s": 9.6,
+      "peak": 0.545867919921875,
+      "rms": 0.07352762599232572
+    },
+    "llm.plan.json": {
+      "sha256": "c6eafe690438d1ea7ff4629d08341b5bd7d0c591b90ba531104da53f025f4ff6",
+      "bytes": 737
+    },
+    "mrt2-preview.png": {
+      "sha256": "a756626713479c69470867e2c1dd4690db8111cf1bbeb1574a90dab94ac6d5fa",
+      "bytes": 112419
+    },
+    "rule-fluidsynth.mid": {
+      "sha256": "5002d7b354783dba71c54ea48f060e32090aff2e87820a9a91e7653c6fd9303f",
+      "bytes": 389
+    },
+    "rule-fluidsynth.receipt.json": {
+      "sha256": "19cac42b774aa7de24087e511ba771d7d90bd1cfa2ab13fa85e359631d34be44",
+      "bytes": 2108
+    },
+    "rule-fluidsynth.wav": {
+      "sha256": "53aa2d25b9a7d8c743498c439894db96432fb7ac29c420279a811f4b5fff2d33",
+      "bytes": 1693996,
+      "sample_rate": 44100,
+      "channels": 2,
+      "duration_s": 9.602902494331065,
+      "peak": 0.59539794921875,
+      "rms": 0.06982500264750292
+    },
+    "rule-mrt2.mid": {
+      "sha256": "5002d7b354783dba71c54ea48f060e32090aff2e87820a9a91e7653c6fd9303f",
+      "bytes": 389
+    },
+    "rule-mrt2.receipt.json": {
+      "sha256": "9758455e08646742da4933f6710546d132ab02a266cce92c381abc99ed4ac7ee",
+      "bytes": 2618
+    },
+    "rule-mrt2.wav": {
+      "sha256": "4f6941498bb194f68d36de6b1b1e8140ad9750f15b59d51fc096b2f85c86ccdc",
+      "bytes": 1843244,
+      "sample_rate": 48000,
+      "channels": 2,
+      "duration_s": 9.6,
+      "peak": 0.545867919921875,
+      "rms": 0.07352762599232572
+    },
+    "rule.plan.json": {
+      "sha256": "d7270bc8d934f128e4e7d3d97a47fe634a47dfde01fb4647ff56c2d09291fbed",
+      "bytes": 644
+    },
+    "final-ui-check.json": {
+      "sha256": "93fcf6acd7dbabcba69b62e6652233fef86e4cc3761da397ea59af43c33859b7",
+      "bytes": 1760
+    },
+    "mrt2-preview-current.png": {
+      "sha256": "21bbc30f08adc2de4dfd599409de9a721463f362d5ff01d99187c2c76188d60f",
+      "bytes": 122023
+    }
+  },
+  "paired": [
+    {
+      "agent": "rule",
+      "backend": "fluidsynth",
+      "plan_id": "comparison_rule",
+      "receipt": {
+        "schema_version": "1.0.0",
+        "session_id": "backend_comparison",
+        "plan_id": "comparison_rule",
+        "based_on_state_version": 1,
+        "effective_bar": 0,
+        "completed_bar": 4,
+        "backend": "kevin_midi_fluidsynth",
+        "mode": "offline_export",
+        "succeeded": true,
+        "phase": "exported",
+        "artifact_generated": true,
+        "state_committed": true,
+        "capabilities": {
+          "preserve": [
+            {
+              "constraint": "tempo",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "key",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:bass",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:keys",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:lead",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            }
+          ],
+          "actions": [
+            {
+              "action": "BUILD",
+              "scope": "drums",
+              "guaranteed": true
+            }
+          ],
+          "exact_notes": true,
+          "exact_timbre": false,
+          "state_commit_allowed": true,
+          "limitations": [
+            "MIDI note fidelity does not prove perceptual quality or physical playback"
+          ]
+        },
+        "midi_verification": {
+          "note_count": 44,
+          "max_time_error_s": 3.552713678800501e-15,
+          "tolerance_s": 0.0006250100000000001,
+          "duration_s": 9.600000000000003,
+          "programs": {
+            "1": 4,
+            "2": 33,
+            "4": 73
+          }
+        },
+        "wav": {
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_s": 9.602902494331065,
+          "rms": 0.06982500264750292,
+          "peak": 0.59539794921875
+        },
+        "instrument_profile": "electric",
+        "lead_program": 73,
+        "soundfont_sha256": "c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854",
+        "midi_role": "performance",
+        "state_version_after": 2,
+        "manager_diagnostics": {
+          "log_write_failures": 0,
+          "last_log_error": null,
+          "event_count": 1,
+          "plan_count": 1,
+          "turn_count": 1
+        },
+        "persistence_warnings": []
+      },
+      "drums_level_after": 0.75
+    },
+    {
+      "agent": "rule",
+      "backend": "mrt2",
+      "plan_id": "comparison_rule",
+      "receipt": {
+        "schema_version": "1.0.0",
+        "session_id": "backend_comparison",
+        "plan_id": "comparison_rule",
+        "based_on_state_version": 1,
+        "effective_bar": 0,
+        "completed_bar": 4,
+        "backend": "jax",
+        "mode": "offline_export",
+        "succeeded": false,
+        "phase": "preview",
+        "artifact_generated": true,
+        "state_committed": false,
+        "capabilities": {
+          "preserve": [
+            {
+              "constraint": "tempo",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "key",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:bass",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:keys",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:lead",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            }
+          ],
+          "actions": [
+            {
+              "action": "BUILD",
+              "scope": "drums",
+              "guaranteed": false
+            }
+          ],
+          "exact_notes": false,
+          "exact_timbre": false,
+          "state_commit_allowed": false,
+          "limitations": [
+            "25 Hz pitch union; velocity, program and voice identity are lost",
+            "Binary drum condition cannot identify kick/snare/hi-hat",
+            "Generated audio is not a verification of pitch, tempo, key, layers or motif preservation",
+            "Each exported clip starts fresh model context; no physical playback receipt"
+          ]
+        },
+        "midi_verification": {
+          "note_count": 44,
+          "max_time_error_s": 3.552713678800501e-15,
+          "tolerance_s": 0.0006250100000000001,
+          "duration_s": 9.600000000000003,
+          "programs": {
+            "1": 4,
+            "2": 33,
+            "4": 73
+          }
+        },
+        "wav": {
+          "sample_rate": 48000,
+          "channels": 2,
+          "duration_s": 9.6,
+          "rms": 0.07352762599232572,
+          "peak": 0.545867919921875
+        },
+        "inference": "real_magenta_rt",
+        "model": "mrt2_small",
+        "prompt": "a warm instrumental band",
+        "frames": 240,
+        "duration_s": 9.6,
+        "elapsed_s": 21.31932236800003,
+        "midi_sha256": "5002d7b354783dba71c54ea48f060e32090aff2e87820a9a91e7653c6fd9303f",
+        "conditioning": "text_and_midi",
+        "frame_quantization_s": 0.04,
+        "official_source": "https://github.com/magenta/magenta-realtime/tree/694a545e4ba0b88bf1150137b129582166d3e07f",
+        "midi_role": "conditioning_not_transcription",
+        "state_version_after": 1,
+        "manager_diagnostics": {
+          "log_write_failures": 0,
+          "last_log_error": null,
+          "event_count": 1,
+          "plan_count": 1,
+          "turn_count": 1
+        },
+        "persistence_warnings": []
+      },
+      "drums_level_after": 0.5
+    },
+    {
+      "agent": "llm",
+      "backend": "fluidsynth",
+      "plan_id": "comparison_llm",
+      "receipt": {
+        "schema_version": "1.0.0",
+        "session_id": "backend_comparison",
+        "plan_id": "comparison_llm",
+        "based_on_state_version": 1,
+        "effective_bar": 0,
+        "completed_bar": 4,
+        "backend": "kevin_midi_fluidsynth",
+        "mode": "offline_export",
+        "succeeded": true,
+        "phase": "exported",
+        "artifact_generated": true,
+        "state_committed": true,
+        "capabilities": {
+          "preserve": [
+            {
+              "constraint": "tempo",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "key",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "groove",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "playing",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:bass",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:keys",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            },
+            {
+              "constraint": "layer:lead",
+              "guaranteed": true,
+              "evidence": "symbolic_note_checks"
+            }
+          ],
+          "actions": [
+            {
+              "action": "BUILD",
+              "scope": "drums",
+              "guaranteed": true
+            }
+          ],
+          "exact_notes": true,
+          "exact_timbre": false,
+          "state_commit_allowed": true,
+          "limitations": [
+            "MIDI note fidelity does not prove perceptual quality or physical playback"
+          ]
+        },
+        "midi_verification": {
+          "note_count": 44,
+          "max_time_error_s": 3.552713678800501e-15,
+          "tolerance_s": 0.0006250100000000001,
+          "duration_s": 9.600000000000003,
+          "programs": {
+            "1": 4,
+            "2": 33,
+            "4": 73
+          }
+        },
+        "wav": {
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_s": 9.602902494331065,
+          "rms": 0.06947954598050397,
+          "peak": 0.58917236328125
+        },
+        "instrument_profile": "electric",
+        "lead_program": 73,
+        "soundfont_sha256": "c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854",
+        "midi_role": "performance",
+        "state_version_after": 2,
+        "manager_diagnostics": {
+          "log_write_failures": 0,
+          "last_log_error": null,
+          "event_count": 1,
+          "plan_count": 1,
+          "turn_count": 1
+        },
+        "persistence_warnings": []
+      },
+      "drums_level_after": 0.7
+    },
+    {
+      "agent": "llm",
+      "backend": "mrt2",
+      "plan_id": "comparison_llm",
+      "receipt": {
+        "schema_version": "1.0.0",
+        "session_id": "backend_comparison",
+        "plan_id": "comparison_llm",
+        "based_on_state_version": 1,
+        "effective_bar": 0,
+        "completed_bar": 4,
+        "backend": "jax",
+        "mode": "offline_export",
+        "succeeded": false,
+        "phase": "preview",
+        "artifact_generated": true,
+        "state_committed": false,
+        "capabilities": {
+          "preserve": [
+            {
+              "constraint": "tempo",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "key",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "groove",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "playing",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:bass",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:keys",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            },
+            {
+              "constraint": "layer:lead",
+              "guaranteed": false,
+              "evidence": "conditioning_only"
+            }
+          ],
+          "actions": [
+            {
+              "action": "BUILD",
+              "scope": "drums",
+              "guaranteed": false
+            }
+          ],
+          "exact_notes": false,
+          "exact_timbre": false,
+          "state_commit_allowed": false,
+          "limitations": [
+            "25 Hz pitch union; velocity, program and voice identity are lost",
+            "Binary drum condition cannot identify kick/snare/hi-hat",
+            "Generated audio is not a verification of pitch, tempo, key, layers or motif preservation",
+            "Each exported clip starts fresh model context; no physical playback receipt"
+          ]
+        },
+        "midi_verification": {
+          "note_count": 44,
+          "max_time_error_s": 3.552713678800501e-15,
+          "tolerance_s": 0.0006250100000000001,
+          "duration_s": 9.600000000000003,
+          "programs": {
+            "1": 4,
+            "2": 33,
+            "4": 73
+          }
+        },
+        "wav": {
+          "sample_rate": 48000,
+          "channels": 2,
+          "duration_s": 9.6,
+          "rms": 0.07352762599232572,
+          "peak": 0.545867919921875
+        },
+        "inference": "real_magenta_rt",
+        "model": "mrt2_small",
+        "prompt": "a warm instrumental band",
+        "frames": 240,
+        "duration_s": 9.6,
+        "elapsed_s": 4.442230343000119,
+        "midi_sha256": "dee31f76234d9fd11362ba16edbdc127bb66aef74e51cf034f1963c66964eda4",
+        "conditioning": "text_and_midi",
+        "frame_quantization_s": 0.04,
+        "official_source": "https://github.com/magenta/magenta-realtime/tree/694a545e4ba0b88bf1150137b129582166d3e07f",
+        "midi_role": "conditioning_not_transcription",
+        "state_version_after": 1,
+        "manager_diagnostics": {
+          "log_write_failures": 0,
+          "last_log_error": null,
+          "event_count": 1,
+          "plan_count": 1,
+          "turn_count": 1
+        },
+        "persistence_warnings": []
+      },
+      "drums_level_after": 0.5
+    }
+  ],
+  "same_plan_control_midi_identical": true
+}

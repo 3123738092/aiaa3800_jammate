@@ -1,0 +1,472 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "strategy",
+    "valid_for_bars",
+    "preserve",
+    "actions",
+    "transport",
+    "reason",
+    "unresolved"
+  ],
+  "properties": {
+    "strategy": {
+      "type": "string",
+      "enum": [
+        "LISTEN",
+        "FOLLOW",
+        "RESPOND",
+        "INITIATE"
+      ]
+    },
+    "valid_for_bars": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16
+    },
+    "preserve": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "PRESERVE"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band",
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "ECHO_MOTIF"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "lead",
+                  "motif"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "motif_id"
+                ],
+                "properties": {
+                  "motif_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "VARY_MOTIF"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "lead",
+                  "motif"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "motif_id"
+                ],
+                "properties": {
+                  "motif_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "INTRODUCE_MOTIF"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "lead",
+                  "motif"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "motif_id"
+                ],
+                "properties": {
+                  "motif_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "BUILD"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band",
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "duration_bars"
+                ],
+                "properties": {
+                  "duration_bars": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "SIMPLIFY"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band",
+                  "drums",
+                  "bass",
+                  "keys"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "duration_bars"
+                ],
+                "properties": {
+                  "duration_bars": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 16
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "ADJUST_FEEL"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band",
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rhythm_event_id",
+                  "level_delta"
+                ],
+                "properties": {
+                  "rhythm_event_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "level_delta": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": -1,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "ADD_LAYER"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "REMOVE_LAYER"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "drums",
+                  "bass",
+                  "keys",
+                  "lead"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        ]
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "playing",
+        "tempo_bpm"
+      ],
+      "properties": {
+        "playing": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tempo_bpm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 60,
+          "maximum": 180
+        }
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
