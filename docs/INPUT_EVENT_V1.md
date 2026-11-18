@@ -12,9 +12,11 @@
 
 ## 1. 已确定的公共外层
 
+本分支增加自由节奏 `1.3.0`，并提供文字、哼唱、拍手三个可运行的 [输入入口与交接样例](../examples/input-event-handoff/README.md)。`1.3.0` 的 `payload.rhythm.onset_seconds` 使用录音内的秒数，与 `accents` 成对；`raw_rhythm` 保存初次检测。下文关于速度、定速和单小节的节奏字段描述适用于旧版按拍计时的事件。
+
 | 字段 | 类型 | 规则 |
 |---|---|---|
-| `schema_version` | string | 接受 `1.0.0` / `1.1.0` / `1.2.0`；1.1 增加 system 生命周期，原三类文件仍可用 1.0 |
+| `schema_version` | string | 接受 `1.0.0` / `1.1.0` / `1.2.0` / `1.3.0`。1.1 增加 system 生命周期，1.2 支持带帧的旋律，1.3 支持自由节奏。 |
 | `event_id` | string | 非空；同一次事件的传输重试保留 ID；重新提交/重新识别形成新事件时使用新 ID |
 | `session_id` | string | 非空；由会话创建者提供，不从文件名或系统时间猜测 |
 | `source` | enum | `text`、`speech`、`rhythm`、`humming`；1.1 新增 `system` |

@@ -1,7 +1,7 @@
 import midiPackage from '@tonejs/midi';
 const { Midi } = midiPackage;
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.3.0';
 export const DECODING = Object.freeze({onsetThreshold:.25, frameThreshold:.25, minimumNoteFrames:9,
   inferOnsets:true, maximumFrequencyHz:1046.502, minimumFrequencyHz:65.406,
   melodiaTrick:true, energyToleranceFrames:11, pitchMin:36, pitchMax:84});

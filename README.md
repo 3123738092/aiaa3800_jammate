@@ -1,14 +1,14 @@
 # JamMate
 
-AIAA 3800 课程项目。JamMate 是一个本地音乐创作工作台，你可以哼一段旋律、拍一段节奏，或用一句话开始创作。三个入口都能单独生成乐队片段，支持浏览器试听、下载 WAV 和导出 MIDI。
+AIAA 3800 课程项目。这个分支提供从键盘文字、哼唱和自由拍手生成标准 `InputEvent` 的工作台。三个入口均可独立验收。[输入接口、可运行样例和验收命令](examples/input-event-handoff/README.md)
 
 ## 三种创作方式
 
 | 入口 | 怎么试 | 生成结果 |
 | --- | --- | --- |
-| **从旋律出发** | 哼一句或载入示例，点「转成 MIDI」。比较原始识别和连贯哼唱，选好后点「生成音乐」。 | 在识别出的旋律上做变奏，加入鼓、贝斯和键盘。[原录音](examples/creation/humming-source.wav) · [变奏试听](examples/creation/humming.wav) |
-| **从律动出发** | 载入示例，或均匀拍四下定速后再拍一小节。点「识别节拍」，选跟随、加花或简化，再生成。 | 用拍点和重音编排乐队，可调力度和小节数。[跟随](examples/reference-creation/rhythm-follow.wav) · [加花](examples/reference-creation/rhythm-vary.wav) · [简化](examples/reference-creation/rhythm-simplify.wav) |
-| **从一句话出发** | 输入「来一段，慢一点」，生成后再输入「去掉贝斯」。 | 根据要求生成第一段，并沿用作品状态编排下一段。[第一段](examples/reference-creation/text-first.wav) · [调整后](examples/reference-creation/text-adjusted.wav) |
+| **从旋律出发** | 哼一句或导入音频，点「转成 MIDI」。 | 试听整理后的音符，下载 MIDI 和含完整旋律的 InputEvent。 |
+| **从律动出发** | 自由拍一段或导入音频，点「识别节奏」。 | 调整拍点和力度，试听并下载 MIDI 和 InputEvent。旧版四拍定速编排可从首页另行进入。 |
+| **从一句话出发** | 输入「来一段，慢一点」，点「下载 InputEvent JSON」。 | 下载原文事件，也可另点「生成第一段」体验团队已有的文字编排。 |
 
 首页也提供独立的风格样段。[Lo-fi](examples/reference-creation/lofi.wav) · [Funk](examples/reference-creation/warm_funk.wav) · [Indie Rock](examples/reference-creation/indie_rock.wav)
 
@@ -17,7 +17,7 @@ AIAA 3800 课程项目。JamMate 是一个本地音乐创作工作台，你可�
 已在 Python 3.12、Node.js 24 和 pnpm 11 上验证。装好 Git 和这些工具后，在 PowerShell 运行以下命令。工作台从 Git 历史读取固定版本，请完整克隆。评审 PR 时，把第一行替换为 PR 描述里的分支克隆命令。
 
 ```powershell
-git clone https://github.com/3123738092/aiaa3800_jammate.git
+git clone --branch codex/input-event-handoff https://github.com/3123738092/aiaa3800_jammate.git
 cd aiaa3800_jammate
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]" -c requirements-input.lock.txt
@@ -40,4 +40,4 @@ pnpm --dir web/optimized run build
 
 ## 实现与来源
 
-哼唱由 Spotify Basic Pitch 提取音符，接上我们的单声部整理和变奏。拍手与文字调用队友 `a63a0f5` 版本的节拍编排和文字 Agent。三种入口都按小节生成乐器音符，拍手使用原版内置合成器，哼唱和文字可以用 Kevin 渲染器及 FluidSynth 发声。[实现与验收](docs/integration/REFERENCE_WORKBENCH.md) · [团队原版命令行和研发记录](https://github.com/3123738092/aiaa3800_jammate/blob/a63a0f5f579cbc36ed0dfa31874c8888e4873cbd/README.md)
+哼唱使用 Spotify Basic Pitch 和单声部整理。自由拍手复用团队的 librosa 起音识别函数。键盘文字使用团队已有的原文适配器。旧版编排与渲染的说明见 [团队工作台](docs/integration/REFERENCE_WORKBENCH.md)。

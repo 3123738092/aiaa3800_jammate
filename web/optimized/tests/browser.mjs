@@ -26,7 +26,7 @@ async function readyInput() { await page.waitForFunction(()=>!document.getElemen
 async function convert() {
   await page.locator('#convert').click();
   await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
-  await page.waitForFunction(()=>!document.getElementById('variant').disabled);
+  await page.waitForFunction(()=>!document.getElementById('timbre').disabled);
 }
 async function exportPair() {
   const json=JSON.parse(await download('#download-json','json'));
@@ -60,23 +60,16 @@ try {
   assert(matchedPitches.length>=3,'recover most distinct synthetic pitches');
   await page.locator('#play-midi').click();
   await page.waitForFunction(()=>document.getElementById('play-midi').textContent.includes('停止'));
-  await page.locator('#variant').selectOption('raw');
-  assert(!(await page.locator('#play-midi').textContent()).includes('停止'),'changing output stops stale playback');
-  const raw=await exportPair(); assert.equal(raw.selectedResult,'raw');
-  assert.deepEqual(raw.notes,raw.results.raw.notes);
+  assert.equal(await page.locator('#variant, #trim, #normalize').count(),0,'humming has one automatic result');
+  assert.deepEqual(first.notes,first.results.cleaned.notes);
   await page.locator('#timbre').selectOption('bright');
+  assert(!(await page.locator('#play-midi').textContent()).includes('停止'),'changing timbre stops stale playback');
   const bright=await exportPair(); assert.equal(bright.playback.gmProgramNumber,81);
   await page.locator('#timbre').selectOption('pluck');
   const pluck=await exportPair(); assert.equal(pluck.playback.gmProgramNumber,24);
-  await page.locator('#variant').selectOption('cleaned');
-  await page.locator('#trim').check();
-  assert.equal(await page.locator('#result-content').isVisible(),false,'preprocessing change invalidates old exports');
-  assert.equal(await page.locator('#download-json').getAttribute('href'),null);
-  await convert();
-  const trimmed=await exportPair();
-  assert(trimmed.input.processing.trimStartSec>0);
-  assert(trimmed.notes.every(n=>n.startSec>=trimmed.input.processing.trimStartSec));
-  assert(trimmed.results.raw.notes.some(n=>n.pitchMidi===60 && n.startSec>.15 && n.startSec<.5),'trimmed recognition maps back to original first-note time');
+  assert.equal(first.input.processing.trimStartSec,0,'automatic preparation keeps quiet leading notes');
+  assert.equal(first.input.processing.trimEndSec,0);
+  assert.deepEqual(pluck.notes,first.notes,'timbre does not change recognition');
   assert.deepEqual(await download('#download-original','wav'),wav);
   await page.locator('#quality-panel details').evaluate(element=>{element.open=true;});
   await page.screenshot({path:path.join(project,'tmp/desktop-v2.png'),fullPage:true});
@@ -110,8 +103,7 @@ try {
   await page.locator('#file').setInputFiles({name:'quiet.wav',mimeType:'audio/wav',buffer:quiet}); await readyInput();
   assert.equal(await page.locator('#quality-panel').getAttribute('data-quality'),'warning');
   assert((await page.locator('#quality-summary').textContent()).includes('偏小'));
-  await page.locator('#normalize').uncheck();
-  assert((await page.locator('#processing-summary').textContent()).includes('×1.00'));
+  assert(!(await page.locator('#processing-summary').textContent()).includes('×1.00'),'quiet input receives automatic bounded gain');
   const clipped=Buffer.from(wav);
   // A 220 Hz clipped waveform, not an alternating Nyquist signal removed by resampling.
   for(let i=44;i<clipped.length;i+=2) clipped.writeInt16LE(Math.sin(2*Math.PI*220*((i-44)/2)/22050)>=0?32767:-32768,i);
@@ -132,8 +124,7 @@ try {
   assert(requests.every(url=>url.startsWith('http://127.0.0.1:4173/')||url.startsWith('blob:')),'unexpected network requests');
   const summary={expectedPitches,matchedPitches,rawNotes:first.results.raw.notes.length,
     cleanedNotes:first.results.cleaned.notes.length,cleanupEdits:first.results.cleaned.edits,
-    trimmedRawNotes:trimmed.results.raw.notes.length,trimmedCleanedNotes:trimmed.notes.length,
-    trimStartSec:trimmed.input.processing.trimStartSec,recordedNotes:recording.notes.length,
+    trimStartSec:first.input.processing.trimStartSec,recordedNotes:recording.notes.length,
     inputQualityCases:['quiet','possible_clipping','near_silence','invalid_file'],
     originalBytesPreserved:true,stereoToMono:true,exportsConsistent:true,browserErrors:errors,mobileNoOverflow:true,
     noExternalAudioRequests:true,limitation:'Synthetic waveform and simulated microphone; not a human humming accuracy study.'};

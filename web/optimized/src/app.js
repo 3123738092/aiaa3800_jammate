@@ -1,14 +1,19 @@
 import { decodeHumming, frameRms } from './continuity.js';
+import { trackHummingPitch, refineHummingWithPitch } from './pitch-track.js';
 import { hummingEvent } from './input-event.js';
+import { publishInputEvent } from '../../input-event-output.js';
 import { attachBandPanel } from '../../band-panel.js';
+import { downloadMrt2Input, prepareMrt2Input } from '../../mrt2-input.js';
 const selectBandInput = attachBandPanel(document.querySelector('#band-panel'));
 import * as tf from '@tensorflow/tfjs';
 import { BasicPitch, outputToNotesPoly, noteFramesToTime } from '@spotify/basic-pitch';
 import { SAMPLE_RATE, measureAudio, prepareSamples } from './audio-pipeline.js';
-import { DECODING, TIMBRES, standardizeNotes, cleanNotes, createMelodyDocument, buildExports } from './melody.js';
+import { APP_VERSION, DECODING, TIMBRES, standardizeNotes, createMelodyDocument, buildExports } from './melody.js';
+import { filterHummingArtifacts } from './humming-cleanup.js';
 
 const $ = id => document.getElementById(id);
-const ui = Object.fromEntries(['record','record-rings','mic-icon','stop-icon','record-timer','record-prompt','input-level','example','import','file','original-track','original','source-name','source-duration','convert','status','progress','model-badge','model-label','retry-model','empty','result-content','note-count','result-time','piano-roll','play-midi','timbre','download-midi','conversion-time','download-original','download-json','quality-panel','quality-summary','quality-metrics','processing-summary','normalize','trim','variant','cleanup-summary','result-state','overlap-hint'].map(id => [id,$(id)]));
+$('pipeline-version').textContent = `哼唱识别 v${APP_VERSION}`;
+const ui = Object.fromEntries(['record','record-rings','mic-icon','stop-icon','record-timer','record-prompt','input-level','example','import','file','original-track','original','source-name','source-duration','convert','status','progress','model-badge','model-label','retry-model','empty','result-content','note-count','result-time','piano-roll','play-midi','timbre','download-midi','conversion-time','download-original','download-json','quality-panel','quality-summary','quality-metrics','processing-summary','cleanup-summary','result-state','overlap-hint'].map(id => [id,$(id)]));
 let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
@@ -35,8 +40,9 @@ function syncUI() {
   ui.example.disabled = busy || recording || requestingMic;
   ui.import.disabled = busy || recording || requestingMic;
   ui.convert.disabled = inferenceRunning || busy || recording || requestingMic || !prepared || prepared.metadata.quality.status === 'rejected' || !modelReady;
-  for (const key of ['normalize','trim','variant','timbre']) ui[key].disabled = busy || recording || requestingMic;
+  ui.timbre.disabled = busy || recording || requestingMic;
   ui['play-midi'].disabled = busy || recording || !playbackNotes.length;
+  $('humming-mrt2-export').disabled = busy || recording || requestingMic || !midiBytes || !playbackNotes.length;
   ui.convert.firstElementChild.textContent = busy ? '正在转换…' : '转成 MIDI';
   ui.record.setAttribute('aria-label', recording ? '停止录音' : '开始录音');
   ui['mic-icon'].hidden = recording;
@@ -110,7 +116,7 @@ function clearAudio() {
 function refreshPreparation() {
   if (!monoSamples) return;
   clearResult();
-  prepared = prepareSamples(monoSamples, {normalize:ui.normalize.checked, trim:ui.trim.checked, sourceMetrics});
+  prepared = prepareSamples(monoSamples, {normalize:true, trim:false, sourceMetrics});
   const {quality, processing} = prepared.metadata;
   ui['quality-panel'].hidden = false;
   ui['quality-panel'].dataset.quality = quality.status;
@@ -266,7 +272,10 @@ async function convert() {
     if (token !== operation) return;
     if (!frames.length) throw new Error('这段录音没有产生可用结果，请再录一段。');
     const times = noteFramesToTime(Array.from({length:frames.length+1},(_,startFrame)=>({startFrame,durationFrames:1,pitchMidi:60,amplitude:1}))).map(n=>n.startTimeSeconds);
-    const continuous = decodeHumming(frames,onsets,times,{durationSec:duration,offsetSec:preparation.metadata.processing.trimStartSec,rms:frameRms(samples,SAMPLE_RATE,times)});
+    const rms = frameRms(samples,SAMPLE_RATE,times);
+    const continuous = decodeHumming(frames,onsets,times,{durationSec:duration,offsetSec:preparation.metadata.processing.trimStartSec,rms});
+    // Read original frame evidence before the diagnostic polyphonic decoder mutates it.
+    const pitchTrack = trackHummingPitch(samples,SAMPLE_RATE,times,frames);
     const config = DECODING;
     const noteFrames = outputToNotesPoly(frames,onsets,config.onsetThreshold,config.frameThreshold,config.minimumNoteFrames,config.inferOnsets,config.maximumFrequencyHz,config.minimumFrequencyHz,config.melodiaTrick,config.energyToleranceFrames);
     const decoded = noteFramesToTime(noteFrames).map((note,index) => {
@@ -275,14 +284,16 @@ async function convert() {
     });
     const offset = preparation.metadata.processing.trimStartSec;
     const raw = standardizeNotes(decoded,Math.min(duration,offset+samples.length/SAMPLE_RATE),offset);
-    melodyDocument = createMelodyDocument(sourceSnapshot,preparation.metadata,raw,continuous,performance.now()-started);
-    melodyDocument.model.executionBackend = tf.getBackend();
     for (const n of continuous.notes) n.sourceNoteIds=raw.filter(r=>r.startSec<n.startSec+n.durationSec&&r.startSec+r.durationSec>n.startSec).map(r=>r.id);
+    const refined = refineHummingWithPitch(continuous,{pitchTrack,times,rms});
+    const cleaned = filterHummingArtifacts(refined);
+    melodyDocument = createMelodyDocument(sourceSnapshot,preparation.metadata,raw,cleaned,performance.now()-started);
+    melodyDocument.model.executionBackend = tf.getBackend();
     trackDuration = duration;
     updateOutputs();
     ui['result-time'].textContent = `${trackDuration.toFixed(1)} 秒`;
     ui['conversion-time'].textContent = `转换用时 ${((performance.now()-started)/1000).toFixed(1)} 秒`;
-    status(continuous.notes.length ? '转换完成。切换“原始识别 / 连贯哼唱”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!continuous.notes.length);
+    status(cleaned.notes.length ? '转换完成，已自动整理旋律。试听、MIDI 和 InputEvent 使用同一份音符。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!cleaned.notes.length);
   } catch (error) {
     if (token !== operation) return;
     console.error('Transcription failed',error);
@@ -295,19 +306,20 @@ async function convert() {
   }
 }
 
+let currentInputEvent = null;
 function updateOutputs({preserveBand = false} = {}) {
   if (!melodyDocument) return;
   stopPlayback();
-  const result = buildExports(melodyDocument,ui.variant.value,ui.timbre.value);
+  const result = buildExports(melodyDocument,'cleaned',ui.timbre.value);
   if (eventURL) URL.revokeObjectURL(eventURL);
-  const inputEvent = hummingEvent(result.document, {sessionId:sourceInfo.sessionId, startedAt:0, eventId:`evt_${sourceInfo.id}_${ui.variant.value}`});
-  // A new export can reflect re-analysis or another variant of the same recording.
-  if (!preserveBand) selectBandInput({
-    schema_version:'1.2.0', event_id:crypto.randomUUID(), session_id:inputEvent.session_id,
-    source:'humming', event_type:'musical_phrase', started_at:inputEvent.started_at,
-    ended_at:inputEvent.ended_at, confidence:null, payload:{melody:result.document},
-    provenance:{producer:'melody_v1', source_id:result.document.id, source_schema_version:result.document.schemaVersion}
-  });
+  const inputEvent = preserveBand && currentInputEvent ? currentInputEvent : hummingEvent(result.document,
+    {sessionId:sourceInfo.sessionId, startedAt:0, eventId:crypto.randomUUID()});
+  // Re-analysis replaces the canonical event; audition timbre alone does not.
+  if (!preserveBand) {
+    selectBandInput(inputEvent);
+    publishInputEvent(inputEvent);
+  }
+  currentInputEvent = inputEvent;
   eventURL = URL.createObjectURL(new Blob([JSON.stringify(inputEvent,null,2)],{type:'application/json'}));
   $('download-event').href = eventURL;
   $('download-event').download = `humming-${sourceInfo.id}.input-event.json`;
@@ -319,7 +331,7 @@ function updateOutputs({preserveBand = false} = {}) {
   if (jsonURL) URL.revokeObjectURL(jsonURL);
   midiURL = URL.createObjectURL(new Blob([midiBytes],{type:'audio/midi'}));
   jsonURL = URL.createObjectURL(new Blob([JSON.stringify(result.document,null,2)],{type:'application/json'}));
-  const basename = `jammate-${sourceInfo.id.slice(0,8)}-${ui.variant.value}-${ui.timbre.value}`;
+  const basename = `jammate-${sourceInfo.id.slice(0,8)}-humming-${ui.timbre.value}`;
   if (midiNotes.length) ui['download-midi'].href = midiURL;
   else ui['download-midi'].removeAttribute('href');
   ui['download-midi'].setAttribute('aria-disabled',String(!midiNotes.length));
@@ -328,8 +340,8 @@ function updateOutputs({preserveBand = false} = {}) {
   ui['empty'].hidden = true; ui['result-content'].hidden = false;
   ui['note-count'].hidden = false; ui['note-count'].textContent = `${midiNotes.length} 个音符`;
   ui['result-state'].textContent = midiNotes.length ? '自由哼唱 · BPM 未指定 · 保留原节奏' : '未识别到音符 · JSON 可用于排查';
-  const {raw,cleaned} = melodyDocument.results;
-  ui['cleanup-summary'].textContent = `原始识别 ${raw.notes.length} 个 → 连贯哼唱 ${cleaned.notes.length} 个；连续性处理 ${cleaned.edits.length} 处；按单声部解释，保留原始识别供比较。`;
+  const adjustments = melodyDocument.results.cleaned.edits.filter(e=>/excursion|drift|remove_short_artifact/.test(e.type)).length;
+  ui['cleanup-summary'].textContent = adjustments ? `已自动整理 ${adjustments} 处疑似误切或过渡碎音，保留原有节奏。` : '已自动整理旋律，保留原有节奏。';
   const selected = result.document.notes;
   const overlap = selected.some((note,index)=>selected.slice(0,index).some(previous=>previous.pitchMidi!==note.pitchMidi && previous.startSec+previous.durationSec > note.startSec+.03));
   ui['overlap-hint'].hidden = !overlap;
@@ -430,11 +442,6 @@ ui['play-midi'].addEventListener('click',() => playMidi().catch(error=>{stopPlay
 ui.original.addEventListener('play',stopPlayback);
 document.querySelector('#band-panel audio').addEventListener('play',stopPlayback);
 ui.timbre.addEventListener('change',()=>updateOutputs({preserveBand:true}));
-ui.variant.addEventListener('change',updateOutputs);
-for (const control of [ui.normalize,ui.trim]) control.addEventListener('change',()=>{
-  operation++; refreshPreparation();
-  if (prepared) status(prepared.metadata.quality.status === 'rejected' ? '录音几乎没有声音，请重新录制。' : '处理设置已更新，请重新转换；原始录音保持完整。',prepared.metadata.quality.status === 'rejected');
-});
 ui.import.addEventListener('click',()=>ui.file.click());
 ui.file.addEventListener('change',async()=>{
   const file = ui.file.files[0];
@@ -452,6 +459,11 @@ ui.example.addEventListener('click',async()=>{
   finally{if(token===operation){busy=false;syncUI();}}
 });
 new ResizeObserver(()=>drawRoll(playing?Math.max(0,audioCtx.currentTime-playStart):-1)).observe(ui['piano-roll']);
+$('humming-mrt2-export').addEventListener('click', () => {
+  if (!midiBytes || !playbackNotes.length) return;
+  const duration = Math.max(trackDuration, ...playbackNotes.map(note => note.time + note.duration));
+  downloadMrt2Input(prepareMrt2Input('humming', {midi: midiBytes, duration}));
+});
 window.addEventListener('pagehide',event=>{
   operation++; ui.progress.hidden = true;
   captureEpoch++; recorder = null; recording = false; busy = false; requestingMic = false;

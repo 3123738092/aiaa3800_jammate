@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from jammate.rhythm import RhythmContext
 
-from .input_event import FRAME_EVENT_VERSION, VERSION, InputEvent, InputEventError
+from .input_event import FRAME_EVENT_VERSION, FREE_RHYTHM_EVENT_VERSION, VERSION, InputEvent, InputEventError
 
 
 def _capture_end(started_at: float | None, duration: float) -> float | None:
@@ -101,12 +101,27 @@ def from_humming(document: dict[str, Any], *, session_id: str, event_id: str | N
                   provenance=provenance, schema_version=FRAME_EVENT_VERSION if frame_decoder else VERSION)
 
 
+def from_free_rhythm(onset_seconds, accents, *, session_id: str, audio_duration_s: float,
+                     event_id: str | None = None, started_at: float | None = None) -> InputEvent:
+    """Snapshot raw detections as the initial editable free rhythm."""
+    rhythm = {"onset_seconds": list(onset_seconds), "accents": list(accents)}
+    return _event(
+        session_id=session_id, event_id=event_id, source="rhythm", event_type="rhythm_seed",
+        started_at=started_at, ended_at=_capture_end(started_at, audio_duration_s),
+        payload={"status": "ready" if rhythm["onset_seconds"] else "no_onsets",
+                 "audio_duration_s": audio_duration_s, "rhythm": rhythm, "raw_rhythm": rhythm},
+        provenance=_provenance("free_rhythm", None, None), schema_version=FREE_RHYTHM_EVENT_VERSION,
+    )
+
+
 def to_legacy_rhythm(event: InputEvent):
     """Compatibility only: a session-grid measurement cannot reset session BPM."""
     from jammate.director.policy import UserRhythm
 
     if event.event_type != "rhythm_seed":
         raise InputEventError("expected a rhythm_seed event")
+    if event.schema_version == FREE_RHYTHM_EVENT_VERSION:
+        raise InputEventError("free rhythm requires the shared Harness; a single-bar grid cannot preserve it")
     payload = event.payload
     return UserRhythm(RhythmContext(**payload["rhythm"]), update_tempo=payload["tempo_source"] != "session")
 

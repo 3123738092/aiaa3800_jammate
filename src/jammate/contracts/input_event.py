@@ -18,6 +18,7 @@ from jsonschema import Draft202012Validator
 
 VERSION = "1.0.0"
 FRAME_EVENT_VERSION = "1.2.0"
+FREE_RHYTHM_EVENT_VERSION = "1.3.0"
 TIME_TOLERANCE_S = 1e-5  # JSON rounding only; not an audio synchronization budget.
 
 
@@ -101,18 +102,30 @@ def _cross_validate(data: dict[str, Any]) -> None:
         return
     if data["event_type"] == "rhythm_seed":
         rhythm = payload["rhythm"]
-        beats, accents = rhythm["onset_beats"], rhythm["accents"]
-        if len(beats) != len(accents):
-            raise InputEventError("payload.rhythm: onset_beats and accents lengths differ")
-        if any(a >= b for a, b in zip(beats, beats[1:])):
-            raise InputEventError("payload.rhythm.onset_beats: must be strictly increasing")
-        expected = "ready" if beats else "no_onsets"
+        duration = payload["audio_duration_s"]
+        if data["schema_version"] == FREE_RHYTHM_EVENT_VERSION:
+            for name in ("rhythm", "raw_rhythm"):
+                onsets, accents = payload[name]["onset_seconds"], payload[name]["accents"]
+                if len(onsets) != len(accents):
+                    raise InputEventError(f"payload.{name}: onset_seconds and accents lengths differ")
+                if any(a >= b for a, b in zip(onsets, onsets[1:])):
+                    raise InputEventError(f"payload.{name}.onset_seconds: must be strictly increasing")
+                if onsets and onsets[-1] >= duration:
+                    raise InputEventError(f"payload.{name}.onset_seconds: onset outside source audio")
+            has_onsets = bool(rhythm["onset_seconds"])
+        else:
+            beats, accents = rhythm["onset_beats"], rhythm["accents"]
+            if len(beats) != len(accents):
+                raise InputEventError("payload.rhythm: onset_beats and accents lengths differ")
+            if any(a >= b for a, b in zip(beats, beats[1:])):
+                raise InputEventError("payload.rhythm.onset_beats: must be strictly increasing")
+            bar_end = rhythm["beat_origin_s"] + rhythm["beats_per_bar"] * 60 / rhythm["tempo_bpm"]
+            if bar_end > duration + TIME_TOLERANCE_S:
+                raise InputEventError("payload.audio_duration_s: must contain the complete rhythm bar")
+            has_onsets = bool(beats)
+        expected = "ready" if has_onsets else "no_onsets"
         if payload["status"] != expected:
             raise InputEventError(f"payload.status: expected {expected}")
-        duration = payload["audio_duration_s"]
-        bar_end = rhythm["beat_origin_s"] + rhythm["beats_per_bar"] * 60 / rhythm["tempo_bpm"]
-        if bar_end > duration + TIME_TOLERANCE_S:
-            raise InputEventError("payload.audio_duration_s: must contain the complete rhythm bar")
     else:
         melody = payload["melody"]
         if melody["id"] != melody["source"]["id"]:

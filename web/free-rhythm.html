@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JamMate · 自由节奏</title>
+  <link rel="stylesheet" href="lab.css">
+  <link rel="stylesheet" href="rhythm.css">
+</head>
+<body>
+<main class="rhythm-page">
+  <nav><a href="/">← 输入工作台</a><a href="appendix.html">迭代附录</a></nav>
+  <h1>自由节奏</h1>
+  <p>按自己的节奏拍手、敲击或打口技。录完后可以试听和调整识别到的拍点。</p>
+
+  <section class="panel" aria-labelledby="capture-title">
+    <h2 id="capture-title">录音或导入</h2>
+    <div class="rhythm-actions">
+      <button type="button" id="record">开始录音</button>
+      <button type="button" id="example" class="secondary">载入示例</button>
+      <label class="rhythm-upload">导入音频 <input id="file" type="file" accept="audio/*"></label>
+    </div>
+    <p class="muted">录制最多 30 秒，支持导入 0.5–30 秒的录音。</p>
+    <div id="original-source" hidden>
+      <audio id="original" aria-label="原始录音" controls></audio>
+      <a id="download-original" hidden>下载原始音频</a>
+    </div>
+    <p><button type="button" id="analyze" disabled>识别节奏</button></p>
+    <p id="status" role="status">录音或导入音频后开始识别。</p>
+  </section>
+
+  <section id="result" class="panel" aria-labelledby="rhythm-result-title" hidden>
+    <div class="rhythm-result-header">
+      <div>
+        <h2 id="rhythm-result-title">节奏编辑</h2>
+        <p id="summary" class="muted"></p>
+      </div>
+      <button id="play-midi" type="button" disabled>听 MIDI</button>
+    </div>
+    <p id="rhythm-help">点击拍点编辑，拖动进度条定位。柱子的高度表示这一段录音内的相对力度。</p>
+    <div id="rhythm-roll" role="group" aria-label="打击乐拍点时间轴" aria-describedby="rhythm-help">
+      <div class="rhythm-lane-label" aria-hidden="true">打击乐</div>
+      <div class="rhythm-plot">
+        <div id="rhythm-grid" aria-hidden="true"></div>
+        <div id="rhythm-hits"></div>
+        <span id="rhythm-cursor" aria-hidden="true"></span>
+        <p id="no-hits" hidden>当前没有拍点</p>
+      </div>
+      <div id="rhythm-axis" aria-hidden="true"></div>
+    </div>
+    <div class="rhythm-transport">
+      <label for="seek">播放位置</label>
+      <input id="seek" type="range" min="0" max="0" step="any" value="0">
+      <span id="play-position" aria-hidden="true">0.000 秒</span>
+    </div>
+
+    <form id="hit-editor">
+      <label>拍点
+        <select id="hit-select" aria-label="选择拍点"></select>
+      </label>
+      <label>起音（秒）
+        <input id="hit-time" type="number" min="0" step="any" required>
+      </label>
+      <label>相对力度（1–127）
+        <input id="hit-velocity" type="number" min="1" max="127" step="1" required>
+      </label>
+      <button id="save-hit" type="submit">保存拍点</button>
+      <button id="delete-hit" type="button" class="secondary">删除拍点</button>
+    </form>
+    <div class="rhythm-actions">
+      <button id="add-hit" type="button" class="secondary">在播放位置添加拍点</button>
+      <button id="undo-hit" type="button" class="secondary">撤销</button>
+    </div>
+    <p id="edit-status" role="status"></p>
+
+    <div class="rhythm-actions rhythm-downloads" aria-label="下载当前节奏">
+      <button id="rhythm-mrt2-midi" type="button" disabled>下载 MIDI</button>
+      <a id="download-event" class="download secondary">下载 InputEvent JSON</a>
+      <button id="rhythm-mrt2-export" type="button" class="secondary" disabled>导出 MRT2 输入</button>
+    </div>
+    <p id="rhythm-mrt2-status" role="status"></p>
+    <button id="retry-midi" type="button" class="secondary" hidden>重试准备 MIDI</button>
+    <details class="rhythm-details"><summary>查看 InputEvent</summary><pre id="event"></pre></details>
+  </section>
+
+</main>
+<script type="module" src="free-rhythm.js"></script>
+</body>
+</html>

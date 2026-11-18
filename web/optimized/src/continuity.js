@@ -1,6 +1,6 @@
 // Single-voice humming decoder. Raw polyphonic Basic Pitch output is retained.
 // Times are provided by the installed model's noteFramesToTime implementation.
-export const CONTINUITY = Object.freeze({version:'1.1.1', activation:.18, holdActivation:.12,
+export const CONTINUITY = Object.freeze({version:'1.1.2', activation:.18, holdActivation:.12,
   pitchMin:36,pitchMax:84,holdRatio:.8,changeSec:.14,articulatedChangeSec:.035,
   minimumNoteSec:.07,bridgeGapSec:.09,strongOnset:.65,repeatSeparationSec:.14});
 const round=n=>Math.round(n*1e6)/1e6;
@@ -12,19 +12,29 @@ export function decodeHumming(frames,onsets,times,{durationSec,offsetSec=0,rms=n
   if(times.some((t,i)=>!Number.isFinite(t)||(i&&t<=times[i-1])))throw Error('frame times must increase');
   const notes=[],edits=[];let current=null,pending=null,gap=null,lastPitch=null;
   const energyFloor=rms?Math.max(.0005,Math.max(...rms)*.015):0;
+  // Pitch and onset heads can peak a frame apart. Use the same bounded evidence
+  // window as the raw-note path, both for change confirmation and exported scores.
+  const onsetNear=(i,pitch)=>Math.max(...[-1,0,1].map(delta=>onsets[i+delta]?.[pitch-21]??0));
   const emit=end=>{
     if(!current)return;
     const startSec=Math.max(offsetSec,offsetSec+times[current.start]);
     const endSec=Math.min(durationSec,offsetSec+times[end]);
     if(endSec-startSec>=cfg.minimumNoteSec){
+      // Pitch changes are confirmed retrospectively. Score the final segment,
+      // not the frames spent waiting for the following pitch to be confirmed.
+      let activationSum=0,weight=0;
+      for(let i=current.start;i<end;i++){
+        const dt=Math.max(0,Math.min(endSec,offsetSec+times[i+1])-Math.max(startSec,offsetSec+times[i]));
+        activationSum+=(frames[i][current.pitch-21]??0)*dt;weight+=dt;
+      }
       const sourceNoteIds=raw.filter(n=>n.startSec<endSec&&n.startSec+n.durationSec>startSec).map(n=>n.id);
       notes.push({id:`h${notes.length+1}`,pitchMidi:current.pitch,startSec:round(startSec),durationSec:round(endSec-startSec),
-        velocity01:90/127,modelActivation:current.sum/current.count,onsetActivation:onsets[current.start]?.[current.pitch-21]??null,
+        velocity01:90/127,modelActivation:weight?activationSum/weight:null,onsetActivation:onsetNear(current.start,current.pitch),
         sourceNoteIds,frameRange:[current.start,end]});
     }
     current=null;pending=null;
   };
-  const start=(pitch,i)=>{current={pitch,start:i,sum:frames[i][pitch-21],count:1};pending=null;gap=null;};
+  const start=(pitch,i)=>{current={pitch,start:i};pending=null;gap=null;};
   for(let i=0;i<frames.length;i++){
     const row=frames[i];let pitch=cfg.pitchMin,peak=-Infinity;
     for(let p=cfg.pitchMin;p<=cfg.pitchMax;p++)if((row[p-21]??0)>peak){peak=row[p-21];pitch=p;}
@@ -32,8 +42,8 @@ export function decodeHumming(frames,onsets,times,{durationSec,offsetSec=0,rms=n
     // A previous note's model tail can remain almost as strong as a newly
     // articulated short note. Let that candidate pass persistence checks;
     // otherwise hysteresis can erase the whole new note before it is tested.
-    const candidateAttack=(onsets[i]?.[pitch-21]??0)>=cfg.strongOnset ||
-      (pending?.pitch===pitch&&(onsets[pending.start]?.[pitch-21]??0)>=cfg.strongOnset);
+    const candidateAttack=onsetNear(i,pitch)>=cfg.strongOnset ||
+      (pending?.pitch===pitch&&onsetNear(pending.start,pitch)>=cfg.strongOnset);
     if(!candidateAttack&&previous!==null && row[previous-21]>=cfg.holdActivation && row[previous-21]>=peak*cfg.holdRatio)pitch=previous;
     const audible=!rms||rms[i]>energyFloor;
     const threshold = current?.pitch === pitch ? cfg.holdActivation : cfg.activation;
@@ -49,7 +59,7 @@ export function decodeHumming(frames,onsets,times,{durationSec,offsetSec=0,rms=n
     if(!current){start(pitch,i);lastPitch=pitch;continue;}
     if(pitch!==current.pitch){
       if(!pending||pending.pitch!==pitch)pending={pitch,start:i};
-      const attack=onsets[pending.start]?.[pitch-21]??0;
+      const attack=onsetNear(pending.start,pitch);
       const required=attack>=cfg.strongOnset?cfg.articulatedChangeSec:cfg.changeSec;
       if(times[i+1]-times[pending.start]>=required){const at=pending.start;emit(at);start(pitch,at);}
     }else{
@@ -62,7 +72,7 @@ export function decodeHumming(frames,onsets,times,{durationSec,offsetSec=0,rms=n
       const energyAttack=rms&&i>=3&&rms[i]>3*Math.max(.0001,Math.min(...rms.slice(i-3,i)));
       if(onset>=cfg.strongOnset&&localPeak&&energyAttack&&times[i]-times[current.start]>=cfg.repeatSeparationSec){emit(i);start(pitch,i);}
     }
-    if(current){current.sum+=row[current.pitch-21]??0;current.count++;lastPitch=current.pitch;}
+    if(current)lastPitch=current.pitch;
   }
   emit(gap?.start??frames.length);
   return {notes,edits,policy:cfg,octaveCorrection:false,forceMonophonic:true,

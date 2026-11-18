@@ -1,0 +1,121 @@
+.rhythm-page h1 { margin-bottom: .35em; }
+.rhythm-page h2 { margin-top: 0; margin-bottom: .5rem; }
+.rhythm-page .panel > :last-child { margin-bottom: 0; }
+.rhythm-page .secondary {
+  color: #315640;
+  background: #edf3e9;
+  border: 1px solid #c8d8c4;
+}
+.rhythm-page .download { display: inline-block; text-decoration: none; }
+.rhythm-page input:focus-visible,
+.rhythm-page select:focus-visible,
+.rhythm-page summary:focus-visible { outline: 3px solid #d58239; outline-offset: 3px; }
+.rhythm-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+.rhythm-actions label { margin: 0; }
+.rhythm-upload { min-width: 0; }
+.rhythm-upload input { display: block; min-width: 0; padding: .2rem 0; }
+.rhythm-result-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.rhythm-result-header button { flex: none; }
+#summary { margin: 0; }
+
+#rhythm-roll {
+  --lane-label-width: 3.9rem;
+  display: grid;
+  grid-template-columns: var(--lane-label-width) minmax(0, 1fr);
+  align-items: stretch;
+  padding: .75rem 1.4rem .5rem .6rem;
+  border: 1px solid #c8d8c4;
+  border-radius: .7rem;
+  background: #fafbf6;
+}
+.rhythm-lane-label {
+  align-self: center;
+  font-size: .75rem;
+  color: #52634e;
+}
+.rhythm-plot { position: relative; height: 7rem; isolation: isolate; }
+#rhythm-grid, #rhythm-hits { position: absolute; inset: 0; }
+#rhythm-grid {
+  border-bottom: 1px solid #80947e;
+  background: repeating-linear-gradient(to top, #dbe5d5 0 1px, transparent 1px 25%);
+  pointer-events: none;
+}
+.rhythm-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #d6e1d2;
+}
+.rhythm-hit {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 14px;
+  width: 2.8%;
+  max-width: 26px;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border-radius: .25rem;
+}
+.rhythm-hit > span {
+  width: 100%;
+  min-height: 4px;
+  border-radius: .25rem .25rem 0 0;
+  background: #4a7855;
+  pointer-events: none;
+}
+.rhythm-hit:hover,
+.rhythm-hit[aria-pressed="true"] { background: #e5d9bb55; z-index: 1; }
+.rhythm-hit[aria-pressed="true"] > span { background: #8c521c; }
+#rhythm-cursor {
+  position: absolute;
+  top: 0;
+  bottom: -3px;
+  width: 2px;
+  background: #bc4f35;
+  z-index: 2;
+  pointer-events: none;
+}
+#no-hits { margin: 2.2rem 0 0; text-align: center; color: #52634e; }
+#rhythm-axis {
+  grid-column: 2;
+  position: relative;
+  margin-top: .25rem;
+  height: 1.4rem;
+  color: #52634e;
+  font: .75rem/1.4 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+#rhythm-axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.rhythm-transport {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: .65rem;
+  margin-top: .4rem;
+}
+.rhythm-transport input { min-width: 0; width: 100%; accent-color: #315e42; }
+#play-position { min-width: 5.3rem; font-variant-numeric: tabular-nums; text-align: right; }
+#hit-editor { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .65rem; margin: .75rem 0; }
+#hit-editor label { margin: 0; color: #465646; }
+#hit-editor :is(input, select) { display: block; width: 100%; margin-top: .15rem; }
+#hit-time { max-width: 8rem; }
+#hit-velocity { max-width: 7rem; }
+#edit-status:empty, #rhythm-mrt2-status:empty { display: none; }
+.rhythm-downloads { margin-top: 1.2rem; }
+.rhythm-details { margin-top: 1.2rem; }
+.rhythm-page summary { cursor: pointer; font-weight: 600; }
+#arrangement[open] > summary { margin-bottom: 1rem; }
+
+@media (max-width: 600px) {
+  .rhythm-page { padding-inline: 12px; }
+  .rhythm-page .panel { padding: 15px; }
+  .rhythm-page button, .rhythm-page .download { padding: .55rem .75rem; }
+  .rhythm-page .rhythm-hit { padding: 0; }
+  #rhythm-roll { --lane-label-width: 2.9rem; }
+  #rhythm-axis span:nth-child(even):not(:last-child) { display: none; }
+  .rhythm-transport { gap: .35rem; font-size: .85rem; }
+}

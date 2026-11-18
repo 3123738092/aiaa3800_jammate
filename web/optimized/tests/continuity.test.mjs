@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {decodeHumming} from '../src/continuity.js';
+import {filterHummingArtifacts} from '../src/humming-cleanup.js';
 const dt=.01;
 function fixture(pitches,{silence=[],attacks=[]}={}){
   const frames=pitches.map(p=>{const r=Array(88).fill(0);if(p!==null)r[p-21]=.8;return r;});
@@ -30,6 +31,27 @@ test('articulated short changes survive overlapping activation from the previous
   assert.deepEqual(r.notes.map(n=>n.startSec),[0,.3,.4]);
 });
 test('silence cannot create notes',()=>assert.equal(run(Array(300).fill(null)).notes.length,0));
+test('note activation only includes frames within its own segment, including delayed confirmation',()=>{
+  const f=fixture([...Array(50).fill(60),...Array(50).fill(64)]);
+  for(let i=50;i<100;i++)f.frames[i][64-21]=.4;
+  const result=decodeHumming(f.frames,f.onsets,f.times,{durationSec:1,rms:f.rms});
+  assert.deepEqual(result.notes.map(n=>n.pitchMidi),[60,64]);
+  assert(Math.abs(result.notes[0].modelActivation-.8)<1e-9);
+  assert(Math.abs(result.notes[1].modelActivation-.4)<1e-9);
+});
+test('brief intermediate pitches without new attacks do not turn a glide into a scale',()=>{
+  const result=run([...Array(50).fill(60),...Array(8).fill(61),...Array(8).fill(62),...Array(8).fill(63),...Array(50).fill(64)]);
+  assert.deepEqual(result.notes.map(n=>n.pitchMidi),[60,64]);
+});
+test('a one-frame onset offset protects an intentional fast note through decoding and cleanup',()=>{
+  for(const shift of [-1,1]){
+    const f=fixture([...Array(50).fill(60),...Array(10).fill(62),...Array(50).fill(64)],{attacks:[[50+shift,62]]});
+    for(let i=50;i<60;i++)f.frames[i][62-21]=.2;
+    const result=filterHummingArtifacts(decodeHumming(f.frames,f.onsets,f.times,{durationSec:1.1,rms:f.rms}));
+    assert.deepEqual(result.notes.map(n=>n.pitchMidi),[60,62,64]);
+    assert.equal(result.notes[1].onsetActivation,.9);
+  }
+});
 test('an audible weak pitch sustains an established note but cannot start one',()=>{
   const f=fixture(Array(100).fill(60));
   for(let i=0;i<100;i++)if(i<20 || (i>=50 && i<75))f.frames[i][60-21]=.15;

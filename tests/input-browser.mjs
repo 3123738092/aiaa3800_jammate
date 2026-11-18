@@ -87,9 +87,11 @@ try{
     const event=JSON.parse(await download('#download-event',path.join(root,`tmp/browser/${version}.event.json`)));
     const doc=JSON.parse(await download('#download-json',path.join(root,`tmp/browser/${version}.melody.json`)));
     const midi=new Midi(await download('#download-midi',path.join(root,`tmp/browser/${version}.mid`)));
-    assert.equal(event.source,'humming');assert.equal(event.payload.notes.length,doc.notes.length);
-    assert.equal(midi.tracks[0].notes.length,event.payload.notes.length);
-    midi.tracks[0].notes.forEach((n,i)=>{assert.equal(n.midi,event.payload.notes[i].pitch_midi);assert(Math.abs(n.time-event.payload.notes[i].start_sec)<.0011);});
+    assert.equal(event.source,'humming');
+    const notes = version === 'optimized' ? event.payload.melody.notes : event.payload.notes;
+    assert.equal(notes.length,doc.notes.length);
+    assert.equal(midi.tracks[0].notes.length,notes.length);
+    midi.tracks[0].notes.forEach((n,i)=>{assert.equal(n.midi,notes[i].pitchMidi ?? notes[i].pitch_midi);assert(Math.abs(n.time-(notes[i].startSec ?? notes[i].start_sec))<.0011);});
     const validation=await context.request.post(`${base}/api/validate`,{data:event});assert.equal(validation.status(),200,await validation.text());
     await page.screenshot({path:path.join(root,`tmp/browser/${version}.png`),fullPage:true});
     await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
@@ -114,9 +116,8 @@ try{
       await page.selectOption('#timbre','bright');
       assert(await page.locator('[data-wav]').isVisible());
       assert.equal(await page.locator('[data-wav]').getAttribute('href'), bandWav);
-      await page.selectOption('#variant','raw');
-      assert(await page.locator('[data-output]').isHidden(), 'changing the notes invalidates the old band');
-      await page.selectOption('#variant','cleaned');
+      assert.equal(await page.locator('#variant').count(),0);
+      assert.equal(doc.selectedResult,'cleaned');
       assert.deepEqual(doc.notes.map(n=>n.pitchMidi),[60,64,67,64,62],'recover all five expected pitches');
       assert.equal(doc.model.executionBackend,'cpu');
       await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});

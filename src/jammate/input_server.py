@@ -17,6 +17,7 @@ from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_rhythm
 from jammate.input_band import render_clip
 from jammate.reference_bridge import ReferenceBridge, SERVICE_ID
+from jammate.perception import rhythm_event, rhythm_midi, text_event
 from jammate.rhythm import RhythmContext
 
 ROOT = Path(__file__).resolve().parents[2] / "web"
@@ -44,7 +45,7 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= 16 * 1024 * 1024:
                 raise ValueError("request must be 1 byte to 16 MB")
-            if self.path.startswith("/api/reference/"):
+            if self.path.startswith(("/api/reference/", "/api/input/")):
                 port = self.server.server_port
                 origin = self.headers.get("Origin")
                 if origin not in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
@@ -53,14 +54,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if self.headers.get_content_type() != "application/json":
                     self.json_response(415, {"error": "请提交 JSON。"})
                     return
-                operation = self.path.removeprefix("/api/reference/")
-                if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
-                    self.json_response(404, {"error": "unknown reference endpoint"})
-                    return
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
                     raise ValueError("请求必须为 JSON 对象。")
-                self.json_response(200, self.server.reference.request(operation, body))
+                producers = {"/api/input/text": text_event, "/api/input/rhythm": rhythm_event,
+                             "/api/input/rhythm/midi": rhythm_midi}
+                if self.path in producers:
+                    self.json_response(200, producers[self.path](body))
+                else:
+                    operation = self.path.removeprefix("/api/reference/")
+                    if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
+                        self.json_response(404, {"error": "unknown endpoint"})
+                        return
+                    self.json_response(200, self.server.reference.request(operation, body))
             elif self.path in ("/api/rhythm", "/api/rhythm/v1"):
                 body = json.loads(self.rfile.read(length))
                 audio, sr = sf.read(io.BytesIO(base64.b64decode(body["wav"], validate=True)), dtype="float32", always_2d=True)
@@ -117,7 +123,7 @@ def main():
                              ("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
         server.reference = reference
-        print(f"JamMate Input Lab: http://127.0.0.1:{args.port}", flush=True)
+        print(f"JamMate Input Lab: http://127.0.0.1:{server.server_port}", flush=True)
         server.serve_forever()
 
 

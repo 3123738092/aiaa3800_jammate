@@ -1,3 +1,5 @@
+import {publishInputEvent} from './input-event-output.js';
+
 const $ = id => document.getElementById(id);
 const prompt = $('creation-prompt'), agent = $('text-agent');
 const bpm = $('text-bpm'), profile = $('text-profile');
@@ -21,6 +23,7 @@ async function post(route, body, signal) {
 function sync() {
   const busy = Boolean(pending);
   for (const field of [prompt, example, $('new-work'), $('text-generate')]) field.disabled = busy;
+  $('text-event').disabled = busy || !prompt.value.trim();
   for (const field of [agent, bpm, profile, renderer, preview]) field.disabled = busy || turn > 0;
   $('text-generate').textContent = turn ? '继续调整' : '生成第一段';
 }
@@ -55,23 +58,65 @@ $('new-work').addEventListener('click', newWork);
 example.onclick = () => {
   prompt.value = example.dataset.prompt;
   prompt.focus();
+  sync();
 };
+prompt.addEventListener('input', sync);
 
-$('text-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  if (pending || !prompt.value.trim()) return;
+function currentRequest() {
   const input = {session_id: session, after_turn: turn, agent: agent.value, bpm: Number(bpm.value),
-    profile: profile.value, text: prompt.value.trim(), renderer: renderer.value, allow_preview: preview.checked};
+    profile: profile.value, text: prompt.value, renderer: renderer.value, allow_preview: preview.checked};
   const signature = JSON.stringify(input);
   if (!attempts.has(signature)) {
     attempts.set(signature, {...input, request_id: crypto.randomUUID()});
   }
-  const body = attempts.get(signature);
+  return attempts.get(signature);
+}
+
+async function produceTextEvent({session_id, request_id, text}, request) {
+  const response = await fetch('/api/input/text', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, signal: request.signal,
+    body: JSON.stringify({session_id, event_id: request_id, text}),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error);
+  if (pending === request) publishInputEvent(result);
+  return result;
+}
+
+$('text-event').addEventListener('click', async () => {
+  if (pending || !prompt.value.trim()) return;
+  const body = currentRequest();
+  const request = new AbortController();
+  pending = request;
+  sync();
+  try {
+    const result = await produceTextEvent(body, request);
+    if (pending !== request) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], {type: 'application/json'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `text-${result.event_id}.input-event.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    status.textContent = '文字 InputEvent 已导出。';
+  } catch (error) {
+    if (pending === request) status.textContent = `导出失败：${error.message}`;
+  } finally {
+    if (pending === request) { pending = null; sync(); }
+  }
+});
+
+$('text-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (pending || !prompt.value.trim()) return;
+  const body = currentRequest();
   const request = new AbortController();
   pending = request;
   sync();
   status.textContent = '正在编排和生成…';
   try {
+    await produceTextEvent(body, request);
+    if (request !== pending) return;
     const result = await post('turn', body, request.signal);
     if (request !== pending) return;
     clearAudio();
@@ -112,6 +157,7 @@ window.addEventListener('pagehide', event => {
   else clearAudio();
 });
 
+sync();
 post('status', {}).then(result => {
   agent.options[0].disabled = !result.llm_ready;
   renderer.options[1].disabled = !result.mrt2_installed;

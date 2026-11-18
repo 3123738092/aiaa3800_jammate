@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
-import { mkdir, copyFile, cp, writeFile } from 'node:fs/promises';
+import { mkdir, copyFile, cp, writeFile, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 const require = createRequire(import.meta.url);
@@ -8,6 +9,9 @@ const dist = path.join(root, 'dist');
 await mkdir(dist, { recursive: true });
 await Promise.all(['index.html', 'style.css'].map(name => copyFile(path.join(root, 'src', name), path.join(dist, name))));
 await build({ entryPoints: [path.join(root, 'src/app.js')], bundle: true, minify: true, sourcemap: false, outfile: path.join(dist, 'app.js'), format: 'esm', platform: 'browser', target: ['es2020'], logLevel: 'info' });
+const revision=createHash('sha256').update(await readFile(path.join(dist,'app.js'))).digest('hex').slice(0,12);
+const html=await readFile(path.join(root,'src/index.html'),'utf8');
+await writeFile(path.join(dist,'index.html'),html.replace('src="./app.js"',`src="./app.js?v=${revision}"`));
 const basicPitchRoot = path.dirname(path.dirname(require.resolve('@spotify/basic-pitch')));
 await cp(path.join(basicPitchRoot, 'model'), path.join(dist, 'model'), { recursive: true });
 await copyFile(path.join(basicPitchRoot, 'LICENSE'), path.join(dist, 'BASIC-PITCH-LICENSE.txt'));
