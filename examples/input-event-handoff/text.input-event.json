@@ -1,0 +1,16 @@
+{
+  "confidence": null,
+  "ended_at": null,
+  "event_id": "c3fcd6cc-d48d-44a0-8c75-9dee7fe3d862",
+  "event_type": "speech",
+  "payload": {
+    "text": "  来一段，慢一点\n"
+  },
+  "provenance": {
+    "producer": "text"
+  },
+  "schema_version": "1.0.0",
+  "session_id": "a13bcd59-9c52-46f9-83dd-4681295ae4f2",
+  "source": "text",
+  "started_at": null
+}

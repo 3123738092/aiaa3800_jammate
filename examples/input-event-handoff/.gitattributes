@@ -1,0 +1,2 @@
+# Preserve the exact UTF-8 keyboard input, including its final LF, on every OS.
+text.txt -text
