@@ -14,8 +14,9 @@ SCALE_STEPS = {
     "major": (0, 2, 4, 5, 7, 9, 11),
     "minor": (0, 2, 3, 5, 7, 8, 10),  # natural minor
 }
-CHORD_INTERVALS = {"maj": (0, 4, 7), "min": (0, 3, 7), "dim": (0, 3, 6)}
-CHORD_SUFFIX = {"maj": "", "min": "m", "dim": "dim"}
+CHORD_INTERVALS = {"maj": (0, 4, 7), "min": (0, 3, 7), "dim": (0, 3, 6),
+                   "dom7": (0, 4, 7, 10), "maj7": (0, 4, 7, 11), "min7": (0, 3, 7, 10)}
+CHORD_SUFFIX = {"maj": "", "min": "m", "dim": "dim", "dom7": "7", "maj7": "maj7", "min7": "m7"}
 BEATS_PER_BAR = 4
 
 
@@ -113,6 +114,20 @@ class Chord:
         """Root-position voicing whose root is the lowest pitch >= `low`."""
         base = low + (self.root - low) % 12
         return tuple(base + i for i in CHORD_INTERVALS[self.quality])
+
+
+@dataclass(frozen=True)
+class ChordStep:
+    """One bar of harmony, with the chord root relative to the key tonic."""
+    offset: int
+    quality: str
+
+    def __post_init__(self) -> None:
+        if type(self.offset) is not int or not 0 <= self.offset <= 11 or self.quality not in CHORD_INTERVALS:
+            raise ValueError("invalid chord step")
+
+    def in_key(self, key: Key) -> Chord:
+        return Chord((key.tonic + self.offset) % 12, self.quality)
 
 
 def hz_to_midi(hz: float) -> float:

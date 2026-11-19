@@ -17,6 +17,7 @@ from .decision_gate import should_execute
 from .llm import validate_plan
 from .manager import StateManager
 from .offline import PlannedPerformance, prepare_bar, prepare_plan
+from .transitions import project
 
 
 @dataclass(frozen=True)
@@ -65,12 +66,14 @@ class BoundDecision:
         return (all(action["action"] == "PRESERVE" for action in data["actions"])
                 and all(getattr(self.state, field) == value for field, value in data["transport"].items()))
 
-    def prepare(self) -> PreparedChange:
+    def prepare(self, arrange=None) -> PreparedChange:
         """Worker-side note preparation using a frozen snapshot."""
         validate_plan(self.plan, self.request.events, self.state)
-        if not should_execute(self.state, self.plan):
+        if not should_execute(self.state, self.plan, local_arrangement=arrange is not None):
             raise PlanError("plan needs clarification or has no executable change")
-        return PreparedChange(self, prepare_plan(self.state, self.plan))
+        performance = (prepare_plan(self.state, self.plan) if arrange is None
+                       else arrange(self.state, self.plan, self.request.events))
+        return PreparedChange(self, performance)
 
 
 @dataclass(frozen=True)
@@ -158,7 +161,8 @@ class RealtimeSession:
             raise PlanError("stale decision request")
         return state
 
-    def bind(self, request: DecisionRequest, plan: BandPlan) -> BoundDecision:
+    def bind(self, request: DecisionRequest, plan: BandPlan, *, preparation_budget_ms=None,
+             after_bar=-1, through_bar=None) -> BoundDecision:
         """Choose the earliest slot with sufficient time left for preparation."""
         state = self._require_current(request)
         data = plan.to_dict()
@@ -166,8 +170,12 @@ class RealtimeSession:
                 or data["based_on_state_version"] != request.state.state_version
                 or tuple(data["trigger_event_ids"]) != tuple(event.event_id for event in request.events)):
             raise PlanError("plan does not match the decision request")
+        budget = self.timing.preparation_budget_ms if preparation_budget_ms is None else preparation_budget_ms
+        samples = round(self.sample_rate * budget / 1000)
+        last_bar = request.last_candidate_bar if through_bar is None else min(through_bar, request.last_candidate_bar)
         slot = next((s for s in self.schedule_window()
-                     if s.bar <= request.last_candidate_bar and self.sample <= s.decision_deadline_sample), None)
+                     if after_bar < s.bar <= last_bar
+                     and self.sample <= s.enqueue_deadline_sample - samples), None)
         if slot is None:
             raise PlanError("decision deadline missed")
         data["effective_at"] = {"bar": slot.bar, "beat": 0.}
@@ -214,6 +222,27 @@ class RealtimeSession:
                     if old_groove != new_groove:
                         raise PlanError("new plan would change queued groove")
 
+    def preview_next_bar(self) -> PlaybackBar:
+        """Read the next bar for buffering without confirming its playback."""
+        clock = copy(self._clock)
+        bar = clock.bar_index
+        state, performance = self.manager.state, self._active
+        queued = self._queued
+        if (queued is not None and queued.decision.slot.bar == bar
+                and queued.decision.slot.start_sample == clock.next_sample
+                and self.manager.plan_status(queued.decision.plan.plan_id) == "pending"):
+            state = project(state, queued.decision.plan)
+            if not queued.decision.keeps_playing_material():
+                performance = queued.performance
+        timing = clock.reserve(state.tempo_bpm)
+        return PlaybackBar(timing, self._bar_notes(state, performance, bar))
+
+    @staticmethod
+    def _bar_notes(state, performance, bar):
+        if performance is not None and bar < performance.start_bar + performance.bars:
+            return _notes_in_bar(performance, bar)
+        return prepare_bar(state, bar)
+
     def _start_bar(self) -> PlaybackBar:
         bar, start = self._clock.bar_index, self._clock.next_sample
         self.manager.update_transport(bar=bar, beat=0., next_bar=bar,
@@ -238,7 +267,7 @@ class RealtimeSession:
             self.manager.update_transport(bar=bar, beat=0., next_bar=bar + 1)
         if self._active is not None and bar >= self._active.start_bar + self._active.bars:
             self._active = None
-        notes = _notes_in_bar(self._active, bar) if self._active is not None else prepare_bar(state, bar)
+        notes = self._bar_notes(state, self._active, bar)
         return PlaybackBar(timing, notes, receipt)
 
     def advance_to(self, sample: int) -> tuple[PlaybackBar, ...]:

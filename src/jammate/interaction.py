@@ -7,9 +7,11 @@ from enum import Enum
 
 from jammate.music import Note
 from jammate.rhythm import RhythmContext
+from jammate.instruments import ADDED_INSTRUMENTS, gm_program
 
 
 CORE_LAYER_NAMES = ("drums", "bass", "keys", "lead")
+LAYER_NAMES = (*CORE_LAYER_NAMES, *ADDED_INSTRUMENTS)
 
 
 class Strategy(str, Enum):
@@ -30,6 +32,9 @@ class JamAction(str, Enum):
     INTRODUCE_LAYER = "INTRODUCE_LAYER"
     ADD_LAYER = "ADD_LAYER"
     REMOVE_LAYER = "REMOVE_LAYER"
+    SET_KEY = "SET_KEY"
+    SET_PROGRESSION = "SET_PROGRESSION"
+    SET_TEXTURE = "SET_TEXTURE"
     FILL = "FILL"
 
 
@@ -60,7 +65,7 @@ class Layer:
     role: str = "support"
 
     def __post_init__(self):
-        if self.name not in (*CORE_LAYER_NAMES, "guitar") or type(self.active) is not bool:
+        if (self.name not in LAYER_NAMES and gm_program(self.name) is None) or type(self.active) is not bool:
             raise ValueError("invalid layer name/active flag")
         unit(self.level, "layer level")
         unit(self.density, "layer density")

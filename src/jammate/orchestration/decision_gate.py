@@ -8,8 +8,8 @@ def should_execute(state, plan, *, local_arrangement=False):
     if not data["unresolved"]:
         return True
     target = project(state, plan)
-    if (target.tempo_bpm, target.playing, target.layers, target.rhythm) != (
-        state.tempo_bpm, state.playing, state.layers, state.rhythm
+    if (target.tempo_bpm, target.playing, target.layers, target.rhythm, target.key, target.texture, target.chord_cycle) != (
+        state.tempo_bpm, state.playing, state.layers, state.rhythm, state.key, state.texture, state.chord_cycle
     ):
         return True
     if not target.playing:

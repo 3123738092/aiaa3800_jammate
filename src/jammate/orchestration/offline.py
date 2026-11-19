@@ -39,7 +39,7 @@ class RenderedPlan(PlannedPerformance):
     sample_rate: int
 
 
-def _layers(notes, state, *, bar=0):
+def apply_layer_settings(notes, state, *, bar=0):
     output = []
     for layer in state.layers:
         if not layer.active or layer.level == 0 or layer.density == 0:
@@ -63,7 +63,20 @@ def _layers(notes, state, *, bar=0):
 
 def prepare_bar(state: JamState, bar: int, lead: tuple[Note, ...] = ()) -> tuple[Note, ...]:
     """Arrange one bar and apply the shared layer settings."""
-    return _layers(arrange_bar(state, bar, lead), state, bar=bar)
+    return apply_layer_settings(arrange_bar(state, bar, lead), state, bar=bar)
+
+
+def performance_state_for_bar(state, target, actions, offset, bars):
+    layers = []
+    for layer in target.layers:
+        build = next((a for a in actions if a["action"] == "BUILD" and a["scope"] in {"band", layer.name}), None)
+        if build:
+            fraction = min(1., (offset + 1) / build["parameters"].get("duration_bars", bars))
+            previous = next((item.level for item in state.layers if item.name == layer.name), .5)
+            level = previous + (layer.level - previous) * fraction
+            layer = replace(layer, level=level)
+        layers.append(layer)
+    return target.with_updates(layers=tuple(layers))
 
 
 def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerformance:
@@ -94,16 +107,7 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
     violations = set()
     for offset in range(bars):
         bar = start + offset
-        layers = []
-        for layer in target.layers:
-            build = next((a for a in data["actions"] if a["action"] == "BUILD" and a["scope"] in {"band", layer.name}), None)
-            if build:
-                fraction = min(1., (offset + 1) / build["parameters"].get("duration_bars", bars))
-                previous = next((item.level for item in state.layers if item.name == layer.name), .5)
-                level = previous + (layer.level - previous) * fraction
-                layer = replace(layer, level=level)
-            layers.append(layer)
-        bar_state = target.with_updates(layers=tuple(layers))
+        bar_state = performance_state_for_bar(state, target, data["actions"], offset, bars)
         notes = prepare_bar(bar_state, bar, lead_bars.get(bar, ()))
         # A preserved layer must also keep actual notes/velocities, not just metadata.
         # Explicit start/stop governs audibility globally. Compare preserved
@@ -139,11 +143,14 @@ def _render_performance(performance, sample_rate):
 
 
 class OfflineRuntime:
-    def __init__(self, *, seed=3800, sample_rate=22050, arranger=None):
+    def __init__(self, *, seed=3800, sample_rate=22050, arranger=None, backend_arranger=None):
         self.seed, self.sample_rate = seed, sample_rate
         self.arranger = arranger
+        self.backend_arranger = backend_arranger
 
     def validate(self, state, plan):
+        if self.backend_arranger is not None:
+            return project(state, plan)
         return prepare_plan(state, plan, seed=self.seed)
 
     def execute(self, manager: StateManager, plan: BandPlan) -> RenderedPlan:
@@ -153,7 +160,12 @@ class OfflineRuntime:
                   "completed_bar": data["effective_at"]["bar"] + data["valid_for_bars"]}
         try:
             # Validation/preflight must never spend an extra model request.
-            if self.arranger is None:
+            if self.backend_arranger is not None:
+                from .backend_arrangement import prepare_scoped_score
+                performance, _ = prepare_scoped_score(state, plan, events, self.backend_arranger, seed=self.seed)
+                manager.check_pending(plan)
+                result = _render_performance(performance, self.sample_rate)
+            elif self.arranger is None:
                 result = render_plan(state, plan, seed=self.seed, sample_rate=self.sample_rate)
             else:
                 performance = self.validate(state, plan)

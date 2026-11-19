@@ -1,0 +1,58 @@
+{
+  "duration_s": 10.0,
+  "original_conditioning": {
+    "style": "Warm instrumental band; keep tempo and key steady, thin the drums noticeably, and let bass and keys stay supportive and unchanged.",
+    "frame_rate": 25,
+    "pitch_spans": [
+      {
+        "pitch": 36,
+        "frame": 188,
+        "length": 62
+      },
+      {
+        "pitch": 60,
+        "frame": 188,
+        "length": 62
+      }
+    ],
+    "drum_spans": [
+      {
+        "frame": 188,
+        "length": 16
+      },
+      {
+        "frame": 219,
+        "length": 16
+      }
+    ]
+  },
+  "chinese_comparison": {
+    "seed": 0,
+    "renders": [
+      {
+        "prompt": "鼓少一点",
+        "model": "mrt2_small",
+        "backend": "jax",
+        "inference": "real_magenta_rt",
+        "duration_s": 10.0,
+        "sample_rate": 48000,
+        "channels": 2,
+        "pcm_sha256": "298e344e6f6c830bdc86bb01922a854b222ea20dbb42ba6af03fab58f78deeef",
+        "file": "01_sparse_prompt.wav",
+        "wav_sha256": "fa3891811458710380e41aae9a8b952a0ad36ad88114524e1961f59b62935a30"
+      },
+      {
+        "prompt": "鼓更密一点",
+        "model": "mrt2_small",
+        "backend": "jax",
+        "inference": "real_magenta_rt",
+        "duration_s": 10.0,
+        "sample_rate": 48000,
+        "channels": 2,
+        "pcm_sha256": "7760f8522fbffdba09d944384a93c94efefb93158e8039c9807eb1a4b3c527ba",
+        "file": "02_dense_prompt.wav",
+        "wav_sha256": "f4ad64b4b19a4be2152847b6c32006bce40f48c1cd7d88e3ecee517ac1844a0f"
+      }
+    ]
+  }
+}

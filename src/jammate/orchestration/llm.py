@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -11,12 +12,17 @@ from jsonschema import Draft202012Validator
 
 from jammate.contracts import BandPlan, PlanError
 from jammate.contracts.input_event import _json_values, _unique_object
+from jammate.generate.harmony import harmony_cycle
+from jammate.instruments import ADDED_INSTRUMENTS, MAX_JAM_LAYERS, added_program, gm_program
 from .plans import make_plan
 from .llm_config import LLMConfig, LLMConfigurationError
 from .transitions import project
 from .context import select_state
-from .tempo_intent import explicit_tempo, tempo_hold, validate_tempo_plan
+from .tempo_intent import explicit_tempo, speech_clauses, tempo_hold, validate_tempo_plan
 from .explicit_request import explicit_request, request_hold, validate_request_plan
+from .key_intent import explicit_key_plan
+from .addition_intent import asks_for_instruments
+from .progression_intent import asks_for_new_progression, explicit_progression_plan
 
 
 class ProviderFailure(RuntimeError):
@@ -33,12 +39,23 @@ class ModelReply:
     usage: dict
 
 
-def decision_schema(state=None, plan_id=None):
+def available_instruments(state, soundfont_programs):
+    if len(state.layers) >= MAX_JAM_LAYERS:
+        return []
+    used = {added_program(layer.name) for layer in state.layers}
+    from_soundfont = [{"name": f"gm_{program}", "label": label} for program, label in (soundfont_programs or {}).items()
+                      if program not in used]
+    local = [{"name": name, "label": instrument.label, "role": instrument.role}
+             for name, instrument in ADDED_INSTRUMENTS.items()
+             if instrument.midi_program not in used and instrument.midi_program not in (soundfont_programs or {})]
+    return local + from_soundfont
+
+
+def decision_schema(state=None, plan_id=None, *, soundfont_programs=None):
     schema = json.loads(files(__package__).joinpath("llm_decision.schema.json").read_text(encoding="utf-8"))
-    schema["properties"]["preserve"]["items"]["pattern"] = "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar))$"
     if state is not None:
         layer_names = [layer.name for layer in state.layers]
-        allowed = ["tempo", "key", "groove", "playing", *(f"layer:{name}" for name in layer_names)]
+        allowed = ["tempo", "key", "progression", "groove", "playing", *(f"layer:{name}" for name in layer_names)]
         if state.current_motif_id:
             allowed.append(f"motif:{state.current_motif_id}")
         schema["properties"]["preserve"]["items"] = {"type": "string", "enum": allowed}
@@ -47,10 +64,13 @@ def decision_schema(state=None, plan_id=None):
             name = branch["properties"]["action"]["enum"][0]
             params = branch["properties"]["parameters"]["properties"]
             scopes = branch["properties"]["scope"]["enum"]
-            if name == "INTRODUCE_LAYER" and "guitar" in layer_names:
-                continue
-            if "guitar" in layer_names and name in {"PRESERVE", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "ADD_LAYER", "REMOVE_LAYER"}:
-                scopes.append("guitar")
+            if name == "INTRODUCE_LAYER":
+                scopes[:] = [item["name"] for item in available_instruments(state, soundfont_programs)]
+                if not scopes:
+                    continue
+            elif name in {"PRESERVE", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "ADD_LAYER", "REMOVE_LAYER"}:
+                scopes[:] = [scope for scope in scopes if scope not in ADDED_INSTRUMENTS or scope in layer_names]
+                scopes.extend(layer for layer in layer_names if gm_program(layer) is not None)
             if name in {"ECHO_MOTIF", "VARY_MOTIF"}:
                 if not state.motifs:
                     continue
@@ -78,14 +98,20 @@ def event_context(event):
     return result
 
 
-def build_context(events, state, plan_id, history=(), *, selection=None):
+def build_context(events, state, plan_id, history=(), *, selection=None, soundfont_programs=None):
     if selection is None:
         state, selection = select_state(events, state)
     recent = []
     for turn in history[-6:]:
         recent.append({**turn, "events": [event_context(e) for e in turn["events"]]})
     # Put the CURRENT event last. last_feedback/history are context, not new requests.
+    active_names = {layer.name: soundfont_programs[program] for layer in state.layers
+                    if (program := gm_program(layer.name)) is not None and program in (soundfont_programs or {})}
+    current_chords = [chord.name for chord in harmony_cycle(state)] if state.key is not None else []
     return {"recent_turns": recent, "state": state.to_dict(), "context_selection": selection, "new_motif_id": f"motif_{plan_id}",
+            "available_instruments": available_instruments(state, soundfont_programs),
+            "soundfont_layer_labels": active_names,
+            "current_chord_cycle": current_chords,
             "events": [event_context(e) for e in events]}
 
 
@@ -148,6 +174,30 @@ def validate_plan(plan, events, state):
     """Execution invariants, not a second natural-language interpreter."""
     target = project(state, plan)
     data = plan.to_dict()
+    has_style_clause = any(
+        re.fullmatch(r"[\w\s]{1,24}(?:风情|风格|曲风|氛围)", clause)
+        and not re.search(r"不|别|保持|保留|沿用|延续|什么|哪种|分析|介绍|解释",
+                          clause.replace("能不能", "").replace("可不可以", ""))
+        for event in events for clause in speech_clauses((event,))
+    )
+    if (has_style_clause and data["transport"].get("playing") is not False
+            and not any(a["action"] == "SET_TEXTURE" for a in data["actions"])
+            and not any(re.search(r"风情|风格|氛围|style", item, re.I) for item in data["unresolved"])):
+        raise PlanError("the request includes a style direction; use SET_TEXTURE or explain that request explicitly")
+    if asks_for_new_progression(events):
+        actions = {action["action"] for action in data["actions"]}
+        if (actions - {"SET_PROGRESSION", "PRESERVE"} or target.key != state.key
+                or target.tempo_bpm != state.tempo_bpm or target.playing != state.playing):
+            raise PlanError("a progression-only request must keep key, transport and other musical controls")
+        if "SET_PROGRESSION" not in actions and (state.key is not None or not data["unresolved"]):
+            raise PlanError("SET_PROGRESSION is available; choose a different chord cycle in the current key")
+    if asks_for_instruments(events):
+        actions = {action["action"] for action in data["actions"]}
+        if (actions - {"INTRODUCE_LAYER", "PRESERVE"}
+                or target.tempo_bpm != state.tempo_bpm or target.playing != state.playing):
+            raise PlanError("an unspecified instrument addition must keep the existing arrangement and transport")
+        if "INTRODUCE_LAYER" not in actions and not data["unresolved"]:
+            raise PlanError("add a playable instrument or explain why no new instrument was added")
     motifs = [a for a in data["actions"] if a["action"].endswith("MOTIF")]
     if state.interaction.user_active and motifs:
         raise PlanError("user_active: do not issue a lead response while the user is performing")
@@ -190,7 +240,7 @@ def validate_plan(plan, events, state):
 class LLMAgent:
     def __init__(self, config: LLMConfig, *, provider=None, max_attempts=2, fallback="hold",
                  max_context_chars=100000, execution_validator=None, arrangement_enabled=False,
-                 direct_bass_enabled=False):
+                 direct_bass_enabled=False, soundfont_programs=None):
         if max_attempts not in (1, 2) or fallback not in {"hold", "rule", "error"}:
             raise ValueError("use one or two attempts and fallback hold/rule/error")
         self.config, self.provider = config, provider or OpenAIProvider(config)
@@ -201,6 +251,7 @@ class LLMAgent:
         self.execution_validator = execution_validator
         self.arrangement_enabled = arrangement_enabled
         self.direct_bass_enabled = direct_bass_enabled
+        self.soundfont_programs = dict(soundfont_programs or {})
         self.last_trace = {}
 
     def _compile(self, content, events, state, plan_id, *, schema=None):
@@ -211,7 +262,7 @@ class LLMAgent:
             _json_values(decision)
         except (ValueError, RecursionError):
             raise PlanError("invalid JSON: no markdown fences, duplicate keys or nonfinite numbers") from None
-        schema = schema if schema is not None else decision_schema(state, plan_id)
+        schema = schema if schema is not None else decision_schema(state, plan_id, soundfont_programs=self.soundfont_programs)
         error = next(Draft202012Validator(schema).iter_errors(decision), None)
         if error:
             if error.validator == "anyOf" and isinstance(error.instance, dict):
@@ -235,7 +286,7 @@ class LLMAgent:
         self.execution_validator(state, plan)
         return plan
 
-    def decide(self, events, state, *, plan_id=None, history=()):
+    def decide(self, events, state, *, plan_id=None, history=(), intent_hints=None):
         events = tuple(events)
         if not events or any(e.session_id != state.session_id for e in events):
             raise ValueError("Agent needs a nonempty accepted batch in this session")
@@ -250,6 +301,16 @@ class LLMAgent:
             self.last_trace.update(source="system_control", elapsed_ms=0.)
             return make_plan(state, events, plan_id, "LISTEN", [], ["tempo", "key"], {"playing": False}, 1,
                                    "Runtime requested stop", [])
+        if plan := (explicit_key_plan(events, state, plan_id) or explicit_progression_plan(events, state, plan_id)):
+            unresolved = plan.to_dict()["unresolved"]
+            if unresolved:
+                self.last_trace.update(source="request_gate", status="held", reason=unresolved[0])
+            else:
+                validate_plan(plan, events, state)
+                self.execution_validator(state, plan)
+                self.last_trace["source"] = "explicit_music_request"
+            self.last_trace["elapsed_ms"] = round((time.monotonic() - started) * 1000, 2)
+            return plan
         request = explicit_request(events, state=state)
         tempo_intent = None if request else explicit_tempo(events)
         grounded = request or tempo_intent
@@ -259,8 +320,11 @@ class LLMAgent:
             hold = request_hold if request else tempo_hold
             return hold(events, state, plan_id, reason)
         view, selection = select_state(events, state)
-        schema = decision_schema(view, plan_id)
-        context_data = build_context(events, view, plan_id, history, selection=selection)
+        schema = decision_schema(view, plan_id, soundfont_programs=self.soundfont_programs)
+        context_data = build_context(events, view, plan_id, history, selection=selection,
+                                     soundfont_programs=self.soundfont_programs)
+        if intent_hints:
+            context_data = {"classifier_hints": intent_hints, **context_data}
         context = json.dumps(context_data, ensure_ascii=False, allow_nan=False)
         prompt = files(__package__).joinpath("llm_prompt.md").read_text(encoding="utf-8")
         if request:

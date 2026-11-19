@@ -10,12 +10,17 @@ import re
 import uuid
 
 from jammate.contracts.band_plan import BandPlan
-from jammate.interaction import CORE_LAYER_NAMES
+from jammate.instruments import ADDED_INSTRUMENTS, INSTRUMENT_ALIASES
+from jammate.interaction import CORE_LAYER_NAMES, LAYER_NAMES
 from jammate.state import JamState
+from .addition_intent import unspecified_instrument_plan
+from .key_intent import explicit_key_plan
+from .progression_intent import explicit_progression_plan
 from .plans import make_plan
 
-SCOPES = {"鼓": "drums", "贝斯": "bass", "键盘": "keys", "钢琴": "keys", "主旋律": "lead", "木吉他": "guitar", "吉他": "guitar",
-          **{name: name for name in (*CORE_LAYER_NAMES, "guitar", "band")}}
+SCOPES = {"鼓": "drums", "贝斯": "bass", "键盘": "keys", "钢琴": "keys", "主旋律": "lead",
+          **{name: name for name in (*CORE_LAYER_NAMES, "band")},
+          **dict(sorted(INSTRUMENT_ALIASES.items(), key=lambda item: -len(item[0])))}
 GRAMMAR = {
     "keep": r"这个不错|不错|保持|保持这样|保留|刚才那句保留|就这样|就这个|keep(?: it)?|sounds good",
     "build": r"再炸一点|再?猛一点|更猛(?:一点)?|更有力|渐强|推上去|build|more powerful",
@@ -77,6 +82,9 @@ class RuleAgent:
         if not events or any(e.session_id != state.session_id for e in events):
             raise ValueError("Agent requires an accepted, nonempty session batch")
         plan_id = plan_id or f"plan_{uuid.uuid4().hex}"
+        if plan := (explicit_key_plan(events, state, plan_id) or explicit_progression_plan(events, state, plan_id)
+                    or unspecified_instrument_plan(events, state, plan_id)):
+            return plan
         actions, transport, unresolved, reasons = [], {}, [], []
         existing_layers = tuple(layer.name for layer in state.layers)
         preserve = ["tempo", "key"]
@@ -95,8 +103,8 @@ class RuleAgent:
         for original, scope, command, negative in commands:
             if command == "add_new_instrument" and scope == "band" and "guitar" not in existing_layers:
                 scope, command = "guitar", "add"
-            missing_guitar = scope == "guitar" and scope not in existing_layers
-            if command is None or command == "add_new_instrument" or (missing_guitar and (command != "add" or negative)):
+            missing_instrument = scope in ADDED_INSTRUMENTS and scope not in existing_layers
+            if command is None or command == "add_new_instrument" or (missing_instrument and (command != "add" or negative)):
                 unresolved.append(f"Unsupported clause: {original}")
                 continue
             if scope != "band" and command not in {"keep", "build", "simplify", "add", "remove", "stop", "start"}:
@@ -211,7 +219,7 @@ class RuleAgent:
                     unresolved.append("Contradictory actions on the same layer")
         # Explicit instrument scope keeps other layers unchanged unless another action touches them.
         modified = [a for a in actions if a["action"] != "PRESERVE"]
-        if modified and all(a["scope"] in (*CORE_LAYER_NAMES, "guitar") for a in modified):
+        if modified and all(a["scope"] in LAYER_NAMES for a in modified):
             mutable_layers = {a["scope"] for a in modified}
             if direct_bass_enabled and state.position.next_bar == 0 and strategy == "INITIATE":
                 mutable_layers.add("bass")

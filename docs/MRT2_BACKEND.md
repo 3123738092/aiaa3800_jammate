@@ -1,6 +1,6 @@
 # MRT2 与 FluidSynth 后端接入
 
-基于工作台基线 `6571fa2` 实现，当前版本随工作台合入 `main`。公共契约使用 InputEvent、JamState 和 BandPlan。MRT2 tokens 是执行端内部格式。
+共享 MIDI 渲染路径最初基于工作台基线 `6571fa2` 实现。公共契约使用 InputEvent、JamState 和 BandPlan。MRT2 tokens 是执行端内部格式。
 
 ## 运行路径与职责
 
@@ -27,9 +27,41 @@ InputEvent + JamState + history
 
 `MRT2Runtime.validate()` 默认拒绝无法保证的要求，抛出带 `report` 的 `BackendCapabilityError`，在加载模型之前失败。不能让 LLM 删除用户的 preserve 约束来绕过限制。
 
-显式传 `allow_preview=True` / `--allow-preview` 才生成 MRT2 试听。回执为 `artifact_generated=true, phase=preview, succeeded=false, state_committed=false`，并逐项列出 preserve/action 的 `guaranteed=false`。StateManager 保留输入，并把计划记为 failed，允许使用新 plan_id 改后端重规划。声音文件已生成与要求已兑现分开记录。试听的 `band.mid` 是**条件 MIDI，不是模型音频的转写**。
+显式传 `allow_preview=True` / `--allow-preview` 才生成 MRT2 试听。回执为 `artifact_generated=true, phase=preview, succeeded=false, state_committed=false`，并逐项列出 preserve/action 的 `guaranteed=false`。StateManager 保留输入，并把计划记为 failed，允许使用新 plan_id 改后端重规划。声音文件已生成与要求已兑现分开记录。从 MIDI 生成试听时，`band.mid` 是提供给 MRT2 的条件输入。
 
 停止/全静音计划由宿主直接输出零样本，不调用模型；这一效果可真实兑现并提交。任何新输入取消了正在生成的计划，旧回执仍不能提交。导出回执从不代表物理声卡已经播放。
+
+## LLM 按后端编排
+
+工作区网页「从一句话出发」的高级设置里，先选 FluidSynth 或 MRT2，再把音符编排设为「LLM 编排所有声部」。Agent 可单独选择规则或大模型。编排请求包含本轮 InputEvents、已批准的 BandPlan、决策时 JamState 和由宿主投影得到的目标状态。它从这些信息开始按后端分流。
+
+- FluidSynth 的 LLM 直接写可修改通道的片段相对 MIDI tick、音高、时值和名义力度。宿主分配 MIDI 通道和 program，应用密度、音量及渐强曲线，并在合并保留声部后回读校验 MIDI。保留鼓点、已绑定的节奏和 motif、停奏以及只改速度等确定性要求由宿主处理。产物为可演奏的 MIDI 和 SoundFont WAV。
+- MRT2 的 LLM 直接写风格和 25 Hz 稀疏音高、鼓活动区间。宿主校验起拍范围，并将越过片段末尾的条件尾部截在结尾。风格为空时使用服务配置的风格提示。处理后的区间会打包成官方条件张量。此模式提供 WAV 和可下载的条件 JSON。普通有声段仍须勾选允许试听，试听回执保持音乐状态未提交。停奏或全静音由宿主执行。
+- 内置合成器的 LLM 直接写获准修改的音符。网页「一起 Jam」提供相同的后端和编排选项，MRT2 在实时伴奏旁提供独立试听，FluidSynth 按小节合成实际伴奏。原有的局部辅助编排和贝斯实验仍可通过旧 API 用作对照。
+
+命令行在现有的对照命令里加 `--backend-arrangement llm`。网页可展开音符编排日志，查看模型采纳的结构化结果或校验失败原因。未通过校验的编排会报错，状态保持在上一轮已确认的版本。
+
+## MRT2 实际收到什么
+
+LLM 编排器读本轮输入、BandPlan、当前和目标 JamState。识别后的拍手节奏、哼唱音符、目标 BPM、调性和和弦可以在这一层参与编排。BPM 决定片段时长和小节边界，编排器再把节奏和和声意图写成音高与鼓活动区间。当前宿主校验这些区间的合法范围和有声分组，尚未检查它们是否确实复现了输入的拍点或目标和弦。
+
+| 生成时传入的条件 | 内容 |
+|---|---|
+| `mulan_tokens_25hz` | MusicCoCa 从风格文字编码出的 12 个 token。当前编排提示词要求英文风格描述。 |
+| `pianoroll_with_onsets_tokens` | 每 40 毫秒一帧，每帧有 128 个 MIDI 音高位置。当前传入的值区分关闭、起音和持续。音符的起音间距可表达节奏，实际音高和同时发声的音组可提示调性和和声。 |
+| `drum_pianoroll_tokens` | 每帧一个鼓活动标记，不能指定底鼓、军鼓和踩镲，也没有力度。 |
+
+试听下载的 `conditioning.json` 是 JamMate 可读的中间格式，记录 `style`、`frame_rate`、`pitch_spans` 和 `drum_spans`。调用 MRT2 时已展开成上表的逐帧条件。BPM、拍号、调性名称和和弦名没有各自的模型输入字段。普通 MIDI 路径使用同样的条件通道，只是区间来自 MIDI 文件中的音符和速度图。
+
+一次「鼓少一点」的 10 秒试听中，模型得到英文风格提示、MIDI 音高 36 和 60，以及两段鼓活动区间。所有非零条件都从第 188 帧（7.52 秒）以后开始。两个 C 音只能提示音高中心，无法区分 C 大调和 C 小调，也没有给出贯穿片段的拍点或和弦进行。这个记录可用于定位条件覆盖，但仅凭它还不能确定为何生成的鼓听起来嘈杂。[原始条件摘要](../examples/backend_outputs/mrt2_chinese_prompt/conditions.json)
+
+## 怎样给 MRT2 条件
+
+- **风格、乐器和音色**用描述目标声音的文字，例如 `warm jazz trio, soft brushed drums, upright bass`。官方 MusicCoCa 示例使用 `a jazz piano trio`，也支持用参考音频提取风格。官方训练覆盖短标签和长描述，没有要求固定句式。JamMate 当前路径使用文字风格。[官方推理示例](https://github.com/magenta/magenta-realtime/blob/main/docs/inference.md) · [MRT2 技术介绍](https://magenta.withgoogle.com/magenta-realtime-2)
+- **固定拍速、调性和和弦**优先编码进有明确起音的音符条件。例如 96 BPM 的一拍是 0.625 秒，把可用于定拍的贝斯和键盘音放到对应的帧上。C 大调可用含 E 自然音的和弦与进行表达。官方支持给定起音，也支持 Auto-Strum 让模型自行安排起音。把规则落到条件帧是对 JamMate 的实现建议，输出中的节拍和和弦遵循度仍需实测。[官方逐帧音符控制](https://magenta.withgoogle.com/magenta-realtime-2#precise-control-through-frame-by-frame-conditioning)
+- **鼓**的官方实时用法是允许生成鼓或引导无鼓。官方认为逐鼓点直控在实际延迟下不实用。若 JamMate 需要精确复现用户的拍手节奏，可以由宿主按拍点渲染单独的鼓轨，再与引导无鼓的 MRT2 试听混合。当前二值条件还无法保证「少打几下」或「降低鼓的音量」。[MRT2 技术介绍](https://magenta.withgoogle.com/magenta-realtime-2)
+
+项目实测过两句中文分别经 MusicCoCa 获得不同的 token，再用相同音高条件、鼓区间和随机种子生成两段不同的 WAV。样本可用于试听比较，尚未测量生成的鼓点密度是否按中文指令变化。[中文提示试听](../examples/backend_outputs/mrt2_chinese_prompt/)
 
 ## 官方 MRT2 输入与环境
 

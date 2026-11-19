@@ -4,20 +4,24 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import pretty_midi
 
 from jammate.contracts import PlanError, load_input_event
 from jammate.contracts.adapters import from_text, from_system
-from jammate.interaction import Interaction, Motif
+from jammate.instruments import ADDED_INSTRUMENTS
+from jammate.interaction import Interaction, Layer, Motif
 from jammate.music import Note
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.llm import LLMAgent, ModelReply, OpenAIProvider, ProviderFailure, build_context, decision_schema
 from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
 from jammate.orchestration.manager import StateManager
-from jammate.orchestration.offline import OfflineRuntime
+from jammate.orchestration.offline import OfflineRuntime, prepare_plan
 from jammate.orchestration.decision_gate import should_execute
 from jammate.orchestration.explicit_request import compile_jev_request
 from jammate.orchestration.jev_hybrid import JevHybridAgent
 from jammate.orchestration.tempo_intent import compile_jev_tempo
+from jammate.render.midi_out import to_pretty_midi
+from jammate.render.soundfont import bank_zero_programs
 from jammate.state import JamState
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +99,63 @@ def test_current_turn_follows_history_and_preserve_choices_match_state():
     assert not any(x.startswith("motif:") for x in schema["properties"]["preserve"]["items"]["enum"])
     names = [b["properties"]["action"]["enum"][0] for b in schema["properties"]["actions"]["items"]["anyOf"]]
     assert "ECHO_MOTIF" not in names and "INTRODUCE_MOTIF" in names
+
+
+@pytest.mark.parametrize("instrument", ["flute", "strings", "harp"])
+def test_model_can_choose_and_render_an_instrument_besides_the_existing_guitar(instrument):
+    fresh = JamState(session_id="instrument-selection")
+    manager = StateManager(fresh.with_updates(layers=(*fresh.layers, Layer("guitar"))))
+    request = from_text("再加一些乐器", session_id=fresh.session_id)
+    events = manager.ingest((request,))
+    before = manager.state
+    duplicate = decision(actions=[action("INTRODUCE_LAYER", "guitar")])
+    choice = decision(actions=[action("INTRODUCE_LAYER", instrument)],
+                      preserve=["tempo", "key", "groove", "layer:keys", "layer:guitar"])
+    provider = FakeProvider(duplicate, choice)
+    agent = LLMAgent(LLMConfig(SECRET), provider=provider, fallback="error")
+    plan = agent.decide(events, before)
+    assert agent.last_trace["source"] == "llm"
+    assert len(provider.calls) == 2
+    context = json.loads(provider.calls[0]["messages"][1]["content"])
+    assert {item["name"] for item in context["available_instruments"]} == {"flute", "strings", "harp"}
+    assert manager.stage(plan)
+    clip = OfflineRuntime(sample_rate=8000).execute(manager, plan)
+    assert manager.state.layer(instrument).active and manager.state.layer("guitar").active
+    assert manager.state.tempo_bpm == before.tempo_bpm and manager.state.key == before.key
+    midi = {track.name: track for track in to_pretty_midi(clip.notes, clip.tempo_bpm).instruments}
+    assert midi[instrument].program == ADDED_INSTRUMENTS[instrument].midi_program
+    assert midi[instrument].notes and midi["guitar"].notes
+
+
+def test_exhausted_catalogue_exposes_no_addition_action():
+    fresh = JamState(session_id="full-lineup")
+    state = fresh.with_updates(layers=(*fresh.layers, *(Layer(name) for name in ADDED_INSTRUMENTS)))
+    events = (from_text("再加一些乐器", session_id=fresh.session_id),)
+    schema = decision_schema(state, "full")
+    actions = {b["properties"]["action"]["enum"][0] for b in schema["properties"]["actions"]["items"]["anyOf"]}
+    assert "INTRODUCE_LAYER" not in actions
+    assert not build_context(events, state, "full")["available_instruments"]
+    assert JamState.from_dict(state.to_dict()) == state
+
+
+def test_soundfont_catalogue_is_read_from_bank_and_model_choice_keeps_the_midi_program():
+    path = Path(pretty_midi.__file__).with_name("TimGM6mb.sf2")
+    bank = bank_zero_programs(path)
+    assert set(bank) == set(range(128))
+    session = "soundfont-selection"
+    m = StateManager(JamState(session_id=session))
+    events = m.ingest((from_text("给这里加点吹奏呼应，选一种合适的乐器。", session_id=session),))
+    pick = decision(actions=[action("INTRODUCE_LAYER", "gm_65")])
+    model = FakeProvider(pick)
+    agent = LLMAgent(LLMConfig(SECRET), provider=model, fallback="error", soundfont_programs=bank)
+    plan = agent.decide(events, m.state)
+    assert plan.actions[0]["scope"] == "gm_65"
+    new_notes = prepare_plan(m.state, plan).notes
+    track = next(track for track in to_pretty_midi(new_notes, m.state.tempo_bpm).instruments if track.name == "gm_65")
+    assert track.program == 65 and track.notes
+    with pytest.raises(ProviderFailure, match="invalid_output"):
+        LLMAgent(LLMConfig(SECRET), provider=FakeProvider(pick), fallback="error",
+                 max_attempts=1).decide(events, m.state)
 
 
 def test_actual_renderer_preservation_failure_is_repaired_before_staging():

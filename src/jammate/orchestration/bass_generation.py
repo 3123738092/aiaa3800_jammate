@@ -71,7 +71,7 @@ def _context(state, plan, performance, events, allow_extra_onsets):
         chord = chord_for_bar(state, performance.start_bar + bar)
         bars.append({
             "bar": bar, "anchor_steps": anchors, "chord_root_pc": chord.root,
-            "chord_fifth_pc": chord.pcs[-1],
+            "chord_fifth_pc": chord.pcs[2],
             "chord_pitch_classes": chord.pcs,
         })
     return {

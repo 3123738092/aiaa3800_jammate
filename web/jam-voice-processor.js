@@ -1,0 +1,102 @@
+class JamVoiceProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.frame = new Float32Array(Math.round(sampleRate * .02));
+    this.used = 0;
+    this.noise = .004;
+    this.preRoll = [];
+    this.loud = 0;
+    this.barFrames = Math.ceil(4 * 60 / 96 / .02);
+    this.port.onmessage = ({data}) => {
+      if (Number.isFinite(data.bpm) && data.bpm >= 60 && data.bpm <= 180) {
+        this.barFrames = Math.ceil(4 * 60 / data.bpm / .02);
+      }
+    };
+    this.resetPhrase();
+  }
+
+  resetPhrase() {
+    this.capturing = false;
+    this.chunks = [];
+    this.frames = 0;
+    this.voiced = 0;
+    this.quiet = 0;
+    this.steady = 0;
+    this.hasSustain = false;
+    this.attacks = 0;
+    this.notified = false;
+  }
+
+  readFrame() {
+    let power = 0;
+    let peak = 0;
+    for (const sample of this.frame) {
+      power += sample * sample;
+      peak = Math.max(peak, Math.abs(sample));
+    }
+    const level = Math.sqrt(power / this.frame.length);
+    const audible = level > Math.max(.011, this.noise * 2.8);
+    const sharp = audible && peak > .08 && peak > 2.5 * level;
+    if (!this.capturing) {
+      if (!audible) this.noise += (level - this.noise) * .04;
+      this.preRoll.push(this.frame.slice());
+      if (this.preRoll.length > 14) this.preRoll.shift();
+      this.loud = audible ? this.loud + 1 : 0;
+      if (this.loud >= 3 || sharp) {
+        this.capturing = true;
+        this.chunks = this.preRoll;
+        this.frames = this.chunks.length;
+        this.firstAttack = this.frames - Math.max(1, this.loud);
+        this.voiced = this.steady = this.loud;
+        this.attacks = 1;
+        this.preRoll = [];
+        this.loud = 0;
+      }
+      return;
+    }
+    this.frames += 1;
+    if (this.frames <= 400) this.chunks.push(this.frame.slice());
+    else this.chunks.length = 0;
+    if (audible) {
+      this.voiced += 1;
+      if (this.quiet >= 5) this.attacks += 1;
+    }
+    this.steady = audible ? this.steady + 1 : 0;
+    this.hasSustain ||= this.steady >= 7;
+    if (!this.notified && (this.hasSustain || this.attacks >= 2)) {
+      this.notified = true;
+      this.port.postMessage({type: 'start'});
+    }
+    this.quiet = audible ? 0 : this.quiet + 1;
+    if (this.hasSustain ? this.quiet < 34 :
+        this.quiet < 60 || this.frames - this.firstAttack < this.barFrames + 2) return;
+    if (this.frames > 400) {
+      this.port.postMessage({type: 'end', tooLong: true});
+    } else if (this.voiced >= 8 || this.attacks >= 2) {
+      const chunks = this.hasSustain ?
+        this.chunks.slice(0, this.chunks.length - this.quiet + 10) : this.chunks;
+      const samples = new Float32Array(chunks.length * this.frame.length);
+      for (const [i, chunk] of chunks.entries()) samples.set(chunk, i * this.frame.length);
+      this.port.postMessage({type: 'end', samples, sampleRate}, [samples.buffer]);
+    } else {
+      this.port.postMessage({type: 'end'});
+    }
+    this.resetPhrase();
+  }
+
+  process(inputs) {
+    const channel = inputs[0]?.[0];
+    if (channel) {
+      for (const sample of channel) {
+        this.frame[this.used++] = sample;
+        if (this.used === this.frame.length) {
+          this.readFrame();
+          this.used = 0;
+        }
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('jam-voice', JamVoiceProcessor);

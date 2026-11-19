@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JamMate · 一起 Jam</title>
+  <link rel="stylesheet" href="lab.css">
+  <link rel="stylesheet" href="jam.css">
+</head>
+<body>
+<main class="jam-workspace">
+  <nav><a href="/">返回创作工作台</a></nav>
+  <h1>一起 Jam</h1>
+  <div class="jam-deck">
+    <section class="jam-transport" aria-label="播放控制">
+      <div class="jam-readout">
+        <span id="jam-playback">等待开始</span>
+        <div class="jam-position"><span id="jam-bar">—</span><span> / 小节</span></div>
+        <div><strong id="jam-current-bpm">96</strong> BPM</div>
+      </div>
+      <div class="jam-settings">
+        <label for="jam-bpm">起始 BPM <input id="jam-bpm" type="number" min="60" max="180" value="96"></label>
+        <label for="jam-agent">指令处理 <select id="jam-agent">
+          <option value="rule">本地规则</option>
+          <option value="llm" disabled>大模型 Agent</option>
+        </select></label>
+        <details class="jam-advanced">
+          <summary>高级设置</summary>
+          <label for="jam-arranger">编排方式 <select id="jam-arranger">
+            <option value="rule">本地规则</option>
+            <option value="llm_all" disabled>LLM 编排所有声部</option>
+          </select></label>
+          <label for="jam-renderer">生成后端 <select id="jam-renderer">
+            <option value="synth">内置合成器</option>
+            <option value="fluidsynth" disabled>FluidSynth 音色库</option>
+            <option value="mrt2" disabled>MRT2 生成试听</option>
+          </select></label>
+          <div id="jam-timbres" hidden>
+            <label for="jam-profile">音色组合 <select id="jam-profile">
+              <option value="electric">电钢琴 + 贝斯</option>
+              <option value="acoustic">原声钢琴 + 贝斯</option>
+              <option value="synth">合成器铺底 + 合成贝斯</option>
+              <option value="custom" disabled>自选音色</option>
+            </select></label>
+            <label for="jam-keys-program">键盘音色 <select id="jam-keys-program"></select></label>
+            <label for="jam-bass-program">贝斯音色 <select id="jam-bass-program"></select></label>
+            <p id="jam-timbre-status" aria-live="polite"></p>
+          </div>
+          <label for="jam-input-mode">麦克风识别 <select id="jam-input-mode">
+            <option value="auto">自动识别</option>
+            <option value="speech">只识别语音</option>
+            <option value="rhythm">只识别拍手</option>
+            <option value="humming">只识别哼唱</option>
+          </select></label>
+          <p id="jam-backend-status" role="status"></p>
+        </details>
+        <div class="jam-buttons">
+          <button id="jam-start" type="button">开始演奏</button>
+          <button id="jam-stop" type="button" disabled>结束会话</button>
+        </div>
+        <p id="jam-mrt2-hint" hidden>开始后先播放伴奏。发送指令后，MRT2 会在下方生成独立试听。</p>
+      </div>
+    </section>
+    <section class="jam-layers" aria-label="当前声部">
+      <ul id="jam-layers"></ul>
+    </section>
+    <form class="panel jam-direct" id="jam-feedback">
+      <div class="jam-voice">
+        <button id="jam-microphone" type="button" aria-pressed="false" disabled>开启麦克风</button>
+        <span class="muted">可以说「鼓少一点」、拍一小节，或哼一小句。拍手和哼唱在本机识别。</span>
+      </div>
+      <p id="jam-voice-status" class="muted" role="status" aria-live="polite">开始演奏后自动开启麦克风，首次使用需要授权。</p>
+      <div id="jam-transcript" class="jam-transcript" hidden>
+        <span id="jam-transcript-text"></span>
+        <button id="jam-transcript-use" type="button">编辑识别结果</button>
+      </div>
+      <label for="jam-text">也可以输入文字</label>
+      <div class="jam-composer">
+        <textarea id="jam-text" rows="2" maxlength="500" placeholder="例如：鼓少一点" required disabled></textarea>
+        <button id="jam-send" type="submit" disabled>发送指令</button>
+      </div>
+      <div class="jam-quick" aria-label="示例指令">
+        <button type="button" data-example="鼓少一点" disabled>鼓少一点</button>
+        <button type="button" data-example="慢一点" disabled>慢一点</button>
+        <button type="button" data-example="去掉贝斯" disabled>去掉贝斯</button>
+      </div>
+      <p id="jam-feedback-status" role="status" aria-live="polite">开始演奏后可发送指令。</p>
+    </form>
+  </div>
+  <section class="panel" id="jam-preview-output" hidden>
+    <h2>MRT2 试听</h2>
+    <p>播放试听时自动静音实时伴奏，暂停或播完后恢复。</p>
+    <audio id="jam-preview-audio" controls aria-label="MRT2 试听"></audio>
+    <a id="jam-preview-download" download="jam-preview.wav">下载 WAV</a>
+  </section>
+  <p class="muted">已确认播放的小节和指令状态会实时更新。刷新页面会结束本次会话。</p>
+</main>
+<script type="module" src="jam.js"></script>
+</body>
+</html>

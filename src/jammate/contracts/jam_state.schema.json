@@ -101,6 +101,50 @@
         "progression_variant": {
           "type": "integer",
           "minimum": 0
+        },
+        "progression": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_bar",
+            "chords"
+          ],
+          "properties": {
+            "start_bar": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "chords": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "offset",
+                  "quality"
+                ],
+                "properties": {
+                  "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 11
+                  },
+                  "quality": {
+                    "enum": [
+                      "maj",
+                      "min",
+                      "dim",
+                      "dom7",
+                      "maj7",
+                      "min7"
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -337,7 +381,7 @@
         "layers": {
           "type": "array",
           "minItems": 4,
-          "maxItems": 5,
+          "maxItems": 16,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -350,12 +394,23 @@
             ],
             "properties": {
               "name": {
-                "enum": [
-                  "drums",
-                  "bass",
-                  "keys",
-                  "lead",
-                  "guitar"
+                "anyOf": [
+                  {
+                    "enum": [
+                      "drums",
+                      "bass",
+                      "keys",
+                      "lead",
+                      "guitar",
+                      "flute",
+                      "strings",
+                      "harp"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^gm_(?:0|[1-9][0-9]?|1[01][0-9]|12[0-7])$"
+                  }
                 ]
               },
               "active": {
@@ -375,6 +430,49 @@
                 "type": "string",
                 "minLength": 1
               }
+            }
+          }
+        },
+        "texture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scale",
+            "drums",
+            "bass",
+            "keys"
+          ],
+          "properties": {
+            "scale": {
+              "enum": [
+                "default",
+                "pentatonic",
+                "blues"
+              ]
+            },
+            "drums": {
+              "enum": [
+                "default",
+                "sparse",
+                "steady",
+                "offbeat"
+              ]
+            },
+            "bass": {
+              "enum": [
+                "default",
+                "drone",
+                "walking",
+                "syncopated"
+              ]
+            },
+            "keys": {
+              "enum": [
+                "default",
+                "arpeggio",
+                "staccato",
+                "open"
+              ]
             }
           }
         }

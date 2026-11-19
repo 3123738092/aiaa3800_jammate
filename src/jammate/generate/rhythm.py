@@ -49,7 +49,7 @@ def rhythm_parts(chord: Chord, context: RhythmContext, mode: RhythmMode,
     hits = rhythmic_hits(context, mode, bar_index, energy)
     if not hits:
         return ()
-    root, _, fifth = chord.voicing(BASS_LOW)
+    root, _, fifth = chord.voicing(BASS_LOW)[:3]
     voicing = chord.voicing(COMP_LOW)
     # A full grid leaves no room to insert notes. Change the color of the
     # phrase ending while keeping every existing attack in place.

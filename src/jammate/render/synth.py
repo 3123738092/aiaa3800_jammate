@@ -12,12 +12,14 @@ from typing import Callable
 import numpy as np
 from scipy.signal import lfilter
 
+from jammate.instruments import gm_program
 from jammate.music import Note, midi_to_hz
 
 SR = 22050
 PEAK_LIMIT = 0.98
 TAIL_S = 1.5  # room after the last note for releases and the crash cymbal
-_GAINS = {"drums": 0.8, "bass": 0.55, "keys": 0.16, "lead": 0.32, "user": 0.3, "guitar": 0.22}
+_GAINS = {"drums": 0.8, "bass": 0.55, "keys": 0.16, "lead": 0.32, "user": 0.3, "guitar": 0.22,
+          "flute": 0.18, "strings": 0.13, "harp": 0.21}
 
 
 def _time(seconds: float, sr: int) -> np.ndarray:
@@ -92,17 +94,42 @@ def _lead(freq: float, hold_s: float, sr: int) -> np.ndarray:
     return tone * _envelope(t, 0.015, hold_s, 0.1)
 
 
+def _flute(freq: float, hold_s: float, sr: int) -> np.ndarray:
+    t = _time(hold_s + .12, sr)
+    vibrato = 1 + .003 * np.sin(2 * np.pi * 4.8 * t) * (1 - np.exp(-5 * t))
+    phase = 2 * np.pi * np.cumsum(freq * vibrato) / sr
+    tone = .76 * np.sin(phase) + .17 * np.sin(2 * phase) + .045 * np.sin(3 * phase)
+    breath = .055 * _noise(t.size, 73)
+    return (tone + breath) * _envelope(t, .035, hold_s, .12)
+
+
+def _strings(freq: float, hold_s: float, sr: int) -> np.ndarray:
+    t = _time(hold_s + .35, sr)
+    tone = sum(
+        .5 * (np.sin(2 * np.pi * k * freq * .998 * t) + np.sin(2 * np.pi * k * freq * 1.002 * t)) / k ** 1.5
+        for k in range(1, 6)
+    )
+    return tone * _envelope(t, .16, hold_s, .35)
+
+
+def _harp(freq: float, hold_s: float, sr: int) -> np.ndarray:
+    t = _time(hold_s + .23, sr)
+    tone = sum(np.sin(2 * np.pi * k * freq * t) * np.exp(-(2.0 + 2.1 * k) * t) / k
+               for k in range(1, 6))
+    return tone * _envelope(t, .004, hold_s, .23)
+
+
+_PITCHED_VOICES = {"bass": _bass, "keys": _keys, "guitar": _guitar, "flute": _flute,
+                   "strings": _strings, "harp": _harp}
+
+
 def _voice(note: Note, hold_s: float, sr: int) -> np.ndarray:
     if note.instrument == "drums":
         return _DRUMS.get(note.pitch, _DRUMS[42])(sr)
-    freq = midi_to_hz(note.pitch)
-    if note.instrument == "bass":
-        return _bass(freq, hold_s, sr)
-    if note.instrument == "keys":
-        return _keys(freq, hold_s, sr)
-    if note.instrument == "guitar":
-        return _guitar(freq, hold_s, sr)
-    return _lead(freq, hold_s, sr)
+    if gm_program(note.instrument) is not None:
+        raise ValueError("SoundFont notes require a SoundFont renderer")
+    voice = _PITCHED_VOICES.get(note.instrument, _lead)
+    return voice(midi_to_hz(note.pitch), hold_s, sr)
 
 
 def _limit(audio: np.ndarray) -> np.ndarray:

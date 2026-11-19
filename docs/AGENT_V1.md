@@ -77,7 +77,7 @@ Agent **不直接生成 MIDI 音符，也不直接修改共享状态**。它保�
 | form | section、bars_elapsed |
 | feel | energy `0..3`；density/brightness/tension `0..1`；tags |
 | motifs | current_id、items；每句的 owner=user/ai、来源事件和拍坐标音符；last_user/last_ai |
-| arrangement | drums/bass/keys/lead 四层，active、level、density、role |
+| arrangement | drums/bass/keys/lead 和已加入的乐器，每层有 active、level、density、role |
 | interaction | strategy、initiative、current_lead、user_active、awaiting_user、last_feedback |
 | rhythm / rhythm_sources | 当前已采用的节奏，以及尚可选择的输入节奏记录 |
 
@@ -109,8 +109,19 @@ Agent **不直接生成 MIDI 音符，也不直接修改共享状态**。它保�
 | SIMPLIFY | 指定伴奏层 density 减少 `0.5 * strength`，下限 0；按起音组删减，和弦同组保留；每小节仅一组时按绝对小节分配休止，避免参数变了却始终保留唯一和弦 |
 | ADJUST_FEEL | 使用 rhythm_event_id 切换节奏，或 level_delta 调整层音量；不自动改 BPM |
 | ADD_LAYER / REMOVE_LAYER | 指定声部 active 开关 |
-| INTRODUCE_LAYER | 新增木吉他声部，按当前和弦生成分解和弦。后续使用 ADD_LAYER / REMOVE_LAYER 启用或静音 |
+| INTRODUCE_LAYER | 从会话音源加入一个乐器。未指定乐器时，LLM 用当前编排和已有声部选择可加入的音色并说明原因。后续使用 ADD_LAYER / REMOVE_LAYER 启用或静音 |
+| SET_KEY | 设置目标主音和大小调。单独输入「换成 D 大调」或「换成 A 小调」时直接生成计划。未指定目标时询问要换到哪个调 |
+| SET_PROGRESSION | 指定 2–8 个和弦，每小节一个，从实际生效小节开始循环。用大模型 Agent 说「换一个和弦进行」可交由模型选择。输入「把和弦进行改成 Dm7–G7–Cmaj7」可直接指定 |
+| SET_TEXTURE | LLM 根据用户描述分别选择音阶、打击乐节奏、贝斯织体和键盘奏法。编排器据此生成各声部音符 |
 | FILL / brightness | 预留，暂未支持 |
+
+和弦进行的根音以当前主音为基准，成功起拍后与起始小节一起记录在 JamState 的 harmony.progression。改变调性时，已设置的进行随主音一起移调。当前可用和弦为大、小、减三和弦及属七、大七、小七和弦。
+
+SET_TEXTURE 使用 band 范围，参数为 scale、drums、bass、keys。每项使用契约里的可执行值，default 恢复该项原有编排。结果随起拍回执写入 JamState 的 arrangement.texture，后续小节沿用。用户可以说「能不能全部换成民乐风格」，由 LLM 选择音乐参数，播放仍使用当前可用音色。
+
+新增乐器候选由后端根据当前会话给出。已加入的乐器从新增候选中移除，静音的声部可以通过恢复指令继续奏出。所选声部使用当前和弦编排，并有对应的浏览器合成音色及 General MIDI program。
+
+浏览器 Jam 配置 FluidSynth 和 SoundFont 后，从当前 SoundFont 的 bank 0 读取音色，使用 gm_<program> 作为声部 ID。模型可从该集合选择，渲染器按实际音色生成音轨。TimGM6mb 提供 128 种音色。缺少 SoundFont 时使用本地的木吉他、长笛、弦乐和竖琴合成声部。会话同时最多容纳 16 个声部，包含鼓。
 
 本版全部节奏输入都沿用会话 BPM；输入分析的 tempo_source 和 BPM 保留作证据。改变会话速度需要显式“加速/减速”指令（±8 BPM，限制在 60–180）。节奏 confidence≥0.65 且非空才采用；这个门槛只用于规则防抖，不是识别准确率保证。低分/空输入保留原 groove。
 

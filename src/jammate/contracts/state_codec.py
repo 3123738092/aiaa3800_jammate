@@ -4,7 +4,10 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from jsonschema import Draft202012Validator
-from jammate.interaction import CORE_LAYER_NAMES
+from jammate.interaction import CORE_LAYER_NAMES, LAYER_NAMES
+from jammate.instruments import GM_SCOPE_PATTERN, MAX_JAM_LAYERS
+from jammate.music import CHORD_INTERVALS
+from jammate.texture import TEXTURE_CHOICES
 from .input_event import _json_values, input_event_schema
 
 
@@ -32,11 +35,25 @@ def state_schema():
         "feel": obj({"energy": {"type": "integer", "minimum": 0, "maximum": 3}, "density": score, "brightness": score, "tension": score, "tags": {"type": "array", "items": text}}),
         "motifs": obj({"current_id": {"type": ["string", "null"]}, "last_user": notes, "last_ai": notes,
                        "items": {"type": "array", "items": obj({"motif_id": text, "owner": {"enum": ["user", "ai"]}, "source_event_ids": {"type": "array", "uniqueItems": True, "items": text}, "notes": notes})}}),
-        "arrangement": obj({"layers": {"type": "array", "minItems": 4, "maxItems": 5, "items": obj({"name": {"enum": [*CORE_LAYER_NAMES, "guitar"]}, "active": boolean, "level": score, "density": score, "role": text})}}),
+        "arrangement": obj({"layers": {"type": "array", "minItems": len(CORE_LAYER_NAMES), "maxItems": MAX_JAM_LAYERS,
+                                       "items": obj({"name": {"anyOf": [{"enum": list(LAYER_NAMES)},
+                                                                      {"type": "string", "pattern": f"^{GM_SCOPE_PATTERN}$"}]},
+                                                     "active": boolean,
+                                                     "level": score, "density": score, "role": text})}}),
         "interaction": obj({"strategy": {"enum": ["LISTEN", "FOLLOW", "RESPOND", "INITIATE"]}, "initiative": score,
                             "current_lead": {"enum": ["user", "ai", None]}, "user_active": boolean, "awaiting_user": boolean, "last_feedback": {"type": ["string", "null"]}}),
         "rhythm": {"anyOf": [{"type": "null"}, rhythm]}, "rhythm_mode": {"enum": ["follow", "vary", "simplify"]},
         "rhythm_sources": {"type": "array", "items": obj({"event_id": text, "context": rhythm})},
+    })
+    result["properties"]["arrangement"]["properties"]["texture"] = obj(
+        {name: {"enum": list(values)} for name, values in TEXTURE_CHOICES.items()}
+    )
+    result["properties"]["harmony"]["properties"]["progression"] = obj({
+        "start_bar": integer,
+        "chords": {"type": "array", "minItems": 2, "maxItems": 8, "items": obj({
+            "offset": {"type": "integer", "minimum": 0, "maximum": 11},
+            "quality": {"enum": list(CHORD_INTERVALS)},
+        })},
     })
     result.update({"$schema": "https://json-schema.org/draft/2020-12/schema", "title": "JamMate JamState 1.0.0", "$defs": {"unit": score}})
     return result

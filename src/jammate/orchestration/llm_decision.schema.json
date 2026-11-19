@@ -28,7 +28,8 @@
     "preserve": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "pattern": "^(tempo|key|progression|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar|flute|strings|harp))$"
       }
     },
     "actions": {
@@ -58,7 +59,11 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -223,7 +228,11 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -272,7 +281,11 @@
                   "band",
                   "drums",
                   "bass",
-                  "keys"
+                  "keys",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -322,7 +335,11 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -375,7 +392,10 @@
               "scope": {
                 "type": "string",
                 "enum": [
-                  "guitar"
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -413,7 +433,11 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -451,7 +475,11 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar",
+                  "flute",
+                  "strings",
+                  "harp"
                 ]
               },
               "strength": {
@@ -464,6 +492,151 @@
                 "additionalProperties": false,
                 "required": [],
                 "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "SET_TEXTURE"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "scale",
+                  "drums",
+                  "bass",
+                  "keys"
+                ],
+                "properties": {
+                  "scale": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "pentatonic",
+                      "blues"
+                    ]
+                  },
+                  "drums": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "sparse",
+                      "steady",
+                      "offbeat"
+                    ]
+                  },
+                  "bass": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "drone",
+                      "walking",
+                      "syncopated"
+                    ]
+                  },
+                  "keys": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "arpeggio",
+                      "staccato",
+                      "open"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "SET_PROGRESSION"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "chords"
+                ],
+                "properties": {
+                  "chords": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "offset",
+                        "quality"
+                      ],
+                      "properties": {
+                        "offset": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 11
+                        },
+                        "quality": {
+                          "type": "string",
+                          "enum": [
+                            "maj",
+                            "min",
+                            "dim",
+                            "dom7",
+                            "maj7",
+                            "min7"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }

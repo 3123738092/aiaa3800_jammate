@@ -7,9 +7,11 @@ import math
 import json
 from enum import Enum
 
-from jammate.music import Key, Note
+from jammate.music import ChordStep, Key, Note
+from jammate.texture import ArrangementTexture
 from jammate.rhythm import RhythmContext, RhythmMode
 from jammate.interaction import CORE_LAYER_NAMES, Interaction, Layer, Motif, RhythmSource, TransportPosition, unit
+from jammate.instruments import MAX_JAM_LAYERS
 
 MIN_TEMPO_BPM = 60.0
 MAX_TEMPO_BPM = 180.0
@@ -52,10 +54,13 @@ class JamState:
     current_motif_id: str | None = None
     rhythm_sources: tuple[RhythmSource, ...] = ()
     interaction: Interaction = Interaction()
+    texture: ArrangementTexture = ArrangementTexture()
+    chord_cycle: tuple[ChordStep, ...] = ()
+    progression_start_bar: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
-        for name in ("last_user_motif", "last_ai_motif", "tags", "layers", "motifs", "rhythm_sources"):
+        for name in ("last_user_motif", "last_ai_motif", "tags", "layers", "motifs", "rhythm_sources", "chord_cycle"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         if not isinstance(self.session_id, str) or not self.session_id.strip() or type(self.state_version) is not int or self.state_version < 0:
             raise ValueError("invalid session_id/state_version")
@@ -77,6 +82,13 @@ class JamState:
                 raise ValueError(f"duplicate {key}")
         if not set(CORE_LAYER_NAMES).issubset(layer.name for layer in self.layers):
             raise ValueError("state requires drums, bass, keys and lead layers (active or muted)")
+        if len(self.layers) > MAX_JAM_LAYERS:
+            raise ValueError("arrangement exceeds the available MIDI channels")
+        if self.chord_cycle and (not 2 <= len(self.chord_cycle) <= 8
+                                 or any(not isinstance(step, ChordStep) for step in self.chord_cycle)):
+            raise ValueError("custom progression requires 2–8 chord steps")
+        if type(self.progression_start_bar) is not int or self.progression_start_bar < 0:
+            raise ValueError("progression_start_bar must be a nonnegative integer")
         if self.current_motif_id is not None and self.current_motif_id not in {m.motif_id for m in self.motifs}:
             raise ValueError("current_motif_id must reference a registered motif")
 
@@ -111,6 +123,11 @@ class JamState:
             "rhythm": self.rhythm.to_dict() if self.rhythm else None, "rhythm_mode": self.rhythm_mode.value,
             "rhythm_sources": [{"event_id": r.event_id, "context": r.context.to_dict()} for r in self.rhythm_sources],
         }
+        if self.texture != ArrangementTexture():
+            data["arrangement"]["texture"] = asdict(self.texture)
+        if self.chord_cycle:
+            data["harmony"]["progression"] = {"start_bar": self.progression_start_bar,
+                                             "chords": [asdict(step) for step in self.chord_cycle]}
         return json.loads(json.dumps(data, allow_nan=False))
 
     @classmethod
@@ -118,6 +135,7 @@ class JamState:
         from jammate.contracts.state_codec import validate_state
         validate_state(data)
         transport, harmony, form, feel, motifs = (data[k] for k in ("transport", "harmony", "form", "feel", "motifs"))
+        progression = harmony.get("progression", {})
         return cls(
             session_id=data["session_id"], state_version=data["state_version"],
             tempo_bpm=transport["tempo_bpm"], playing=transport["playing"],
@@ -129,4 +147,7 @@ class JamState:
             current_motif_id=motifs["current_id"], layers=tuple(Layer(**layer) for layer in data["arrangement"]["layers"]),
             interaction=Interaction(**data["interaction"]), rhythm=RhythmContext(**data["rhythm"]) if data["rhythm"] else None,
             rhythm_mode=data["rhythm_mode"], rhythm_sources=tuple(RhythmSource(r["event_id"], RhythmContext(**r["context"])) for r in data["rhythm_sources"]),
+            texture=ArrangementTexture(**data["arrangement"].get("texture", {})),
+            chord_cycle=tuple(ChordStep(**step) for step in progression.get("chords", ())),
+            progression_start_bar=progression.get("start_bar", 0),
         )

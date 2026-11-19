@@ -12,12 +12,12 @@
     "strategy": {"enum": ["LISTEN", "FOLLOW", "RESPOND", "INITIATE"]},
     "effective_at": {"type": "object", "additionalProperties": false, "required": ["bar", "beat"], "properties": {"bar": {"type": "integer", "minimum": 0}, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}}},
     "valid_for_bars": {"type": "integer", "minimum": 1, "maximum": 16},
-    "preserve": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar))$"}},
+    "preserve": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(tempo|key|progression|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar|flute|strings|harp|gm_(?:0|[1-9][0-9]?|1[01][0-9]|12[0-7])))$"}},
     "actions": {"type": "array", "items": {
       "type": "object", "additionalProperties": false, "required": ["action", "scope", "strength", "parameters"],
       "properties": {
-        "action": {"enum": ["PRESERVE", "ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER", "FILL"]},
-        "scope": {"enum": ["band", "drums", "bass", "keys", "lead", "guitar", "motif"]},
+        "action": {"enum": ["PRESERVE", "ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER", "SET_KEY", "SET_PROGRESSION", "SET_TEXTURE", "FILL"]},
+        "scope": {"anyOf": [{"enum": ["band", "drums", "bass", "keys", "lead", "guitar", "flute", "strings", "harp", "motif"]}, {"type": "string", "pattern": "^gm_(?:0|[1-9][0-9]?|1[01][0-9]|12[0-7])$"}]},
         "strength": {"type": "number", "minimum": 0, "maximum": 1},
         "parameters": {
           "type": "object", "additionalProperties": false,
@@ -26,7 +26,18 @@
             "rhythm_event_id": {"type": "string", "minLength": 1},
             "duration_bars": {"type": "integer", "minimum": 1, "maximum": 16},
             "level_delta": {"type": "number", "minimum": -1, "maximum": 1},
-            "brightness": {"type": "number", "minimum": 0, "maximum": 1}
+            "brightness": {"type": "number", "minimum": 0, "maximum": 1},
+            "tonic": {"type": "integer", "minimum": 0, "maximum": 11},
+            "mode": {"enum": ["major", "minor"]},
+            "chords": {"type": "array", "minItems": 2, "maxItems": 8, "items": {
+              "type": "object", "additionalProperties": false, "required": ["offset", "quality"],
+              "properties": {"offset": {"type": "integer", "minimum": 0, "maximum": 11},
+                             "quality": {"enum": ["maj", "min", "dim", "dom7", "maj7", "min7"]}}
+            }},
+            "scale": {"enum": ["default", "pentatonic", "blues"]},
+            "drums": {"enum": ["default", "sparse", "steady", "offbeat"]},
+            "bass": {"enum": ["default", "drone", "walking", "syncopated"]},
+            "keys": {"enum": ["default", "arpeggio", "staccato", "open"]}
           }
         }
       }

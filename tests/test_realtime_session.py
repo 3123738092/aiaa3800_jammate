@@ -7,6 +7,9 @@ import pytest
 
 from jammate.contracts import PlanError
 from jammate.contracts.adapters import from_system, from_text
+from jammate.generate.arranger import chord_for_bar
+from jammate.generate.harmony import harmony_cycle
+from jammate.music import Key
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.llm import LLMAgent, ModelReply
 from jammate.orchestration.llm_config import LLMConfig
@@ -15,7 +18,9 @@ from jammate.orchestration.offline import prepare_bar
 from jammate.orchestration.plans import make_plan
 from jammate.orchestration.realtime import RealtimeSession, ScheduleSlot
 from jammate.render.synth import render
+from jammate.rhythm import RhythmContext
 from jammate.state import JamState
+from jammate.texture import ArrangementTexture
 
 
 def session():
@@ -49,6 +54,135 @@ def test_timing_policy_uses_playback_samples():
     )
     runtime.advance_to(2301)
     assert runtime.schedule_window()[0].bar == 2
+
+
+@pytest.mark.parametrize("agent", [RuleAgent(), LLMAgent(LLMConfig("test"), provider=object())])
+def test_explicit_key_change_is_applied_on_the_scheduled_downbeat(agent):
+    runtime = session()
+    runtime.advance_to(0)
+    request = observe(runtime, "换一个调", "unclear")
+    plan = request.decide(agent)
+    assert "想换到哪个调" in plan.to_dict()["unresolved"][0]
+    assert runtime.manager.hold(plan)
+    assert runtime.manager.state.key == Key(0)
+
+    request = observe(runtime, "换成D大调", "named")
+    change = prepare(runtime, request, request.decide(agent))
+    assert runtime.schedule(change)
+    assert runtime.manager.state.key == Key(0)
+    assert runtime.advance_to(2499) == ()
+    changed, = runtime.advance_to(2500)
+    assert changed.started.plan_id == change.decision.plan.plan_id
+    assert runtime.manager.state.key == Key(2)
+    assert changed.timing.tempo_bpm == request.state.tempo_bpm
+    baseline = prepare_bar(request.state, 1)
+    assert scoped(changed.notes, "drums") == scoped(baseline, "drums")
+    assert scoped(changed.notes, "keys") != scoped(baseline, "keys")
+    assert changed.notes == prepare_bar(request.state.with_updates(key=Key(2)), 1)
+
+
+def test_repeat_request_for_more_instruments_reports_the_existing_lineup():
+    runtime = session()
+    runtime.advance_to(0)
+    request = observe(runtime, "再加一些乐器", "first-add")
+    change = prepare(runtime, request)
+    assert runtime.schedule(change)
+    joined, = runtime.advance_to(2500)
+    assert scoped(joined.notes, "guitar")
+
+    request = observe(runtime, "再加一些乐器", "second-add")
+    plan = request.decide(RuleAgent())
+    assert not plan.actions
+    assert "木吉他已经加入" in plan.to_dict()["unresolved"][0]
+    assert runtime.manager.hold(plan)
+    assert sum(layer.name == "guitar" for layer in runtime.manager.state.layers) == 1
+
+
+def test_llm_arrangement_changes_multiple_parts_and_persists_past_the_plan():
+    class TextureDirector:
+        def complete(self, messages, schema, timeout_s):
+            action = {"action": "SET_TEXTURE", "scope": "band", "strength": 1,
+                      "parameters": {"scale": "pentatonic", "drums": "sparse", "bass": "drone", "keys": "arpeggio"}}
+            return ModelReply(json.dumps({"strategy": "FOLLOW", "actions": [action], "valid_for_bars": 1,
+                                          "preserve": ["tempo", "key", "playing"],
+                                          "transport": {"tempo_bpm": None, "playing": None},
+                                          "reason": "改变伴奏织体", "unresolved": []}), "test-model", {})
+
+    runtime = session()
+    runtime.advance_to(0)
+    request = observe(runtime, "能不能全部换成民乐风格")
+    agent = LLMAgent(LLMConfig("test"), provider=TextureDirector(), fallback="error")
+    plan = request.decide(agent)
+    assert agent.last_trace["source"] == "llm"
+    change = prepare(runtime, request, plan)
+    assert runtime.schedule(change)
+    assert runtime.manager.state.texture == ArrangementTexture()
+    arranged, = runtime.advance_to(2500)
+    assert arranged.started.plan_id == plan.plan_id
+    assert runtime.manager.state.key == request.state.key
+    assert runtime.manager.state.texture == ArrangementTexture("pentatonic", "sparse", "drone", "arpeggio")
+    continued, = runtime.advance_to(5000)
+    assert continued.started is None
+    for bar in (arranged, continued):
+        original = prepare_bar(request.state, bar.timing.bar_index)
+        for layer in ("drums", "keys", "bass"):
+            assert scoped(original, layer) != scoped(bar.notes, layer)
+        assert all(note.pitch % 12 in {0, 2, 4, 7, 9} for note in bar.notes if note.instrument != "drums")
+
+
+def test_model_replaces_the_chord_cycle_and_starts_it_at_the_actual_playback_bar():
+    class ProgressionDirector:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, messages, schema, timeout_s):
+            self.calls += 1
+            # The first proposal just rotates C–G–Am–F. The second actually changes the harmony.
+            proposed = [(7, "maj"), (9, "min"), (5, "maj"), (0, "maj")] if self.calls == 1 else [
+                (2, "min7"), (7, "dom7"), (0, "maj7"),
+            ]
+            action = {"action": "SET_PROGRESSION", "scope": "band", "strength": 1,
+                      "parameters": {"chords": [{"offset": root, "quality": quality} for root, quality in proposed]}}
+            return ModelReply(json.dumps({"strategy": "FOLLOW", "actions": [action], "valid_for_bars": 3,
+                                          "preserve": ["tempo", "key", "playing", "groove"],
+                                          "transport": {"tempo_bpm": None, "playing": None},
+                                          "reason": "切换和弦", "unresolved": []}), "test-model", {})
+
+    runtime = session()
+    runtime.advance_to(0)
+    request = observe(runtime, "能不能换一个和弦进行")
+    provider = ProgressionDirector()
+    agent = LLMAgent(LLMConfig("test"), provider=provider, fallback="error")
+    plan = request.decide(agent)
+    assert provider.calls == 2
+    assert "rotation" in agent.last_trace["attempts"][0]["validation_error"]
+    runtime.advance_to(1951)
+    change = prepare(runtime, request, plan)
+    assert change.decision.slot.bar == 2
+    assert runtime.schedule(change)
+    unchanged, = runtime.advance_to(2500)
+    assert unchanged.started is None and not runtime.manager.state.chord_cycle
+    switched, = runtime.advance_to(5000)
+    state = runtime.manager.state
+    assert switched.started.plan_id == plan.plan_id
+    assert state.key == request.state.key and state.tempo_bpm == request.state.tempo_bpm
+    assert state.progression_start_bar == 2
+    assert [chord.name for chord in harmony_cycle(state)] == ["Dm7", "G7", "Cmaj7"]
+    assert {note.pitch % 12 for note in scoped(switched.notes, "keys")} == {0, 2, 5, 9}
+    assert scoped(switched.notes, "drums") == scoped(prepare_bar(request.state, 2), "drums")
+    assert chord_for_bar(state, 3).name == "G7" and chord_for_bar(state, 5).name == "Dm7"
+
+
+def test_named_seventh_chords_use_the_existing_recorded_rhythm():
+    rhythm = RhythmContext(96, (0., 1.5, 3.), (1., .7, .8))
+    state = JamState(session_id="live-test", rhythm=rhythm, texture=ArrangementTexture("pentatonic", keys="open"))
+    runtime = RealtimeSession(StateManager(state), sample_rate=1000)
+    runtime.advance_to(0)
+    request = observe(runtime, "把和弦进行改成 Dm7–G7–Cmaj7")
+    assert runtime.schedule(prepare(runtime, request))
+    changed, = runtime.advance_to(2500)
+    assert runtime.manager.state.rhythm == rhythm
+    assert {note.pitch % 12 for note in scoped(changed.notes, "keys")} == {0, 2, 5, 9}
 
 
 def test_drums_change_at_planned_start_but_audio_before_it_is_preserved():

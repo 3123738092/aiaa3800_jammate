@@ -3,6 +3,8 @@ const prompt = $('creation-prompt'), agent = $('text-agent');
 const bpm = $('text-bpm'), profile = $('text-profile');
 const renderer = $('text-renderer'), preview = $('text-preview');
 const arranger = $('text-arranger');
+const nativeArrangement = arranger.querySelector('option[value="llm_all"]');
+let nativeAvailable = false;
 const audio = $('text-audio'), status = $('text-status');
 const example = document.querySelector('[data-prompt]');
 let session = crypto.randomUUID();
@@ -23,7 +25,11 @@ function sync() {
   const busy = Boolean(pending);
   for (const field of [prompt, example, $('new-work'), $('text-generate')]) field.disabled = busy;
   for (const field of [agent, bpm, profile, renderer, preview, arranger]) field.disabled = busy || turn > 0;
-  $('direct-bass-help').hidden = arranger.value !== 'llm_direct_bass';
+  nativeArrangement.disabled = !nativeAvailable;
+  if (nativeArrangement.disabled && arranger.value === 'llm_all') arranger.value = 'rule';
+  profile.disabled = busy || turn > 0 || renderer.value !== 'fluidsynth';
+  if (renderer.value !== 'fluidsynth') profile.value = 'electric';
+  preview.disabled = busy || turn > 0 || renderer.value !== 'mrt2';
   $('text-generate').textContent = turn ? '继续调整' : '生成第一段';
 }
 
@@ -80,7 +86,16 @@ $('text-form').addEventListener('submit', async event => {
     clearAudio();
     audio.src = media(result.wav, 'audio/wav');
     $('text-wav').href = audio.src;
-    $('text-midi').href = media(result.midi, 'audio/midi');
+    const midi = $('text-midi');
+    midi.hidden = !result.midi;
+    if (result.midi) midi.href = media(result.midi, 'audio/midi');
+    const conditions = $('text-conditioning');
+    conditions.hidden = !result.conditioning;
+    if (result.conditioning) {
+      conditions.href = URL.createObjectURL(new Blob([JSON.stringify(result.conditioning, null, 2)],
+        {type: 'application/json'}));
+      urls.push(conditions.href);
+    }
     const uncommitted = result.receipt?.phase === 'preview';
     $('text-midi').textContent = uncommitted ? '下载条件 MIDI（非音频转写）' : '下载 MIDI';
     $('text-output').hidden = false;
@@ -92,8 +107,8 @@ $('text-form').addEventListener('submit', async event => {
     $('text-decision').textContent = [result.plan.reason, ...result.plan.unresolved].filter(Boolean).join('。');
     $('arrangement-details').hidden = !result.arrangement;
     $('arrangement-trace').textContent = result.arrangement ? JSON.stringify(result.arrangement, null, 2) : '';
-    if (result.arranger === 'llm_direct_bass' && result.arrangement?.status === 'accepted') {
-      status.textContent += ' · 贝斯由 LLM 直接编排';
+    if (result.arranger === 'llm_all' && result.arrangement?.status === 'accepted') {
+      status.textContent += ' · LLM 编排';
     }
     if (result.arrangement?.status === 'fallback') status.textContent += ' · 已用规则编排';
     if (uncommitted) {
@@ -123,9 +138,18 @@ window.addEventListener('pagehide', event => {
 
 post('status', {}).then(result => {
   agent.options[0].disabled = !result.llm_ready;
-  arranger.querySelector('option[value="llm"]').disabled = !result.llm_ready || !result.llm_arranger_available;
-  arranger.querySelector('option[value="llm_direct_bass"]').disabled = !result.llm_ready || !result.llm_direct_bass_available;
-  renderer.options[1].disabled = !result.mrt2_installed;
+  nativeAvailable = result.llm_ready && result.llm_backend_arranger_available;
+  renderer.querySelector('option[value="fluidsynth"]').disabled = !result.soundfont;
+  renderer.querySelector('option[value="mrt2"]').disabled = !result.mrt2_installed;
+  if (!result.mrt2_installed && ['4193', '4195'].includes(location.port)) {
+    const status = $('text-backend-status');
+    const link = document.createElement('a');
+    link.href = 'http://127.0.0.1:4196/text-creation.html';
+    link.textContent = '打开支持 MRT2 的工作台';
+    status.append(link);
+    status.hidden = false;
+  }
+  sync();
   for (const option of [...profile.options].slice(1)) option.disabled = !result.soundfont;
   $('provider-state').textContent = result.llm_ready ? '大模型已配置，可在上方选择。' : result.notice;
 }).catch(error => {

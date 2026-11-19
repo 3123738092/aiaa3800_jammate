@@ -16,21 +16,41 @@ import numpy as np
 import soundfile as sf
 
 from jammate.contracts import PlanError
+from jammate.instruments import ADDED_INSTRUMENTS, gm_program
+from jammate.music import BEATS_PER_BAR
+from jammate.orchestration.backend_arrangement import TICKS_PER_BEAT, prepare_scoped_score
 from jammate.orchestration.offline import prepare_plan, RenderedPlan
+from jammate.orchestration.transitions import project
 from jammate.render.capabilities import capability_report, segment_seconds
-from jammate.render.midi_out import GUITAR_PROGRAM
 from .midi.events import MidiEvent
 from .midi.files import write_midi, write_events, render_with_fluidsynth
 from .presets import get_instrument
 
-CHANNELS = {"drums": 9, "bass": 2, "keys": 1, "lead": 4, "guitar": 5}
+CHANNELS = {"drums": 9, "bass": 2, "keys": 1, "lead": 4,
+            **{name: instrument.midi_channel for name, instrument in ADDED_INSTRUMENTS.items()}}
 
 
-def midi_events(performance):
+def layer_channels(names):
+    # Reserve the core program channels even when their parts are silent.
+    channels = {name: channel for name, channel in CHANNELS.items()
+                if name in names or name not in ADDED_INSTRUMENTS}
+    available = [channel for channel in range(16) if channel not in channels.values()]
+    added = sorted(name for name in names if gm_program(name) is not None)
+    if len(added) > len(available):
+        raise PlanError("all MIDI channels are occupied")
+    channels.update(zip(added, available))
+    return channels
+
+
+def performance_channels(notes):
+    return layer_channels({note.instrument for note in notes})
+
+def midi_events(performance, channels=None):
     """Session beats -> segment seconds, retaining source rests and velocities."""
     events = []
+    channels = channels if channels is not None else performance_channels(performance.notes)
     for note in performance.notes:
-        channel = CHANNELS[note.instrument]
+        channel = channels[note.instrument]
         events.extend((MidiEvent(segment_seconds(note.start, performance), "note_on", channel, note.pitch, note.velocity),
                        MidiEvent(segment_seconds(note.end, performance), "note_off", channel, note.pitch, 0)))
     return sorted(events, key=lambda event: (event.timestamp, event.type == "note_on"))
@@ -89,7 +109,7 @@ class KevinRuntime:
     backend_name = "kevin_midi_fluidsynth"
 
     def __init__(self, output: Path, *, executable: Path, soundfont: Path,
-                 profile="electric", lead_program=73, sample_rate=44100, seed=3800, arranger=None):
+                 profile="electric", lead_program=73, sample_rate=44100, seed=3800, arranger=None, backend_arranger=None):
         self.output = Path(output)
         self.executable, self.soundfont = Path(executable), Path(soundfont)
         self.programs = {k: v for k, v in get_instrument(profile).programs.items() if k in (1, 2)}
@@ -99,12 +119,15 @@ class KevinRuntime:
             raise ValueError("sample_rate must be within 8000-96000")
         self.programs[4] = lead_program
         self.profile, self.sample_rate, self.seed = profile, sample_rate, seed
+        if arranger is not None and backend_arranger is not None:
+            raise ValueError("choose one arrangement mode")
         self.arranger = arranger
+        self.backend_arranger = backend_arranger
         self.last_artifacts = None
         self.last_receipt = None
         self._execution_lock = threading.Lock()
 
-    def capabilities(self, plan, performance):
+    def capabilities(self, plan, performance, conditioning=None):
         return capability_report(plan)
 
     def render_audio(self, folder, performance):
@@ -114,19 +137,76 @@ class KevinRuntime:
                 "soundfont_sha256": hashlib.sha256(self.soundfont.read_bytes()).hexdigest()}
 
     def validate(self, state, plan):
+        if self.backend_arranger is not None:
+            return self._project(state, plan)
         performance = prepare_plan(state, plan, seed=self.seed)
         self._validate_midi(performance)
         return performance
 
-    def _validate_midi(self, performance):
+    @staticmethod
+    def _project(state, plan):
+        target = project(state, plan)
+        if plan.to_dict()["effective_at"]["bar"] != state.position.next_bar:
+            raise PlanError("renderer requires the next unrendered bar")
+        if target.playing and target.key is None:
+            raise PlanError("a playing arrangement requires a key")
+        return target
+
+    def _arrange_midi(self, events, state, plan):
+        def request(target, mutable, length, origin, context):
+            channels = layer_channels({layer.name for layer in target.layers})
+            writable = {channels[name]: {"channel": channels[name], "layer": name,
+                                        "program": self.programs.get(channels[name],
+                                                                     gm_program(name) if name not in ADDED_INSTRUMENTS
+                                                                     else ADDED_INSTRUMENTS[name].midi_program)}
+                        for name in sorted(mutable)}
+            notes = self.backend_arranger.midi(events, state, plan, target, writable,
+                                               length * TICKS_PER_BEAT, origin, context)
+            return notes, channels
+
+        return prepare_scoped_score(state, plan, events, self.backend_arranger, seed=self.seed,
+                                    request_notes=request, reference=prepare_plan)
+
+    def prepare_execution(self, state, plan, events, check_pending):
+        if self.backend_arranger is not None:
+            self.validate(state, plan)
+            performance, channels = self._arrange_midi(events, state, plan)
+            check_pending()
+            self._validate_midi(performance, channels)
+            return performance, channels
+        else:
+            performance = self.validate(state, plan)
+            if self.arranger is not None:
+                performance = self.arranger.arrange(state, plan, performance, events)
+                check_pending()
+                self._validate_midi(performance)
+        return performance, None
+
+    def export_audio(self, folder, performance, conditioning):
+        channels = conditioning if conditioning is not None else performance_channels(performance.notes)
+        events = midi_events(performance, channels)
+        duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+        write_events(folder / "events.json", events)
+        programs = dict(self.programs)
+        occupied = {event.channel for event in events}
+        programs.update({instrument.midi_channel: instrument.midi_program
+                         for instrument in ADDED_INSTRUMENTS.values() if instrument.midi_channel in occupied})
+        programs.update({channel: program for name, channel in channels.items()
+                         if channel in occupied and (program := gm_program(name)) is not None})
+        write_midi(folder / "band.mid", events, performance.tempo_bpm, programs, duration_s=duration)
+        verification = verify_midi(folder / "band.mid", events, programs, duration)
+        return {"midi_verification": verification, **self.render_audio(folder, performance)}
+
+    def _validate_midi(self, performance, channels=None):
         # Reject ambiguous same-pitch overlaps on one channel rather than silently
         # shortening one note with another note-off. Polyphonic different pitches work.
         import mido
         tempo = mido.bpm2tempo(performance.tempo_bpm)
         tick = lambda beat: round(mido.second2tick((beat - performance.start_bar * 4) * 60 / performance.tempo_bpm, 480, tempo))
         ends = {}
+        channels = channels if channels is not None else performance_channels(performance.notes)
         for note in sorted(performance.notes, key=lambda n: n.start):
-            key = (CHANNELS[note.instrument], note.pitch)
+            key = (channels[note.instrument], note.pitch)
             # Upstream seconds are decimal-rounded: adjacent notes can overlap
             # by one microsecond. Judge the actual MIDI ticks, not float noise.
             if tick(note.start) < ends.get(key, -1):
@@ -160,31 +240,22 @@ class KevinRuntime:
         try:
             plan.write(folder / "plan.json")
             _write(folder / "state_observed.json", state.to_dict())
-            performance = self.validate(state, plan)
-            if self.arranger is not None:
-                performance = self.arranger.arrange(state, plan, performance, triggered_events)
-                receipt["arrangement"] = self.arranger.last_trace
-                manager.check_pending(plan)
-                self._validate_midi(performance)
-            capabilities = self.capabilities(plan, performance)
+            arranger = self.backend_arranger or self.arranger
+            performance, conditioning = self.prepare_execution(
+                state, plan, triggered_events, lambda: manager.check_pending(plan))
+            if arranger is not None:
+                receipt["arrangement"] = arranger.last_trace
+            capabilities = self.capabilities(plan, performance, conditioning)
             receipt["capabilities"] = capabilities
-            events = midi_events(performance)
-            duration = performance.bars * 4 * 60 / performance.tempo_bpm
-            write_events(folder / "events.json", events)
-            programs = dict(self.programs)
-            guitar_channel = CHANNELS["guitar"]
-            if any(event.channel == guitar_channel for event in events):
-                programs[guitar_channel] = GUITAR_PROGRAM
-            write_midi(folder / "band.mid", events, performance.tempo_bpm, programs, duration_s=duration)
-            verification = verify_midi(folder / "band.mid", events, programs, duration)
-            metadata = self.render_audio(folder, performance)
+            duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+            metadata = self.export_audio(folder, performance, conditioning)
             audio, sr = sf.read(folder / "band.wav", dtype="float32", always_2d=True)
             if sr != self.sample_rate or len(audio) < round(duration * sr) - 2 or not np.isfinite(audio).all():
                 raise ValueError("invalid WAV duration, sample rate or samples")
             rms = float(np.sqrt(np.mean(audio.astype(np.float64) ** 2)))
-            if performance.notes and rms < 1e-7:
+            if (performance.notes or conditioning is not None) and rms < 1e-7:
                 raise ValueError("renderer produced silence for a nonempty performance")
-            receipt.update(midi_verification=verification, wav={"sample_rate": sr, "channels": audio.shape[1],
+            receipt.update(wav={"sample_rate": sr, "channels": audio.shape[1],
                            "duration_s": len(audio) / sr, "rms": rms,
                            "peak": float(np.max(np.abs(audio))) if audio.size else 0.},
                            **metadata)
@@ -201,7 +272,8 @@ class KevinRuntime:
                 raise PlanError("execution receipt was not accepted; plan already reached a terminal status")
             receipt.update(succeeded=can_commit, state_committed=can_commit,
                            phase="exported" if can_commit else "preview",
-                           midi_role="performance" if can_commit else "conditioning_not_transcription",
+                           midi_role=("performance" if can_commit else "conditioning_not_transcription")
+                           if "midi_verification" in metadata else None,
                            state_version_after=committed.state_version,
                            manager_diagnostics=manager.diagnostics(), persistence_warnings=[])
             # Commit already happened. Report persistence failure separately;
@@ -215,8 +287,9 @@ class KevinRuntime:
             return RenderedPlan(performance.notes, performance.lead_notes, performance.generated_motif,
                                 performance.tempo_bpm, performance.start_bar, performance.bars, audio, sr)
         except Exception as exc:
-            if self.arranger is not None and self.arranger.last_trace.get("plan_id") == plan.plan_id:
-                receipt["arrangement"] = self.arranger.last_trace
+            arranger = self.backend_arranger or self.arranger
+            if arranger is not None and arranger.last_trace.get("plan_id") == plan.plan_id:
+                receipt["arrangement"] = arranger.last_trace
             if hasattr(exc, "report"):
                 receipt["capabilities"] = exc.report
             receipt.update(reason=type(exc).__name__ + ": " + str(exc), plan_status=manager.plan_status(plan.plan_id))

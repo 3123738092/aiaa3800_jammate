@@ -9,9 +9,11 @@ import subprocess
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from contextlib import closing
 
 import numpy as np
 import soundfile as sf
+from jammate.browser_jam import BrowserJamService
 from jammate.input_event import perceive_rhythm, validate_event
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_rhythm
@@ -44,7 +46,7 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= 16 * 1024 * 1024:
                 raise ValueError("request must be 1 byte to 16 MB")
-            if self.path.startswith("/api/reference/"):
+            if self.path.startswith(("/api/reference/", "/api/jam/")):
                 port = self.server.server_port
                 origin = self.headers.get("Origin")
                 if origin not in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
@@ -53,14 +55,21 @@ class Handler(SimpleHTTPRequestHandler):
                 if self.headers.get_content_type() != "application/json":
                     self.json_response(415, {"error": "请提交 JSON。"})
                     return
-                operation = self.path.removeprefix("/api/reference/")
-                if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
-                    self.json_response(404, {"error": "unknown reference endpoint"})
-                    return
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
                     raise ValueError("请求必须为 JSON 对象。")
-                self.json_response(200, self.server.reference.request(operation, body))
+                if self.path.startswith("/api/jam/"):
+                    operation = self.path.removeprefix("/api/jam/")
+                    if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop"}:
+                        self.json_response(404, {"error": "unknown Jam endpoint"})
+                        return
+                    self.json_response(200, self.server.jam.dispatch(operation, body))
+                else:
+                    operation = self.path.removeprefix("/api/reference/")
+                    if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
+                        self.json_response(404, {"error": "unknown reference endpoint"})
+                        return
+                    self.json_response(200, self.server.reference.request(operation, body))
             elif self.path in ("/api/rhythm", "/api/rhythm/v1"):
                 body = json.loads(self.rfile.read(length))
                 audio, sr = sf.read(io.BytesIO(base64.b64decode(body["wav"], validate=True)), dtype="float32", always_2d=True)
@@ -112,11 +121,12 @@ def main():
         parser.error("FluidSynth and SoundFont must be existing files")
     if args.soundfont and not args.fluidsynth:
         parser.error("a SoundFont requires FluidSynth")
-    with ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
+    with closing(BrowserJamService(fluidsynth=args.fluidsynth, soundfont=args.soundfont)) as jam, ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
                          soundfont=args.soundfont, implementation=args.implementation) as reference, ThreadingHTTPServer(
                              ("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
         server.reference = reference
+        server.jam = jam
         print(f"JamMate Input Lab: http://127.0.0.1:{args.port}", flush=True)
         server.serve_forever()
 

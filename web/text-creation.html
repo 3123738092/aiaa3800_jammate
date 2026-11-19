@@ -19,16 +19,16 @@
       </select></label>
       <p id="provider-state" class="muted" role="status">正在检查大模型配置…</p>
       <details><summary>高级设置</summary>
-        <label>音符编排 <select id="text-arranger" aria-describedby="direct-bass-help">
+        <label>编排方式 <select id="text-arranger">
           <option value="rule">本地规则</option>
-          <option value="llm" disabled>LLM 辅助编排</option>
-          <option value="llm_direct_bass" disabled>LLM 直接编排贝斯</option>
+          <option value="llm_all" disabled>LLM 编排所有声部</option>
         </select></label>
-        <p id="direct-bass-help" class="muted" hidden>模型直接写 1–4 小节贝斯。可先输入「来一段」。用大模型 Agent 还可以指定音域或写法。计划未授权或校验失败时会显示规则回退。</p>
         <label>生成后端 <select id="text-renderer">
-          <option value="default">精确编排（当前音源）</option>
-          <option value="mrt2">MRT2 生成试听</option>
+          <option value="synth">内置合成器</option>
+          <option value="fluidsynth" disabled>FluidSynth 音色库</option>
+          <option value="mrt2" disabled>MRT2 生成试听</option>
         </select></label>
+        <p id="text-backend-status" class="muted" hidden></p>
         <label><input id="text-preview" type="checkbox">允许生成试听：MRT2 无法保证逐音符或声部保留，试听不提交音乐状态。</label>
         <label>起始 BPM <input id="text-bpm" type="number" min="60" max="180" step="any" value="100" required></label>
         <label>音色 <select id="text-profile">
@@ -54,7 +54,9 @@
         <pre id="arrangement-trace"></pre>
       </details>
       <audio id="text-audio" controls aria-label="文字创作结果"></audio>
-      <p><a id="text-wav" download="text.wav">下载 WAV</a> · <a id="text-midi" download="text.mid">下载 MIDI</a></p>
+      <p><a id="text-wav" download="text.wav">下载 WAV</a>
+        <a id="text-midi" download="text.mid">下载 MIDI</a>
+        <a id="text-conditioning" download="mrt2-conditioning.json" hidden>下载 MRT2 条件</a></p>
     </section>
   </main>
   <script type="module" src="text-creation.js"></script>

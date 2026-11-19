@@ -201,3 +201,127 @@ def test_missing_official_dependency_is_a_recoverable_error(tmp_path, monkeypatc
     with pytest.raises(RuntimeError, match="server's Python"):
         generate("warm trio", output=tmp_path/"missing.wav", duration=.1)
     assert not (tmp_path/"missing.wav").exists()
+
+
+class BackendProvider:
+    def __init__(self, output):
+        self.output = output
+        self.context = None
+
+    def complete(self, messages, schema, timeout_s):
+        self.context = json.loads(messages[-1]["content"])
+        assert self.context["band_plan"]["plan_id"] == "paired_plan"
+        assert self.context["input_events"][0]["payload"]["text"] == "鼓更猛一点"
+        assert "groups" not in self.context and "performance" not in self.context
+        return ModelReply(json.dumps(self.output), "native-arranger-test", {})
+
+
+def test_fluidsynth_llm_supplies_targeted_midi_events_before_reference_compilation(tmp_path, monkeypatch):
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger
+
+    manager, plan = staged()
+    provider = BackendProvider({"events": [{"channel": 9, "pitch": 56, "tick": 240, "length_ticks": 60, "velocity": 47}]})
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), "fluidsynth", provider=provider)
+    original = band_plan.prepare_plan
+
+    def guarded_prepare(*args, **kwargs):
+        assert provider.context is not None
+        return original(*args, **kwargs)
+
+    def fake_fs(midi, wav, executable, font, sr):
+        t = np.arange(round(mido.MidiFile(midi).length * sr)) / sr
+        sf.write(wav, .05 * np.sin(2 * np.pi * 220 * t), sr)
+
+    monkeypatch.setattr(band_plan, "prepare_plan", guarded_prepare)
+    monkeypatch.setattr(band_plan, "render_with_fluidsynth", fake_fs)
+    font = tmp_path / "fake.sf2"
+    font.write_bytes(b"fixture")
+    runtime = band_plan.KevinRuntime(tmp_path, executable=tmp_path / "fs", soundfont=font, backend_arranger=arranger)
+    runtime.execute(manager, plan)
+    assert [item["channel"] for item in provider.context["writable_channels"]] == [9]
+    midi = mido.MidiFile(runtime.last_artifacts / "band.mid")
+    drums = [event.note for event in midi if event.type == "note_on" and event.channel == 9]
+    assert drums == [56]
+    assert runtime.last_receipt["state_committed"] and runtime.last_receipt["arrangement"]["status"] == "accepted"
+
+
+def test_mrt2_llm_feeds_direct_frame_tokens_and_never_compiles_midi(tmp_path, monkeypatch):
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger
+
+    manager, plan = staged()
+    before = manager.state
+    provider = BackendProvider({"style": "dry and punchy drums", "pitch_spans": [{"frame": 2, "length": 3, "pitch": 60}],
+                                "drum_spans": [{"frame": 2, "length": 1}]})
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), "mrt2", provider=provider)
+    monkeypatch.setattr(band_plan, "prepare_plan", lambda *a, **k: pytest.fail("MRT2 must bypass score compilation"))
+    monkeypatch.setattr(band_plan, "write_midi", lambda *a, **k: pytest.fail("MRT2 must bypass MIDI export"))
+
+    def generator(style, *, output, duration, conditions, **kwargs):
+        notes, drums = conditions
+        assert style == "dry and punchy drums"
+        assert notes[2:5, 60].tolist() == [2, 1, 1] and drums[2, 0] == 1
+        return scripted_audio(style, output=output, duration=duration)
+
+    runtime = MRT2Runtime(tmp_path, allow_preview=True, backend_arranger=arranger, generator=generator)
+    runtime.execute(manager, plan)
+    assert manager.state == before and runtime.last_receipt["phase"] == "preview"
+    assert (runtime.last_artifacts / "conditioning.json").is_file()
+    assert not (runtime.last_artifacts / "band.mid").exists()
+
+
+def test_native_mrt2_strict_mode_rejects_before_arrangement_provider(tmp_path):
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger
+
+    manager, plan = staged()
+    before = manager.state
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), "mrt2", provider=BackendProvider({}))
+    runtime = MRT2Runtime(tmp_path, backend_arranger=arranger)
+    with pytest.raises(BackendCapabilityError):
+        runtime.execute(manager, plan)
+    assert not arranger.last_trace and manager.state == before
+
+
+def test_synth_llm_writes_concrete_notes_for_authorized_voices():
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger, prepare_scoped_score
+
+    manager, plan = staged()
+    events = manager.current_batch()
+    provider = BackendProvider({"notes": [{"instrument": "drums", "pitch": 56, "start": 0.5,
+                                           "duration": .125, "velocity": 47}]})
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), "synth", provider=provider)
+    performance, _ = prepare_scoped_score(manager.state, plan, events, arranger)
+    assert provider.context["writable_instruments"] == ["drums"]
+    drums = [n for n in performance.notes if n.instrument == "drums"]
+    assert [(n.pitch, n.start, n.duration) for n in drums] == [(56, .5, .125)]
+    assert any(n.instrument == "bass" for n in performance.notes)
+
+
+@pytest.mark.parametrize("empty_style", ["", "   "])
+def test_native_mrt2_shortens_tail_spans_and_keeps_their_onsets(tmp_path, empty_style):
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger
+
+    manager, plan = staged()
+    before = manager.state
+    provider = BackendProvider({
+        "style": empty_style,
+        "pitch_spans": [{"frame": 0, "length": 2, "pitch": 64}, {"frame": 238, "length": 5, "pitch": 60}],
+        "drum_spans": [{"frame": 239, "length": 3}],
+    })
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), "mrt2", provider=provider)
+
+    def generator(style, *, output, duration, conditions, **kwargs):
+        notes, drums = conditions
+        assert style == "a warm instrumental band"
+        assert notes[238:, 60].tolist() == [2, 1]
+        assert drums[-2:, 0].tolist() == [0, 1]
+        return scripted_audio(style, output=output, duration=duration)
+
+    runtime = MRT2Runtime(tmp_path, allow_preview=True, backend_arranger=arranger, generator=generator)
+    runtime.execute(manager, plan)
+    assert runtime.last_receipt["phase"] == "preview" and manager.state == before
+    adjustments = runtime.last_receipt["arrangement"]["adjustments"]
+    assert adjustments == {"shortened_pitch_spans": 1, "shortened_drum_spans": 1, "used_style_hint": True}
+    assert provider.context["last_valid_frame"] == 239
+    conditions = json.loads((runtime.last_artifacts / "conditioning.json").read_text())
+    assert conditions["pitch_spans"][-1] == {"frame": 238, "length": 2, "pitch": 60}
+    assert conditions["drum_spans"] == [{"frame": 239, "length": 1}]

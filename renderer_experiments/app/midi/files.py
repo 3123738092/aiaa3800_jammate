@@ -63,7 +63,7 @@ def render_with_fluidsynth(midi_path: Path, wav_path: Path, executable: Path, so
     if not soundfont.is_file(): raise FileNotFoundError(f"SoundFont not found: {soundfont}")
     wav_path.parent.mkdir(parents=True, exist_ok=True)
     command = [str(executable), "-ni", "-F", str(wav_path), "-r", str(sample_rate), "-g", "0.8", str(soundfont), str(midi_path)]
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
+    completed = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=180)
     if completed.returncode != 0:
         raise RuntimeError(f"FluidSynth failed ({completed.returncode}): {(completed.stderr or completed.stdout)[-2000:]}")
     if not wav_path.is_file() or wav_path.stat().st_size <= 44:

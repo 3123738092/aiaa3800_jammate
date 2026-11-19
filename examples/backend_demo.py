@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from jammate.contracts.adapters import from_text
 from jammate.orchestration.agent import RuleAgent
+from jammate.orchestration.backend_arrangement import LLMBackendArranger
 from jammate.orchestration.llm import LLMAgent
 from jammate.orchestration.llm_config import LLMConfig
 from jammate.orchestration.manager import StateManager
@@ -28,6 +29,7 @@ def main():
     p.add_argument("--fluidsynth", type=Path)
     p.add_argument("--soundfont", type=Path)
     p.add_argument("--allow-preview", action="store_true")
+    p.add_argument("--backend-arrangement", choices=("rule", "llm"), default="rule")
     p.add_argument("--out", type=Path, required=True)
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=False)
@@ -52,8 +54,11 @@ def main():
             # acknowledgement change the other renderer's input.
             m = StateManager(initial)
             m.ingest([event])
+            backend_arranger = (LLMBackendArranger(LLMConfig.load(args.config), backend)
+                                if args.backend_arrangement == "llm" else None)
             runtime = create_runtime(args.out / f"{mode}_{backend}", backend=backend,
-                fluidsynth=args.fluidsynth, soundfont=args.soundfont, allow_preview=args.allow_preview)
+                fluidsynth=args.fluidsynth, soundfont=args.soundfont, allow_preview=args.allow_preview,
+                backend_arranger=backend_arranger)
             row = {"agent": mode, "backend": backend, "plan_id": plan.plan_id}
             try:
                 m.stage(plan)

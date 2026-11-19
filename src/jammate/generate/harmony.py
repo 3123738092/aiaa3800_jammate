@@ -25,3 +25,18 @@ def progression(key: Key, variant: int = 0) -> tuple[Chord, ...]:
     loops = PROGRESSIONS[key.mode]
     degrees = loops[variant % len(loops)]
     return tuple(triad(key, d) for d in degrees)
+
+
+def harmony_cycle(state) -> tuple[Chord, ...]:
+    if state.chord_cycle:
+        return tuple(step.in_key(state.key) for step in state.chord_cycle)
+    return progression(state.key, state.progression_variant)
+
+
+def same_cycle(first, second):
+    """Compare what would repeat, independent of starting chord or duplicate cycles."""
+    horizon = len(first) * len(second)
+    return any(
+        all(first[index % len(first)] == second[(index + phase) % len(second)] for index in range(horizon))
+        for phase in range(len(second))
+    )

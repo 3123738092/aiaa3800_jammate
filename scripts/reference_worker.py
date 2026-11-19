@@ -45,9 +45,9 @@ PROFILES = ("electric", "acoustic", "synth")
 STYLES = ("lofi", "warm_funk", "indie_rock")
 
 
-def encode(wav, midi):
+def encode(wav, midi=None):
     return {"wav": base64.b64encode(wav).decode("ascii"),
-            "midi": base64.b64encode(midi).decode("ascii")}
+            "midi": base64.b64encode(midi).decode("ascii") if midi is not None else None}
 
 
 def media(audio, sr, notes, bpm):
@@ -123,6 +123,8 @@ class ReferenceService:
                         "llm_arranger_available": importlib.util.find_spec("jammate.orchestration.arrangement") is not None,
                         "llm_direct_bass_available": importlib.util.find_spec(
                             "jammate.orchestration.bass_generation") is not None,
+                        "llm_backend_arranger_available": importlib.util.find_spec(
+                            "jammate.orchestration.backend_arrangement") is not None,
                         "mrt2_installed": importlib.util.find_spec("magenta_rt") is not None
                             and importlib.util.find_spec("jammate.render.runtime") is not None}
         try:
@@ -147,10 +149,15 @@ class ReferenceService:
             raise ValueError("选择音色需要本机 FluidSynth。")
         backend, preview = body.get("renderer", "default"), body.get("allow_preview", False)
         arrangement = body.get("arranger", "rule")
-        if backend not in {"default", "fluidsynth", "mrt2"} or type(preview) is not bool:
+        if backend not in {"default", "synth", "fluidsynth", "mrt2"} or type(preview) is not bool:
             raise ValueError("无效的渲染后端或试听选项。")
-        if arrangement not in {"rule", "llm", "llm_direct_bass"}:
+        if arrangement not in {"rule", "llm", "llm_direct_bass", "llm_backend", "llm_all"}:
             raise ValueError("无效的音符编排方式。")
+        if arrangement in {"llm_backend", "llm_all"} and backend == "default":
+            backend = "fluidsynth" if self.fluidsynth else "synth"
+        full_arrangement = arrangement in {"llm_backend", "llm_all"}
+        if backend == "fluidsynth" and not self.fluidsynth:
+            raise ValueError("此服务尚未配置 FluidSynth 和 SoundFont。")
         settings = (mode, bpm, profile, backend, preview, arrangement)
         work = self.works.get(sid)
         if work is not None:
@@ -177,11 +184,13 @@ class ReferenceService:
             raise ValueError(work.held_message)
 
         config = self.config() if mode == "llm" or arrangement != "rule" else None
-        arranger = None
+        arranger = backend_arranger = None
         log = None
         if arrangement != "rule":
             try:
-                if arrangement == "llm_direct_bass":
+                if full_arrangement:
+                    from jammate.orchestration.backend_arrangement import LLMBackendArranger as Arranger
+                elif arrangement == "llm_direct_bass":
                     from jammate.orchestration.bass_generation import LLMBassArranger as Arranger
                 else:
                     from jammate.orchestration.arrangement import LLMArranger as Arranger
@@ -189,7 +198,10 @@ class ReferenceService:
                 raise ValueError("LLM 音符编排需要工作区版本。") from None
             session_hash = hashlib.sha256(sid.encode()).hexdigest()[:20]
             log = SessionLog(Path("demo_out/arrangement_logs") / f"{session_hash}.jsonl")
-            arranger = Arranger(config, log=log)
+            if full_arrangement:
+                backend_arranger = Arranger(config, backend, log=log)
+            else:
+                arranger = Arranger(config, log=log)
         if work is None:
             if len(self.works) >= 8:
                 self.works.popitem(last=False)
@@ -219,10 +231,14 @@ class ReferenceService:
             if backend == "default" and arranger is None:
                 runtime = self.runtime(directory.name, profile)
             else:
-                runtime = self.backend_runtime(directory.name, profile, backend, preview, arranger)
+                if backend_arranger is None:
+                    runtime = self.backend_runtime(directory.name, profile, backend, preview, arranger)
+                else:
+                    runtime = self.backend_runtime(directory.name, profile, backend, preview,
+                                                   backend_arranger=backend_arranger)
             if mode == "llm":
                 agent_options = {"fallback": "error", "execution_validator": runtime.validate}
-                if arrangement == "llm":
+                if arrangement == "llm" or (full_arrangement and backend != "mrt2"):
                     agent_options["arrangement_enabled"] = True
                 elif arrangement == "llm_direct_bass":
                     agent_options["direct_bass_enabled"] = True
@@ -233,7 +249,7 @@ class ReferenceService:
                     decision_options["direct_bass_enabled"] = True
             plan = agent.decide(accepted, snapshot, **decision_options)
             decision = plan.to_dict()
-            if not should_execute(snapshot, plan, local_arrangement=arranger is not None):
+            if not should_execute(snapshot, plan, local_arrangement=arranger is not None or backend_arranger is not None):
                 if hasattr(manager, "hold"):
                     manager.hold(plan)
                 work.held_message = "这条要求无法执行：" + "；".join(decision["unresolved"])
@@ -248,11 +264,11 @@ class ReferenceService:
         result = {"session_id": sid, "request_id": rid, "turn": len(work.completed) + 1,
                   "tempo_bpm": rendered.tempo_bpm, "start_bar": rendered.start_bar, "bars": rendered.bars,
                   "plan": decision, "agent": mode, "arranger": arrangement,
-                  "arrangement": arranger.last_trace if arranger else None,
+                  "arrangement": (backend_arranger or arranger).last_trace if backend_arranger or arranger else None,
                   "decision_trace": getattr(agent, "last_trace", {"source": "rule"}),
                   "receipt": receipt,
                   "renderer": "MRT2 / generated preview" if backend == "mrt2" else (
-                      "Kevin / FluidSynth" if self.fluidsynth else "原版合成器")}
+                      "Kevin / FluidSynth" if self.fluidsynth and backend != "synth" else ("原版合成器" if backend == "default" else "内置合成器"))}
         artifacts = getattr(runtime, "last_artifacts", None)
         # The original runtime has already acknowledged the plan. Keep its
         # output available for retry without deciding or applying it again.
@@ -266,7 +282,12 @@ class ReferenceService:
         try:
             if applied.artifacts is not None:
                 files = applied.artifacts
-                output_media = encode((files / "band.wav").read_bytes(), (files / "band.mid").read_bytes())
+                midi = files / "band.mid"
+                wav = (files / "band.wav").read_bytes()
+                output_media = encode(wav, midi.read_bytes() if midi.is_file() else None)
+                conditions = files / "conditioning.json"
+                if conditions.is_file():
+                    output_media["conditioning"] = json.loads(conditions.read_text(encoding="utf-8"))
             else:
                 clip = applied.clip
                 notes = tuple(note.shifted(-clip.start_bar * 4) for note in clip.notes)
@@ -289,7 +310,7 @@ class ReferenceService:
             return KevinRuntime(Path(output), executable=self.fluidsynth, soundfont=self.soundfont, profile=profile)
         return OfflineRuntime()
 
-    def backend_runtime(self, output, profile, backend, preview, arranger=None):
+    def backend_runtime(self, output, profile, backend, preview, arranger=None, *, backend_arranger=None):
         # Pinned a63a0f5 has no new runtime module. Never import a second copy
         # of JamState beside it to make the backend seem available.
         try:
@@ -297,7 +318,8 @@ class ReferenceService:
         except ImportError:
             raise ValueError("新后端需要 --implementation workspace；固定历史版本不包含 MRT2。") from None
         return create_runtime(output, backend=backend, fluidsynth=self.fluidsynth,
-                              soundfont=self.soundfont, profile=profile, allow_preview=preview, arranger=arranger)
+                              soundfont=self.soundfont, profile=profile, allow_preview=preview, arranger=arranger,
+                              backend_arranger=backend_arranger)
 
     def style_sample(self, body):
         from renderer_experiments.app.midi.files import render_with_fluidsynth, write_midi

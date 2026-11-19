@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 import re
 
 from jammate.contracts import PlanError
+from jammate.instruments import INSTRUMENT_ALIASES
 from .plans import make_plan
 from .tempo_intent import TempoIntent, speech_clauses, tempo_clause
 from .transitions import project
@@ -14,7 +15,7 @@ _LAYERS = {
     "贝斯": "bass", "低音": "bass", "bass": "bass",
     "键盘": "keys", "钢琴": "keys", "keys": "keys", "keyboard": "keys",
     "主旋律": "lead", "主奏": "lead", "lead": "lead",
-    "木吉他": "guitar", "吉他": "guitar", "guitar": "guitar",
+    **INSTRUMENT_ALIASES,
 }
 _NAMES = "|".join(sorted(_LAYERS, key=len, reverse=True))
 _TARGETS = rf"(?:{_NAMES})(?:\s*(?:和|与|及|以及|、|and\s+)(?:\s*)(?:{_NAMES}))*"

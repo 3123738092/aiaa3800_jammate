@@ -1,0 +1,254 @@
+{
+  "fixture_sha256": "4316d56c757bdbeffe50219abca8aa2ff5a50ec9bcc3cf93e48f115be67f0069",
+  "min_jev_confidence": 0.9,
+  "arms": {
+    "rule": {
+      "cases": 24,
+      "passed": 10,
+      "by_split": {
+        "dev": {
+          "cases": 8,
+          "passed": 3
+        },
+        "holdout": {
+          "cases": 16,
+          "passed": 7
+        }
+      },
+      "failures": {
+        "set_tempo": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm"
+        ],
+        "relative_from_92": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm"
+        ],
+        "relative_from_110": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm"
+        ],
+        "compound_three_bars": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm",
+          "final.muted",
+          "bar1.keys",
+          "exact_actions",
+          "declared_bars"
+        ],
+        "compound_four_bars": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm",
+          "final.muted",
+          "bar1.keys",
+          "exact_actions",
+          "declared_bars"
+        ],
+        "indirect_drum_simplify": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "indirect_keys_simplify": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.keys.fewer_onsets",
+          "exact_actions"
+        ],
+        "bass_space_en": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.bass.fewer_onsets",
+          "exact_actions"
+        ],
+        "keys_space_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.keys.fewer_onsets",
+          "exact_actions"
+        ],
+        "bass_fewer_events_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.bass.fewer_onsets",
+          "exact_actions"
+        ],
+        "drums_broad_density_en": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_before": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_after": [
+          "turn.status",
+          "turn.tempo",
+          "bar2.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "explicit_text_alone": [
+          "turn.status",
+          "turn.tempo",
+          "final.bpm",
+          "final.muted",
+          "bar1.drums",
+          "exact_actions"
+        ]
+      },
+      "routes": {
+        "rule": 24
+      },
+      "reasons": {},
+      "no_mutation_cases": 8,
+      "negative_cases_modified": [],
+      "jev_requests": 0,
+      "jev_errors": {},
+      "jev_models": {},
+      "jev_request_p50_ms": null
+    },
+    "local": {
+      "cases": 24,
+      "passed": 16,
+      "by_split": {
+        "dev": {
+          "cases": 8,
+          "passed": 6
+        },
+        "holdout": {
+          "cases": 16,
+          "passed": 10
+        }
+      },
+      "failures": {
+        "indirect_drum_simplify": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "indirect_keys_simplify": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.keys.fewer_onsets",
+          "exact_actions"
+        ],
+        "bass_space_en": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.bass.fewer_onsets",
+          "exact_actions"
+        ],
+        "keys_space_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.keys.fewer_onsets",
+          "exact_actions"
+        ],
+        "bass_fewer_events_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.bass.fewer_onsets",
+          "exact_actions"
+        ],
+        "drums_broad_density_en": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_before": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_after": [
+          "turn.status",
+          "turn.tempo",
+          "bar2.drums.fewer_onsets",
+          "exact_actions"
+        ]
+      },
+      "routes": {
+        "local_explicit": 6,
+        "rule": 18
+      },
+      "reasons": {},
+      "no_mutation_cases": 8,
+      "negative_cases_modified": [],
+      "jev_requests": 0,
+      "jev_errors": {},
+      "jev_models": {},
+      "jev_request_p50_ms": null
+    },
+    "jev": {
+      "cases": 24,
+      "passed": 20,
+      "by_split": {
+        "dev": {
+          "cases": 8,
+          "passed": 8
+        },
+        "holdout": {
+          "cases": 16,
+          "passed": 12
+        }
+      },
+      "failures": {
+        "keys_space_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.keys.fewer_onsets",
+          "exact_actions"
+        ],
+        "bass_fewer_events_zh": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.bass.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_before": [
+          "turn.status",
+          "turn.tempo",
+          "bar1.drums.fewer_onsets",
+          "exact_actions"
+        ],
+        "deadline_after": [
+          "turn.status",
+          "turn.tempo",
+          "bar2.drums.fewer_onsets",
+          "exact_actions"
+        ]
+      },
+      "routes": {
+        "local_explicit": 6,
+        "rule": 14,
+        "jev_density": 4
+      },
+      "reasons": {
+        "outside_density_gate": 5,
+        "candidate_not_scoped_density": 3,
+        "below_confidence_gate": 4
+      },
+      "no_mutation_cases": 8,
+      "negative_cases_modified": [],
+      "jev_requests": 11,
+      "jev_errors": {},
+      "jev_models": {
+        "jev-1.14.0": 11
+      },
+      "jev_request_p50_ms": 869.9
+    }
+  }
+}

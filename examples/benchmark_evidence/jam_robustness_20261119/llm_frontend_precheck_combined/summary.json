@@ -1,0 +1,130 @@
+{
+  "agent": "llm",
+  "fixture_sha256": "465221872ffc8e8e9808cefcf61be66acc6968d7a716a7fd3ea48f46638090dd",
+  "original_run_parts": [
+    "llm_frontend_precheck",
+    "llm_frontend_precheck_remainder"
+  ],
+  "scenarios": 24,
+  "passed": 19,
+  "turns": 37,
+  "statuses": {
+    "applied": 26,
+    "decision_late": 1,
+    "prepare_late": 1,
+    "stale": 1,
+    "cancelled": 2,
+    "ignored": 3,
+    "error": 1,
+    "held": 2
+  },
+  "model_attempts": {
+    "gpt-5.4-mini-2026-03-17": 35
+  },
+  "agent_wall_provider_turns": 33,
+  "agent_wall_p50_ms": 3676.09,
+  "failures": {
+    "weak_timing_evidence_keeps_existing_pattern": [
+      "final.rhythm",
+      "bar2.drums.same",
+      "bar2.bass.same",
+      "bar2.keys.same"
+    ],
+    "empty_pulse_retains_default": [
+      "final.rhythm",
+      "bar2.drums",
+      "bar2.drums.same"
+    ],
+    "ambiguity_then_scoped_clarification": [
+      "unclear.status",
+      "clarify.status",
+      "clarify.actions",
+      "bar1.drums.same",
+      "bar1.bass.same",
+      "bar2.drums.same",
+      "bar2.keys.same"
+    ],
+    "stop_wins_combined_batch_and_audio_cannot_restart": [
+      "pattern_while_stopped.status"
+    ],
+    "rhythm_then_humming_150ms_within_prepare_window": [
+      "final.rhythm"
+    ]
+  },
+  "by_split": {
+    "dev": {
+      "scenarios": 12,
+      "passed": 10
+    },
+    "holdout": {
+      "scenarios": 12,
+      "passed": 9
+    }
+  },
+  "by_family": {
+    "decision_deadline": {
+      "scenarios": 3,
+      "passed": 3
+    },
+    "prepare_deadline": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "quick_revision": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "duplicate": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "rhythm_quality": {
+      "scenarios": 3,
+      "passed": 1
+    },
+    "wording_zh": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "wording_en": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "two_turn_repair": {
+      "scenarios": 1,
+      "passed": 0
+    },
+    "transport_control": {
+      "scenarios": 1,
+      "passed": 0
+    },
+    "multimodal_window": {
+      "scenarios": 3,
+      "passed": 2
+    },
+    "activity_order": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "long_handoff": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "empty_phrase": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "tempo_timing": {
+      "scenarios": 2,
+      "passed": 2
+    }
+  },
+  "continuous_clock": {
+    "passed": 24,
+    "scenarios": 24
+  },
+  "only_applied_plans_have_one_receipt": {
+    "passed": 24,
+    "scenarios": 24
+  }
+}

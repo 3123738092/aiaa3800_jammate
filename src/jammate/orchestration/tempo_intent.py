@@ -9,7 +9,11 @@ from jammate.state import MAX_TEMPO_BPM, MIN_TEMPO_BPM
 from .plans import make_plan
 
 
-_NUMBER = r"(\d{1,3}(?:\.\d{1,3})?)"
+_CHINESE_DIGITS = "零一二三四五六七八九"
+_CHINESE_NONZERO = "[一二两三四五六七八九]"
+_CHINESE_TENS = rf"{_CHINESE_NONZERO}?十{_CHINESE_NONZERO}?"
+_CHINESE_HUNDREDS = rf"{_CHINESE_NONZERO}百(?:零{_CHINESE_NONZERO}|{_CHINESE_NONZERO}十{_CHINESE_NONZERO}?)?"
+_NUMBER = rf"(\d{{1,3}}(?:\.\d{{1,3}})?|零|{_CHINESE_NONZERO}|{_CHINESE_TENS}|{_CHINESE_HUNDREDS})"
 _UNIT = r"(?:bpm|拍每分钟)"
 _SET = re.compile(
     rf"(?:(?:请|只)?\s*(?:把|将)?\s*(?:速度|bpm)\s*(?:调整到|调到|调至|设成|设到|设为|改到|改为|改成)\s*{_NUMBER}(?:\s*{_UNIT})?"
@@ -52,10 +56,26 @@ def speech_clauses(events):
     return [part.strip().rstrip(".!?") for part in re.split(r"[，,；;。！？!?\n]", text) if part.strip()]
 
 
+def _tempo_number(value):
+    if value[0].isdecimal():
+        return Decimal(value)
+    value = value.replace("两", "二")
+    hundreds, unit, remainder = value.partition("百")
+    total = 100 * _CHINESE_DIGITS.index(hundreds) if unit else 0
+    value = (remainder if unit else value).lstrip("零")
+    tens, unit, ones = value.partition("十")
+    if unit:
+        total += 10 * (_CHINESE_DIGITS.index(tens) if tens else 1)
+        value = ones
+    if value:
+        total += _CHINESE_DIGITS.index(value)
+    return Decimal(total)
+
+
 def tempo_clause(text):
     for mode, pattern in (("set", _SET), ("up", _UP), ("down", _DOWN)):
         if match := pattern.fullmatch(text):
-            return TempoIntent(mode, Decimal(next(value for value in match.groups() if value is not None)))
+            return TempoIntent(mode, _tempo_number(next(value for value in match.groups() if value is not None)))
     return None
 
 
@@ -65,9 +85,9 @@ def explicit_tempo(events):
     if not clauses:
         return None
     conditional = _CONDITIONAL.fullmatch(clauses[0])
-    if (conditional and len(clauses) > 1 and Decimal(conditional[1]) == Decimal(conditional[2])
+    if (conditional and len(clauses) > 1 and _tempo_number(conditional[1]) == _tempo_number(conditional[2])
             and all(_ON_FAILURE.fullmatch(item) for item in clauses[1:])):
-        return TempoIntent("set", Decimal(conditional[1]))
+        return TempoIntent("set", _tempo_number(conditional[1]))
     requests = [item for item in clauses if item not in _KEEP]
     if len(requests) != 1:
         return None

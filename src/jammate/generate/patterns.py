@@ -6,6 +6,7 @@ are bar-relative (start in [0, 4) beats); the arranger moves them in time.
 
 from __future__ import annotations
 
+from jammate.instruments import gm_program
 from jammate.music import Chord, Note
 
 KICK, SNARE, CLOSED_HAT, OPEN_HAT, CRASH = 36, 38, 42, 46, 49
@@ -72,6 +73,33 @@ def guitar_bar(chord: Chord) -> tuple[Note, ...]:
     return tuple(Note(pitch, beat, .45, velocity, "guitar")
                  for pitch, beat, velocity in ((root, .5, 64), (fifth, 1.5, 55),
                                                (third, 2.5, 60), (fifth, 3.5, 54)))
+
+
+def added_instrument_bar(instrument: str, chord: Chord, phrase_pos: int) -> tuple[Note, ...]:
+    """Harmonize an added instrument in a register and rhythm suited to its role."""
+    if instrument == "guitar":
+        return guitar_bar(chord)
+    program = gm_program(instrument)
+    family = program // 8 if program is not None else None
+    if instrument == "flute" or family in {7, 8, 9, 13, 15}:
+        root, third, fifth = chord.voicing(72)[:3]
+        if phrase_pos % 2:
+            part = ((fifth, 1.75, .45, 63), (third, 2.25, .45, 59), (root, 3., .8, 61))
+        else:
+            part = ((root, 1.5, .7, 61), (fifth, 2.75, .8, 64))
+    elif instrument == "strings" or family in {2, 5, 6, 11, 12}:
+        root, _, fifth = chord.voicing(55)[:3]
+        part = ((root, 0., 3.8, 53), (fifth, 0., 3.8, 45))
+    elif instrument == "harp" or family in {0, 1, 3, 10, 14}:
+        root, third, fifth = chord.voicing(60)[:3]
+        part = ((root, .25, .55, 65), (third, .75, .5, 54), (fifth, 1.25, .6, 60),
+                (root + 12, 2.25, .55, 57), (fifth, 3., .7, 49))
+    elif family == 4:
+        root, _, fifth = chord.voicing(BASS_LOW)[:3]
+        part = ((root, .5, .85, 62), (fifth, 2., .7, 56), (root + 12, 3.25, .5, 55))
+    else:
+        raise ValueError(f"no arrangement for instrument {instrument!r}")
+    return tuple(Note(pitch, beat, duration, velocity, instrument) for pitch, beat, duration, velocity in part)
 
 
 def comp_bar(chord: Chord, energy: int) -> tuple[Note, ...]:

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+from jammate.instruments import added_program
 from .input_event import _json_values, read_json
 
 
@@ -38,11 +39,15 @@ class BandPlan:
             allowed = {"PRESERVE": set(), "ECHO_MOTIF": {"motif_id"}, "VARY_MOTIF": {"motif_id"},
                        "INTRODUCE_MOTIF": {"motif_id"}, "BUILD": {"duration_bars"}, "SIMPLIFY": {"duration_bars"},
                        "ADJUST_FEEL": {"rhythm_event_id", "level_delta", "brightness"},
-                       "INTRODUCE_LAYER": set(), "ADD_LAYER": set(), "REMOVE_LAYER": set(), "FILL": set()}
+                       "INTRODUCE_LAYER": set(), "ADD_LAYER": set(), "REMOVE_LAYER": set(),
+                       "SET_KEY": {"tonic", "mode"}, "SET_PROGRESSION": {"chords"},
+                       "SET_TEXTURE": {"scale", "drums", "bass", "keys"}, "FILL": set()}
             if not set(params) <= allowed[action["action"]]:
                 raise PlanError("parameters do not belong to this action")
-            if action["action"] == "INTRODUCE_LAYER" and action["scope"] != "guitar":
-                raise PlanError("INTRODUCE_LAYER only supports guitar")
+            if action["action"] == "INTRODUCE_LAYER" and added_program(action["scope"]) is None:
+                raise PlanError("INTRODUCE_LAYER requires an instrument from the playable catalogue")
+            if action["action"] in {"SET_KEY", "SET_PROGRESSION", "SET_TEXTURE"} and (action["scope"] != "band" or set(params) != allowed[action["action"]]):
+                raise PlanError(f"{action['action']} requires band scope and all parameters")
             if params.get("duration_bars", 1) > data["valid_for_bars"]:
                 raise PlanError("action duration exceeds plan lifetime")
             if action["action"] in {"ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF"} and "motif_id" not in params:
@@ -52,6 +57,9 @@ class BandPlan:
         motifs = [a for a in data["actions"] if a["action"] in {"ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF"}]
         if len(motifs) > 1 or any(a["scope"] not in {"lead", "motif"} for a in motifs):
             raise PlanError("baseline supports one lead/motif response per plan")
+        for action in ("SET_KEY", "SET_PROGRESSION", "SET_TEXTURE"):
+            if sum(a["action"] == action for a in data["actions"]) > 1:
+                raise PlanError(f"a plan can specify {action} only once")
         if data["transport"].get("playing") is False and data["actions"]:
             raise PlanError("stop control cannot also request musical actions")
         object.__setattr__(self, "_json", json.dumps(data, ensure_ascii=False, sort_keys=True))

@@ -36,3 +36,19 @@ PYTHONPATH=src python examples/jam_robustness/run.py --agent llm --config /path/
 规则基线通过 22/24 个会话，开发集 12/12、留出对照 10/12。失败集中在两条中、英文的间接简化指令。保留这两条可量测的失败用于后续对照。逐会话记录保存输入到达和间隔、实际接受事件、计划、截止时间、起拍回执、每小节音符、最终状态与评分。
 
 **范围**。拍手和哼唱为结构化、合成的识别后数据。这批测试覆盖 Agent、状态和虚拟排程。麦克风录音识别、声卡起拍和主观听感需用真实录音及设备单独验收。本次基线调用的是规则 Agent。
+
+## 规则 Agent 与 Jev 的文字决策对照
+
+[24 个固定用例](rule_jev_cases.json) 用同一套虚拟排程、状态提交和音符检查，对照原规则、复用本地解析器的规则、再加 Jev 密度识别的版本。调速、声部开关和段长命中完整本地语法时直接编译计划。单条文字超出规则语法且只涉及一个具名伴奏声部时，可以让 Jev 判断是否需要减少音符密度。原文目标、其他声部的保护条件、两项分类分数和计划校验共同决定能否提交。
+
+在仓库根目录运行，使用新的输出目录。Jev 组选项从环境读取 OHMYGPT_API_KEY。
+
+~~~bash
+PYTHONPATH=src:. python examples/jam_robustness/rule_jev.py --dry-run
+PYTHONPATH=src:. python examples/jam_robustness/rule_jev.py --out demo_out/jam_robustness/rule_jev_local
+PYTHONPATH=src:. python examples/jam_robustness/rule_jev.py --jev --out demo_out/jam_robustness/rule_jev_live
+~~~
+
+首轮实验固定 0.90 的 Jev 分数门槛。三组分别通过 10/24、16/24 和 20/24，留出组分别是 7/16、10/16 和 12/16。Jev 返回模型 jev-1.14.0，11 次请求的接口耗时中位数为 869.9 ms。8 个应保持伴奏的用例全部通过。四个漏执行的密度用例均选对动作和声部，动作分数在 0.74–0.86。该门槛是本轮实验条件。
+
+模拟器使用固定决策延时排小节，并另记实际 API 耗时。两个临界用例在 Jev 分数不足时保持伴奏；注入通过校验的候选后分别在第 1、2 小节生效。此脚本使用规则计划承接退出快路径的用例，便于测量分类器的独立增量。

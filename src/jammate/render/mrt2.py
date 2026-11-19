@@ -11,6 +11,8 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import subprocess
+import sys
 import time
 
 import numpy as np
@@ -59,7 +61,7 @@ def midi_conditioning(path, duration):
     return notes, drums
 
 
-def generate(prompt, *, output, duration, midi=None, backend="jax", model="mrt2_small", system=None):
+def generate(prompt, *, output, duration, midi=None, conditions=None, backend="jax", model="mrt2_small", system=None):
     """Run the official model. `system` injection is for labelled unit tests only."""
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("a nonempty style prompt is required")
@@ -67,7 +69,17 @@ def generate(prompt, *, output, duration, midi=None, backend="jax", model="mrt2_
         raise ValueError("duration must be within (0,120] seconds")
     if backend not in {"jax", "mlx"} or model not in {"mrt2_small", "mrt2_base"}:
         raise ValueError("unsupported MRT2 backend/model")
-    tokens = midi_conditioning(midi, duration) if midi is not None else None
+    count = math.ceil(duration * FRAME_RATE)
+    if conditions is not None and midi is not None:
+        raise ValueError("provide either direct conditions or MIDI")
+    if conditions is None:
+        tokens = midi_conditioning(midi, duration) if midi is not None else None
+    else:
+        notes, drums = map(np.asarray, conditions)
+        if (notes.shape != (count, 128) or drums.shape != (count, 1)
+                or not np.isin(notes, [0, 1, 2]).all() or not np.isin(drums, [0, 1]).all()):
+            raise ValueError("invalid MRT2 pitch/drum frame conditions")
+        tokens = notes.astype(np.int32, copy=False), drums.astype(np.int32, copy=False)
     start = time.perf_counter()
     injected = system is not None
     if system is None:
@@ -76,7 +88,6 @@ def generate(prompt, *, output, duration, midi=None, backend="jax", model="mrt2_
         except ImportError:
             raise RuntimeError("Install magenta-rt 2.0.3 with its JAX/MLX dependencies in this server's Python environment") from None
     style = system.tokenize_style(system.embed_style(prompt, use_mapper=True))
-    count = math.ceil(duration * FRAME_RATE)
     state, pieces = None, []
     # Each generate call holds its conditioning constant. Continue model state
     # across runs, splitting whenever the actual MIDI conditioning changes.
@@ -104,21 +115,48 @@ def generate(prompt, *, output, duration, midi=None, backend="jax", model="mrt2_
             "backend": backend, "model": model, "prompt": prompt, "frames": count,
             "duration_s": len(audio) / 48000, "elapsed_s": time.perf_counter()-start,
             "midi_sha256": hashlib.sha256(Path(midi).read_bytes()).hexdigest() if midi else None,
-            "conditioning": "text_and_midi" if midi else "text_only",
+            "conditioning": ("text_and_direct_frames" if conditions is not None
+                             else "text_and_midi" if midi is not None else "text_only"),
             "frame_quantization_s": 1/FRAME_RATE, "official_source": OFFICIAL_SOURCE}
+
+
+def generate_isolated(prompt, *, output, duration, midi=None, conditions=None, backend="jax", model="mrt2_small"):
+    """Keep model initialization and inference off the live playback server."""
+    output = Path(output)
+    command = [sys.executable, "-m", "jammate.render.mrt2", "--prompt", prompt,
+               "--duration", str(duration), "--backend", backend, "--model", model, "--out", str(output)]
+    if midi is not None:
+        command.extend(("--midi", str(midi)))
+    if conditions is not None:
+        path = output.with_suffix(".conditions.npz")
+        np.savez(path, notes=conditions[0], drums=conditions[1])
+        command.extend(("--conditions", str(path)))
+    try:
+        process = subprocess.run(command, capture_output=True, timeout=150)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("MRT2 inference timed out") from exc
+    if process.returncode:
+        raise RuntimeError("MRT2 inference process failed")
+    return json.loads(output.with_suffix(".inference.json").read_text(encoding="utf-8"))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prompt", required=True)
-    parser.add_argument("--midi", type=Path)
+    inputs = parser.add_mutually_exclusive_group()
+    inputs.add_argument("--midi", type=Path)
+    inputs.add_argument("--conditions", type=Path)
     parser.add_argument("--duration", type=float, default=4.)
     parser.add_argument("--backend", choices=("jax", "mlx"), default="jax")
     parser.add_argument("--model", choices=("mrt2_small", "mrt2_base"), default="mrt2_small")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    conditions = None
+    if args.conditions:
+        with np.load(args.conditions, allow_pickle=False) as data:
+            conditions = (data["notes"], data["drums"])
     report = generate(args.prompt, output=args.out, duration=args.duration, midi=args.midi,
-                      backend=args.backend, model=args.model)
+                      conditions=conditions, backend=args.backend, model=args.model)
     args.out.with_suffix(".inference.json").write_text(json.dumps(report, indent=2)+"\n")
     print(json.dumps(report, indent=2))
 

@@ -2,8 +2,12 @@
 from dataclasses import replace
 
 from jammate.contracts.band_plan import BandPlan, PlanError
+from jammate.generate.harmony import harmony_cycle, same_cycle
+from jammate.instruments import MAX_JAM_LAYERS, added_program
 from jammate.interaction import Layer, Strategy
+from jammate.music import ChordStep, Key
 from jammate.state import JamState
+from jammate.texture import ArrangementTexture
 
 
 def project(state: JamState, plan: BandPlan) -> JamState:
@@ -15,13 +19,33 @@ def project(state: JamState, plan: BandPlan) -> JamState:
         name, scope, strength, params = (action[k] for k in ("action", "scope", "strength", "parameters"))
         if name == "FILL":
             raise PlanError("offline renderer does not implement FILL")
+        if name == "SET_KEY":
+            target = target.with_updates(key=Key(int(params["tonic"]), params["mode"]))
+            continue
+        if name == "SET_PROGRESSION":
+            if target.key is None:
+                raise PlanError("a chord progression needs a configured key")
+            steps = tuple(ChordStep(int(chord["offset"]), chord["quality"]) for chord in params["chords"])
+            if len(set(steps)) < 2:
+                raise PlanError("a progression needs at least two distinct chords")
+            if same_cycle(harmony_cycle(target), tuple(step.in_key(target.key) for step in steps)):
+                raise PlanError("choose a different chord progression, not a rotation or repeat of the current one")
+            target = target.with_updates(chord_cycle=steps, progression_start_bar=data["effective_at"]["bar"])
+            continue
+        if name == "SET_TEXTURE":
+            target = target.with_updates(texture=ArrangementTexture(**params))
+            continue
         if name == "INTRODUCE_LAYER":
             if any(layer.name == scope for layer in target.layers):
                 raise PlanError(f"layer already exists: {scope}")
+            if any(added_program(layer.name) == added_program(scope) for layer in target.layers):
+                raise PlanError(f"the timbre for {scope} is already in the arrangement")
+            if len(target.layers) >= MAX_JAM_LAYERS:
+                raise PlanError("all MIDI channels are occupied")
             target = target.with_updates(layers=(*target.layers, Layer(scope)))
             continue
-        if scope == "guitar" and not any(layer.name == scope for layer in target.layers):
-            raise PlanError("guitar must be introduced before it can be adjusted")
+        if added_program(scope) is not None and not any(layer.name == scope for layer in target.layers):
+            raise PlanError(f"{scope} must be introduced before it can be adjusted")
         if name == "SIMPLIFY" and scope == "lead":
             raise PlanError("baseline cannot simplify a lead motif without losing its notes")
         if name == "PRESERVE":
@@ -74,6 +98,10 @@ def project(state: JamState, plan: BandPlan) -> JamState:
             raise PlanError("plan violates preserve playing")
         if preserved == "key" and (target.key, target.progression_variant) != (state.key, state.progression_variant):
             raise PlanError("plan violates preserve key/harmony")
+        if preserved == "progression" and (target.chord_cycle, target.progression_variant) != (
+            state.chord_cycle, state.progression_variant
+        ):
+            raise PlanError("plan violates preserve progression")
         if preserved == "groove" and target.rhythm != state.rhythm:
             raise PlanError("plan violates preserve groove")
         if preserved.startswith("motif:"):
