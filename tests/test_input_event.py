@@ -83,6 +83,22 @@ def test_unknown_capture_times_remain_unknown(melody):
     assert "createdAt" in event.payload["melody"]
 
 
+def test_reviewed_humming_keeps_manual_notes_separate_from_raw_evidence(melody):
+    cleaned = melody["results"]["cleaned"]
+    cleaned["userEdited"] = True
+    note = dict(id="manual-1", manual=True, pitchMidi=64, startSec=.1, durationSec=.09,
+                velocity01=45 / 127, sourceNoteIds=[])
+    cleaned["notes"] = melody["notes"] = [note]
+    event = from_humming(melody, session_id="jam_test")
+    assert event.schema_version == "1.4.0"
+    assert event.payload["melody"]["notes"] == [note]
+    with pytest.raises(InputEventError):
+        InputEvent.from_dict({**event.to_dict(), "schema_version": "1.2.0"})
+    cleaned["notes"] = melody["notes"] = []
+    melody["status"] = "no_notes"
+    assert from_humming(melody, session_id="jam_test").payload["melody"]["results"]["raw"]["notes"]
+
+
 def test_humming_wrapper_preserves_full_evidence_and_does_not_use_midi_bpm(melody):
     before = copy.deepcopy(melody)
     event = from_humming(melody, session_id="jam_test", event_id="evt_hum", started_at=20)

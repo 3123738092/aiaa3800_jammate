@@ -36,7 +36,8 @@
             <p id="record-prompt" class="record-prompt">点一下，开始哼唱</p>
             <div class="level-wrap"><span class="level-caption">麦克风音量</span><meter id="input-level" min="0" max="1" value="0" aria-label="麦克风输入音量"></meter></div>
           </div>
-          <div class="source-actions"><button id="example" class="text-button" type="button">用示例试试 <span aria-hidden="true">↗</span></button><span aria-hidden="true">/</span><button id="import" class="text-button" type="button">导入录音</button><input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" hidden></div>
+          <div class="source-actions"><button id="example" class="text-button" type="button">用示例试试 <span aria-hidden="true">↗</span></button><span aria-hidden="true">/</span><button id="import" class="text-button" type="button">导入录音（可多选）</button><input id="file" type="file" multiple accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" hidden></div>
+          <label class="review-control" id="take-picker" hidden>当前录音<select id="take"></select></label>
           <div id="original-track" class="original-track" hidden><div class="track-caption"><span id="source-name">原始录音</span><span id="source-duration"></span></div><audio id="original" controls preload="metadata" aria-label="播放原始录音"></audio><a id="download-original" class="download-button original-download" download>下载原录音 ↓</a></div>
           <p class="status">自动整理哼唱中的疑似误切和过渡碎音，原录音与原有时序保持完整。</p>
           <div id="quality-panel" class="quality-panel" hidden aria-live="polite"><p id="quality-summary"></p><details><summary>查看音频与处理信息</summary><p id="quality-metrics"></p><p id="processing-summary"></p><p>音量检查不能判断旋律是否清晰，也不能修复已录入的失真。声音偏小不一定是噪声。</p></details></div>
@@ -51,16 +52,26 @@
           <div id="empty" class="empty-state"><div class="empty-score" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i><i></i><i></i><i></i></div><p>你的音符会出现在这里</p><span>每一格，都是从哼唱里听到的一个音。</span></div>
           <div id="result-content" hidden>
             <p id="result-state" class="result-state">自由哼唱 · BPM 未指定 · 保留原节奏</p>
+            <label class="review-control">对比版本<select id="revision"><option value="current">BPM 短音过滤＋独立起音保护（默认）</option><option value="previous">旧版 D</option></select></label>
             <p id="cleanup-summary" class="cleanup-summary"></p>
+            <label class="review-control" id="region-picker" hidden>MIDI 试听范围<select id="region"><option value="">全段</option></select></label>
             <p id="overlap-hint" class="overlap-hint" hidden>有不同音高重叠，可能包含误识别。已保留，方便你对照原声判断。</p>
-            <div class="score-top"><span>音符预览</span><span id="result-time"></span></div>
-            <canvas id="piano-roll" aria-label="音符图：横轴为时间，纵轴为音高。" role="img"></canvas>
+            <div class="score-top"><span>旋律音轨 · 点音符可编辑</span><span id="result-time"></span></div>
+            <canvas id="piano-roll" aria-label="旋律音轨。也可在下方选择音符并编辑。" role="img"></canvas>
+            <div class="note-tools" aria-label="音符编辑">
+              <label for="note-select">当前音符</label>
+              <select id="note-select" aria-label="当前音符"></select>
+              <button id="edit-note" type="button">编辑</button>
+              <button id="add-note" type="button">＋ 添加音符</button>
+              <button id="undo-note" type="button">撤销上一步</button>
+            </div>
             <div class="playback-controls"><button id="play-midi" class="play-button" type="button"><span aria-hidden="true">▶</span> 听 MIDI</button><label class="tone-label">音色<select id="timbre"><option value="soft">柔和合成器</option><option value="bright">明亮合成器</option><option value="pluck">短促拨弦</option></select></label></div>
-            <div class="result-bottom"><div class="export-actions"><a id="download-midi" class="download-button" download="jammate-hum.mid">下载 MIDI ↓</a><a id="download-event" class="download-button" download>下载 InputEvent ↓</a><a id="download-json" class="download-button" download="jammate-hum.json">下载 JSON ↓</a></div><span id="conversion-time"></span></div>
+            <div class="confirm-row"><button id="confirm-melody" class="play-button" type="button">确认旋律</button><span id="edit-status" role="status" aria-live="polite"></span></div>
+            <div class="result-bottom"><div class="export-actions"><a id="download-midi" class="download-button" aria-disabled="true" download="jammate-hum.mid">下载 MIDI ↓</a><a id="download-event" class="download-button" aria-disabled="true" download>下载 InputEvent ↓</a><a id="download-json" class="download-button" aria-disabled="true" download="jammate-hum.json">下载 JSON ↓</a></div><span id="conversion-time"></span></div>
             <button type="button" id="humming-mrt2-export" class="download-button" disabled>导出 MRT2 输入</button>
             <section id="band-panel" hidden></section>
-            <p class="result-hint">试听、MIDI 和 InputEvent 使用同一份旋律，时间从原录音开始。<br>试听统一力度；外部 MIDI 音源可能不同。</p>
-            <details class="export-help"><summary>这些文件有什么用？</summary><p>MIDI 用于音乐软件；InputEvent 用于接入 JamMate；JSON 保留原始识别、过滤记录及最终旋律，便于排查误删。</p><p>MIDI 内的 120 BPM 只用于记录时间，并非检测到的速度；没有对齐节拍。JSON 中保留 BPM 未知。原录音请单独下载，刷新页面后需重新导入。</p></details>
+            <p class="result-hint">试听跟随当前音轨，下载使用最近一次确认的旋律。</p>
+            <details class="export-help"><summary>这些文件有什么用？</summary><p>MIDI 用于音乐软件，InputEvent 用于接入 JamMate。JSON 记录识别结果和短音过滤的门槛。</p><p>估计的 BPM 只用于过滤。MIDI 按原录音的时间播放，文件内用 120 BPM 编码时间。原录音可单独下载。</p></details>
           </div>
         </div>
       </section>
@@ -69,6 +80,23 @@
     </main>
     <footer><span>JamMate / 把小灵感，交给乐队。 · <span id="pipeline-version"></span></span><a href="https://github.com/spotify/basic-pitch-ts" target="_blank" rel="noreferrer">Powered by Spotify Basic Pitch ↗</a></footer>
   </div>
+  <dialog id="note-dialog" aria-labelledby="note-title">
+    <form id="note-form">
+      <h2 id="note-title">编辑音符</h2>
+      <div class="note-fields">
+        <label>开始（秒）<input id="note-start" type="number" min="0" step="any" required></label>
+        <label>结束（秒）<input id="note-end" type="number" min="0" step="any" required></label>
+        <label>音高<select id="note-pitch"></select></label>
+        <label>力度（1–127）<input id="note-velocity" type="number" min="1" max="127" step="1" required></label>
+      </div>
+      <p id="note-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="remove-note" type="button">删除音符</button>
+        <button id="cancel-note" type="button">取消</button>
+        <button class="play-button" type="submit">应用到音轨</button>
+      </div>
+    </form>
+  </dialog>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

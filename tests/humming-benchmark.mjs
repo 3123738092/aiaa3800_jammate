@@ -10,6 +10,7 @@ for(const version of (process.env.HUM_BENCHMARK_VERSIONS||'baseline,optimized').
  for(const[name,golden]of Object.entries(expected)){
   await page.locator('#file').setInputFiles(path.join(root,`web/fixtures/${name}.wav`));await page.waitForFunction(()=>!document.querySelector('#convert').disabled);
   await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:120000});
+  if (version === 'optimized') await page.locator('#confirm-melody').click();
   const pending=page.waitForEvent('download');await page.locator('#download-json').click();const file=path.join(root,`tmp/benchmark/${version}-${name}.json`);await(await pending).saveAs(file);
   const doc=JSON.parse(await readFile(file));const notes=doc.notes.map(n=>({pitch:n.pitchMidi,start:n.startSec,duration:n.durationSec}));
   const entry={expected:golden.notes,actual:notes,rawCount:doc.results.raw.notes.length,count:notes.length,elapsedMs:doc.analysisElapsedMs};

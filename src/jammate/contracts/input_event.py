@@ -19,6 +19,7 @@ from jsonschema import Draft202012Validator
 VERSION = "1.0.0"
 FRAME_EVENT_VERSION = "1.2.0"
 FREE_RHYTHM_EVENT_VERSION = "1.3.0"
+EDITED_HUMMING_VERSION = "1.4.0"
 TIME_TOLERANCE_S = 1e-5  # JSON rounding only; not an audio synchronization budget.
 
 
@@ -140,10 +141,11 @@ def _cross_validate(data: dict[str, Any]) -> None:
             raise InputEventError(f"payload.melody.status: expected {expected}")
         # The frame decoder reads activations directly. A pitch can have frame
         # evidence even when the separate Basic Pitch note decoder is silent.
-        frame_decoder = data["schema_version"] == FRAME_EVENT_VERSION and melody["results"]["cleaned"].get("forceMonophonic") is True and all(
-            "frameRange" in note for note in cleaned
+        reviewed = data["schema_version"] == EDITED_HUMMING_VERSION
+        frame_decoder = data["schema_version"] in (FRAME_EVENT_VERSION, EDITED_HUMMING_VERSION) and melody["results"]["cleaned"].get("forceMonophonic") is True and all(
+            "frameRange" in note or (reviewed and note.get("manual") is True) for note in cleaned
         )
-        if not frame_decoder and bool(raw) != bool(cleaned):
+        if not reviewed and not frame_decoder and bool(raw) != bool(cleaned):
             raise InputEventError("payload.melody.results: cleanup cannot invent or erase all notes")
         raw_ids = {note["id"] for note in raw}
         for label, notes in (("raw", raw), ("cleaned", cleaned)):
@@ -152,7 +154,7 @@ def _cross_validate(data: dict[str, Any]) -> None:
             for note in notes:
                 if "frameRange" in note:
                     first, stop = note["frameRange"]
-                    if label != "cleaned" or not frame_decoder or first >= stop:
+                    if label != "cleaned" or not frame_decoder or note.get("manual") or first >= stop:
                         raise InputEventError(f"{path}: invalid decoded frame range")
                 if not set(note["sourceNoteIds"]).issubset(raw_ids):
                     raise InputEventError(f"{path}: sourceNoteIds must reference raw notes")

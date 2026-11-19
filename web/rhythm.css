@@ -17,6 +17,10 @@
 .rhythm-result-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .rhythm-result-header button { flex: none; }
 #summary { margin: 0; }
+.rhythm-timeline-tools { display: flex; align-items: center; gap: .6rem; margin: .5rem 0; }
+.rhythm-timeline-tools label { margin: 0; }
+.rhythm-timeline-tools select { padding: .25rem .45rem; }
+#rhythm-viewport { overflow-x: auto; max-width: 100%; padding-block: 4px; }
 
 #rhythm-roll {
   --lane-label-width: 3.9rem;
@@ -27,6 +31,7 @@
   border: 1px solid #c8d8c4;
   border-radius: .7rem;
   background: #fafbf6;
+  width: var(--timeline-width, 100%);
 }
 .rhythm-lane-label {
   align-self: center;
@@ -53,16 +58,15 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-width: 14px;
-  width: 2.8%;
-  max-width: 26px;
+  min-width: 0;
+  width: min(24px, var(--hit-space, 100%));
   height: 100%;
   padding: 0;
   background: transparent;
   border-radius: .25rem;
 }
 .rhythm-hit > span {
-  width: 100%;
+  width: min(8px, 70%);
   min-height: 4px;
   border-radius: .25rem .25rem 0 0;
   background: #4a7855;
@@ -71,6 +75,7 @@
 .rhythm-hit:hover,
 .rhythm-hit[aria-pressed="true"] { background: #e5d9bb55; z-index: 1; }
 .rhythm-hit[aria-pressed="true"] > span { background: #8c521c; }
+.rhythm-hit:focus-visible { outline-offset: 0; }
 #rhythm-cursor {
   position: absolute;
   top: 0;

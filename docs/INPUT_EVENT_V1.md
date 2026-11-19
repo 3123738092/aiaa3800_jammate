@@ -16,7 +16,7 @@
 
 | 字段 | 类型 | 规则 |
 |---|---|---|
-| `schema_version` | string | 接受 `1.0.0` / `1.1.0` / `1.2.0` / `1.3.0`。1.1 增加 system 生命周期，1.2 支持带帧的旋律，1.3 支持自由节奏。 |
+| `schema_version` | string | 支持 1.0.0 至 1.4.0。1.1 增加 system 生命周期，1.2 支持自动识别的旋律，1.3 支持自由节奏，1.4 支持手动编辑的旋律。 |
 | `event_id` | string | 非空；同一次事件的传输重试保留 ID；重新提交/重新识别形成新事件时使用新 ID |
 | `session_id` | string | 非空；由会话创建者提供，不从文件名或系统时间猜测 |
 | `source` | enum | `text`、`speech`、`rhythm`、`humming`；1.1 新增 `system` |
@@ -96,6 +96,8 @@ Python 跨字段校验允许 `1e-5 s` 的 JSON 数值舍入误差。这个容差
 
 ### 哼唱：`source=humming`，`event_type=musical_phrase`
 
+哼唱页在「确认旋律」时发布当前音轨。直接确认自动结果使用 1.2.0，编辑后确认使用 1.4.0。编辑结果保存在 `results.cleaned`，带有 `userEdited=true`。手动添加或修改的音符带有 `manual=true`，手动补音允许空的 `sourceNoteIds`。原始识别仍可从 `results.raw` 读取。
+
 最终采用 `payload.melody = 原 Melody v1 JSON` 的包装方式，保留整个上游文档；没有把之前讨论中的 notes/tempo 再拷贝成另一份扁平字段。这避免丢失 raw/cleaned、模型信息、质量警告、处理参数和音符来源。
 
 ```text
@@ -116,7 +118,7 @@ payload.melody
 - notes 必须与 selectedResult 对应的结果完全一致。
 - raw/cleaned 内部按开始秒数、音高排序，音符 ID 不重复，音尾不能越过录音长度，sourceNoteIds 必须能在 raw 中找到。
 - `status=no_notes` 与空结果对应；不把空输入变成虚构用户旋律。
-- 当前 velocity01 固定为 90/127；模型激活值不等于识别正确率或物理响度。
+- 自动哼唱使用模型激活值映射到 MIDI 力度，手动音符采用用户设置的力度。旧样例中保存的固定力度仍可读取。
 - `id` 是上游录音来源身份；重新转换同一录音可能复用它。外层 event_id 是本次事件身份，两者不能混用。
 
 完整样例：[humming.json](../examples/input_events/humming.json)。原始合成来源：[humming_melody_v1.json](../examples/input_events/source/humming_melody_v1.json)，来自 2026-10-24 哼唱交接包；没有个人录音。Agent 后续可为模型挑选相关字段，但事件中原始证据仍可追溯。

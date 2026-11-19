@@ -7,6 +7,7 @@ const { Midi } = midiPackage;
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 const project = path.resolve(import.meta.dirname,'..');
+const workbenchURL=process.env.JAMMATE_HUMMING_TEST_URL || 'http://127.0.0.1:4173/';
 await mkdir(path.join(project,'tmp'),{recursive:true});
 const wav=await readFile(path.join(project,'dist/example.wav'));
 const browser=await chromium.launch({channel:'msedge',headless:true,args:[
@@ -29,6 +30,7 @@ async function convert() {
   await page.waitForFunction(()=>!document.getElementById('timbre').disabled);
 }
 async function exportPair() {
+  if (await page.locator('#confirm-melody').isEnabled()) await page.locator('#confirm-melody').click();
   const json=JSON.parse(await download('#download-json','json'));
   const midi=new Midi(await download('#download-midi','mid'));
   const notes=midi.tracks.flatMap(track=>track.notes);
@@ -46,7 +48,7 @@ async function exportPair() {
   return json;
 }
 try {
-  await page.goto('http://127.0.0.1:4173/');
+  await page.goto(workbenchURL);
   await page.waitForFunction(()=>document.getElementById('model-badge').classList.contains('ready'),null,{timeout:60000});
   await page.locator('#example').click(); await readyInput();
   assert.deepEqual(await download('#download-original','wav'),wav,'original audio bytes must not change');
@@ -83,6 +85,9 @@ try {
   assert.equal(await page.locator('#result-content').isVisible(),false);
   await convert(); const recording=await exportPair();
   assert.equal(recording.source.kind,'recording');
+  assert.equal(recording.results.cleaned.policy.durationGate.experiment,'strict');
+  assert.equal(recording.results.cleaned.policy.samePitchReattack,null);
+  assert.equal(recording.playback.velocityPolicy,'basic_pitch_amplitude');
   assert(recording.notes.length>0);
   assert((await download('#download-original','webm')).length>100);
   const stereo=Buffer.alloc(44+(wav.length-44)*2);
@@ -103,7 +108,7 @@ try {
   await page.locator('#file').setInputFiles({name:'quiet.wav',mimeType:'audio/wav',buffer:quiet}); await readyInput();
   assert.equal(await page.locator('#quality-panel').getAttribute('data-quality'),'warning');
   assert((await page.locator('#quality-summary').textContent()).includes('偏小'));
-  assert(!(await page.locator('#processing-summary').textContent()).includes('×1.00'),'quiet input receives automatic bounded gain');
+  assert((await page.locator('#processing-summary').textContent()).includes('×1.00'),'D evaluates the recording at its original level');
   const clipped=Buffer.from(wav);
   // A 220 Hz clipped waveform, not an alternating Nyquist signal removed by resampling.
   for(let i=44;i<clipped.length;i+=2) clipped.writeInt16LE(Math.sin(2*Math.PI*220*((i-44)/2)/22050)>=0?32767:-32768,i);
@@ -121,7 +126,7 @@ try {
   assert(await page.locator('#convert').isDisabled());
   assert.equal(await page.locator('#original-track').isVisible(),false);
   assert.equal(errors.length,0,errors.join('\n'));
-  assert(requests.every(url=>url.startsWith('http://127.0.0.1:4173/')||url.startsWith('blob:')),'unexpected network requests');
+  assert(requests.every(url=>url.startsWith(new URL(workbenchURL).origin+'/')||url.startsWith('blob:')),'unexpected network requests');
   const summary={expectedPitches,matchedPitches,rawNotes:first.results.raw.notes.length,
     cleanedNotes:first.results.cleaned.notes.length,cleanupEdits:first.results.cleaned.edits,
     trimStartSec:first.input.processing.trimStartSec,recordedNotes:recording.notes.length,

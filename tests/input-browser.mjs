@@ -84,6 +84,7 @@ try{
     await page.waitForFunction(()=>document.querySelector('#model-badge.ready'),null,{timeout:90000});
     await page.locator('#example').click();await page.waitForFunction(()=>!document.querySelector('#convert').disabled);
     await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
+    if (version === 'optimized') await page.locator('#confirm-melody').click();
     const event=JSON.parse(await download('#download-event',path.join(root,`tmp/browser/${version}.event.json`)));
     const doc=JSON.parse(await download('#download-json',path.join(root,`tmp/browser/${version}.melody.json`)));
     const midi=new Midi(await download('#download-midi',path.join(root,`tmp/browser/${version}.mid`)));
@@ -120,15 +121,15 @@ try{
       assert.equal(doc.selectedResult,'cleaned');
       assert.deepEqual(doc.notes.map(n=>n.pitchMidi),[60,64,67,64,62],'recover all five expected pitches');
       assert.equal(doc.model.executionBackend,'cpu');
-      await page.locator('#convert').click();await page.locator('#result-content').waitFor({state:'visible',timeout:90000});
+      await page.locator('#confirm-melody').click();
       const repeated=JSON.parse(await download('#download-json',path.join(root,'tmp/browser/repeated.melody.json')));
-      assert.deepEqual(repeated.notes,doc.notes,'repeat conversion is deterministic');
-      assert.equal(repeated.source.sessionId,event.session_id,'reprocessing retains clip session');
-      report.versions[version].repeatable=true;
+      assert.deepEqual(repeated.notes,doc.notes,'confirming timbre preserves the melody');
+      assert.equal(repeated.source.sessionId,event.session_id,'confirmation retains clip session');
       await page.locator('#file').setInputFiles(path.join(root,'web/fixtures/sustain.wav'));
       await page.waitForFunction(()=>!document.querySelector('#convert').disabled);
       assert(await page.locator('[data-output]').isHidden());
       await page.locator('#convert').click();
+      await page.locator('#confirm-melody').click({timeout:90000});
       await page.locator('#band-panel').waitFor({state:'visible',timeout:90000});
       report.uploadedSustain = await checkBand('humming', 'uploaded-sustain');
       const uploaded = JSON.parse(await readFile(path.join(root,'tmp/browser/uploaded-sustain.agent.json')));

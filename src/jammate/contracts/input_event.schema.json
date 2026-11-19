@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "JamMate InputEvent 1.0.0 / 1.1.0 / 1.2.0 / 1.3.0",
+  "title": "JamMate InputEvent 1.0.0 through 1.4.0",
   "description": "Downstream contract baseline. Cross-field time and note invariants are additionally checked by the Python validator.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "event_id", "session_id", "source", "event_type", "started_at", "ended_at", "confidence", "payload"],
   "properties": {
-    "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]},
+    "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"]},
     "event_id": {"$ref": "#/$defs/id"},
     "session_id": {"$ref": "#/$defs/id"},
     "source": {"enum": ["text", "speech", "rhythm", "humming", "system"]},
@@ -29,6 +29,18 @@
     }
   },
   "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.4.0"}}},
+      "then": {"properties": {"event_type": {"const": "musical_phrase"}, "payload": {"properties": {"melody": {
+        "properties": {"selectedResult": {"const": "cleaned"}, "results": {"properties": {
+          "cleaned": {"required": ["userEdited"], "properties": {"userEdited": {"const": true}}}
+        }}}
+      }}}}},
+      "else": {"properties": {"payload": {"properties": {"melody": {
+        "allOf": [{"$ref": "#/$defs/automaticNotes"}],
+        "properties": {"results": {"properties": {"cleaned": {"$ref": "#/$defs/automaticNotes"}}}}
+      }}}}}
+    },
     {
       "if": {"properties": {"schema_version": {"const": "1.3.0"}}},
       "then": {"properties": {"event_type": {"const": "rhythm_seed"}, "confidence": {"type": "null"}}}
@@ -152,6 +164,7 @@
       "required": ["id", "pitchMidi", "startSec", "durationSec", "velocity01", "sourceNoteIds"],
       "properties": {
         "id": {"$ref": "#/$defs/id"},
+        "manual": {"const": true},
         "pitchMidi": {"type": "integer", "minimum": 0, "maximum": 127},
         "startSec": {"type": "number", "minimum": 0},
         "durationSec": {"type": "number", "exclusiveMinimum": 0},
@@ -161,11 +174,12 @@
         "sourceNoteIds": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "frameRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 0}}
       },
-      "if": {"not": {"required": ["frameRange"]}},
+      "if": {"not": {"anyOf": [{"required": ["frameRange"]}, {"required": ["manual"]}]}},
       "then": {"properties": {"sourceNoteIds": {"minItems": 1}}}
     },
     "notes": {"type": "array", "items": {"$ref": "#/$defs/note"}},
     "withoutFrames": {"properties": {"notes": {"items": {"not": {"required": ["frameRange"]}}}}},
+    "automaticNotes": {"properties": {"notes": {"items": {"not": {"required": ["manual"]}}}}},
     "melodyResult": {
       "type": "object",
       "required": ["notes"],
@@ -197,7 +211,7 @@
         "notes": {"$ref": "#/$defs/notes"},
         "results": {
           "type": "object", "additionalProperties": false, "required": ["raw", "cleaned"],
-          "properties": {"raw": {"$ref": "#/$defs/melodyResult"}, "cleaned": {"$ref": "#/$defs/melodyResult"}}
+          "properties": {"raw": {"allOf": [{"$ref": "#/$defs/melodyResult"}, {"$ref": "#/$defs/automaticNotes"}]}, "cleaned": {"$ref": "#/$defs/melodyResult"}}
         }
       }
     }

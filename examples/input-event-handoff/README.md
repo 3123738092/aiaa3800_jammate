@@ -16,7 +16,7 @@ python -m jammate.input_server --port 4188
 打开 [本地工作台](http://127.0.0.1:4188/)。
 
 1. **文字**　打开「从一句话出发」，输入任意创作提示，点击「下载 InputEvent JSON」。按钮直接调用 `POST /api/input/text` 和 Python 的 `from_text`，原文、标点、空格和换行都会保留。
-2. **哼唱**　打开「从旋律出发」，录音或导入音频，点击「转成 MIDI」，再点「下载 InputEvent」。浏览器实际运行 Basic Pitch，进行单声部整理、音高修正和弱碎音过滤，随后 `hummingEvent` 封装当前音符。整个过程在本机运行。
+2. **哼唱**　打开「从旋律出发」，录音或导入音频，点击「转成 MIDI」。默认使用 Basic Pitch＋D 和按 BPM 调整的短音过滤，可在「对比版本」里试听旧版 D。点击音轨可编辑音符，试听满意后点「确认旋律」，再下载 MIDI 或 InputEvent。手动补回的快音直接进入确认结果。
 3. **拍手**　打开「从律动出发」，录一段或导入 WAV，点击「识别节奏」。编辑拍点或力度后，可试听、下载 MIDI 和 InputEvent。识别器复用原仓库的 librosa 起音检测、回溯和力度筛选。常规 PCM WAV 直接按原采样率分析。旧版单小节编排另有入口。
 
 ### 接入 Harness
@@ -29,7 +29,7 @@ python -m jammate.input_server --port 4188
 | 拍手 | `POST /api/input/rhythm` | JSON 含 base64 编码的 WAV 字段 `wav` 和 `session_id`，可传 `event_id`、`started_at`。直接返回事件。 |
 | 哼唱 | [网页识别](../../web/optimized/src/app.js) → [hummingEvent](../../web/optimized/src/input-event.js) | 浏览器从音频生成 Melody 文档，封装函数接收该文档及 `sessionId`、`eventId`、`startedAt`，返回标准事件。 |
 
-三个页面还提供同一个浏览器回调。可在页面初始化时注册一次，直接取到与下载 JSON 一致的事件。文字提交或导出、哼唱完成识别、节奏完成识别或编辑，都会触发。重复导出同一条文字时可按 `event_id` 去重。文件导出与回调都无需运行生成模型。
+三个页面都支持 `jammate:input`。页面初始化时注册一次，就能收到与下载 JSON 相同的事件。文字提交或导出时发布，拍手识别或编辑后发布。哼唱在点击「确认旋律」时发布，编辑草稿期间可试听，下载保留最近一次确认的结果。自动哼唱使用 1.2.0，编辑后确认的哼唱使用 1.4.0。重复导出同一条文字时可按 `event_id` 去重。
 
 ```js
 window.addEventListener('jammate:input', ({detail}) => {

@@ -21,7 +21,7 @@ function sync() {
   $('analyze').disabled = !idle || !buffer;
   const ready = idle && Boolean(prepared);
   for (const id of ['play-midi', 'rhythm-mrt2-midi', 'rhythm-mrt2-export']) $(id).disabled = !ready;
-  $('play-midi').textContent = playback || playPending ? '暂停 MIDI' : '听 MIDI';
+  $('play-midi').textContent = playback || playPending ? '暂停 MIDI' : '听当前 MIDI';
   $('retry-midi').hidden = !midiFailed;
   $('retry-midi').disabled = !idle;
 }
@@ -113,16 +113,25 @@ async function playMidi() {
 
 function renderAxis(duration) {
   const marks = [], labels = [];
-  for (let i = 0; i <= 4; i++) {
+  const divisions = 4 * Number($('timeline-zoom').value);
+  for (let i = 0; i <= divisions; i++) {
     const tick = document.createElement('span'), label = document.createElement('span');
     tick.className = 'rhythm-tick';
-    tick.style.left = label.style.left = `${i * 25}%`;
-    label.textContent = `${Number((i * duration / 4).toFixed(2))} 秒`;
+    tick.style.left = label.style.left = `${i * 100 / divisions}%`;
+    label.textContent = `${Number((i * duration / divisions).toFixed(2))} 秒`;
     marks.push(tick);
     labels.push(label);
   }
   $('rhythm-grid').replaceChildren(...marks);
   $('rhythm-axis').replaceChildren(...labels);
+}
+
+function revealPosition() {
+  const viewport = $('rhythm-viewport');
+  const visible = viewport.getBoundingClientRect();
+  const cursor = $('rhythm-cursor').getBoundingClientRect();
+  if (cursor.left < visible.left || cursor.right > visible.right)
+    viewport.scrollLeft += cursor.left - visible.left - viewport.clientWidth / 2;
 }
 
 function selectHit(index, seekToHit = false) {
@@ -138,6 +147,7 @@ function selectHit(index, seekToHit = false) {
   if (seekToHit && selected !== -1) {
     stopPlayback();
     setPosition(times[selected]);
+    revealPosition();
   }
 }
 
@@ -151,6 +161,11 @@ function renderHits() {
     button.type = 'button';
     button.className = 'rhythm-hit';
     button.style.left = `${time / duration * 100}%`;
+    // Shrink the hit target as well as the visible bar so adjacent hits cannot
+    // cover one another. Zoom changes only display scale, never source timing.
+    const gap = Math.min(time - (times[index - 1] ?? -duration),
+      (times[index + 1] ?? time + duration) - time);
+    button.style.setProperty('--hit-space', `${90 * gap / duration}%`);
     button.setAttribute('aria-label', `${label} · 相对力度 ${midiVelocity(accents[index])}`);
     button.title = button.getAttribute('aria-label');
     button.onclick = () => selectHit(index, true);
@@ -181,10 +196,10 @@ function prepareMidi() {
   prepared = null;
   midiFailed = false;
   const event = editor?.event;
-  const ready = event?.payload.status === 'ready';
-  midiStatus.textContent = ready ? '正在准备当前节奏的 MIDI…' : '';
+  // An empty edited rhythm is a valid silent MIDI, with the full take duration.
+  midiStatus.textContent = event ? '正在准备当前节奏的 MIDI…' : '';
   sync();
-  if (!ready) return;
+  if (!event) return;
 
   return midiRequest.run(signal => post('rhythm/midi', {event}, signal), result => {
     prepared = result;
@@ -203,6 +218,7 @@ function saveMidi(download) {
 }
 
 function refreshEvent() {
+  original.pause();
   stopPlayback();
   const event = editor.event;
   const documentText = JSON.stringify(event, null, 2);
@@ -415,6 +431,9 @@ $('analyze').onclick = () => {
       const {audio_duration_s: duration, status} = event.payload;
       seek.max = String(duration);
       setPosition(0);
+      $('timeline-zoom').value = '1';
+      $('rhythm-roll').style.removeProperty('--timeline-width');
+      $('rhythm-viewport').scrollLeft = 0;
       renderAxis(duration);
       selected = status === 'ready' ? 0 : -1;
       refreshEvent();
@@ -454,6 +473,12 @@ seek.oninput = () => {
   const next = seek.valueAsNumber;
   stopPlayback();
   setPosition(next);
+  revealPosition();
+};
+$('timeline-zoom').onchange = () => {
+  $('rhythm-roll').style.setProperty('--timeline-width', `${Number($('timeline-zoom').value) * 100}%`);
+  renderAxis(editor?.event.payload.audio_duration_s ?? 0);
+  revealPosition();
 };
 $('play-midi').onclick = playMidi;
 $('rhythm-mrt2-midi').onclick = () => saveMidi(downloadMrt2Midi);

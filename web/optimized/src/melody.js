@@ -1,10 +1,10 @@
 import midiPackage from '@tonejs/midi';
 const { Midi } = midiPackage;
 
-export const APP_VERSION = '1.3.0';
-export const DECODING = Object.freeze({onsetThreshold:.25, frameThreshold:.25, minimumNoteFrames:9,
-  inferOnsets:true, maximumFrequencyHz:1046.502, minimumFrequencyHz:65.406,
-  melodiaTrick:true, energyToleranceFrames:11, pitchMin:36, pitchMax:84});
+export const APP_VERSION = '1.5.0';
+export const DECODING = Object.freeze({onsetThreshold:.5, frameThreshold:.3, minimumNoteFrames:5,
+  inferOnsets:true, maximumFrequencyHz:null, minimumFrequencyHz:null,
+  melodiaTrick:true, energyToleranceFrames:11, pitchMin:21, pitchMax:108});
 export const CLEANUP = Object.freeze({version:'1.0.0', maximumGapSec:.06,
   maximumOverlapSec:.01, maximumFragmentSec:.18, minimumPreviousSec:.25, maximumOnsetActivation:.35});
 export const TIMBRES = Object.freeze({
@@ -50,9 +50,26 @@ export function cleanNotes(raw) {
   return {notes, edits, policy:{...CLEANUP}, octaveCorrection:false, forceMonophonic:false};
 }
 
-export function buildExports(document, variant = 'cleaned', timbreId = 'soft') {
+export function modelVelocity(note) {
+  if (note.manual) return Math.round(note.velocity01 * 127);
+  // Basic Pitch writes mean frame activation as the normalized MIDI velocity.
+  // Match the encoder's seven-bit truncation. Zero is a MIDI note-off.
+  const strength = Number.isFinite(note.modelActivation) ? note.modelActivation
+    : Number.isFinite(note.velocity01) ? note.velocity01 : VELOCITY;
+  return Math.max(1, Math.min(127, Math.floor(strength * 127)));
+}
+
+export function buildExports(document, variant = 'cleaned', timbreId = 'soft',
+  {modelDynamics = ['basic_pitch_amplitude','edited_note_velocities'].includes(document.playback?.velocityPolicy)} = {}) {
   if (!['raw','cleaned'].includes(variant) || !TIMBRES[timbreId]) throw new Error('无效的回放设置。');
-  const notes = document.results[variant].notes;
+  const results = {...document.results};
+  if (modelDynamics) {
+    for (const key of ['raw', 'cleaned']) {
+      const result = results[key];
+      if (result) results[key] = {...result, notes:result.notes.map(n => ({...n,velocity01:modelVelocity(n)/127}))};
+    }
+  }
+  const notes = results[variant].notes;
   const midi = new Midi();
   midi.name = `JamMate ${variant}`;
   midi.header.setTempo(MIDI_REFERENCE_BPM); // Encoding reference only. No detected/assigned musical tempo.
@@ -64,9 +81,9 @@ export function buildExports(document, variant = 'cleaned', timbreId = 'soft') {
   const bytes = midi.toArray();
   const exported = new Midi(bytes);
   return {bytes, playbackNotes:exported.tracks.flatMap(item=>item.notes),
-    document:{...document,selectedResult:variant,notes,status:notes.length?'ready':'no_notes',
+    document:{...document,results,selectedResult:variant,notes,status:notes.length?'ready':'no_notes',
       playback:{timbreId,gmProgramNumber:TIMBRES[timbreId].program,gmProgramNumberBase:0,
-        velocityPolicy:'fixed_audition_level', velocity01:VELOCITY,
+        ...(modelDynamics ? {velocityPolicy:results[variant].userEdited ? 'edited_note_velocities' : 'basic_pitch_amplitude'} : {velocityPolicy:'fixed_audition_level',velocity01:VELOCITY}),
         timbreNote:'Browser synthesizer approximations; external MIDI instruments may sound different.'},
       midiExport:{referenceBpm:MIDI_REFERENCE_BPM,tempoMeaning:'serialization_reference_only',
         ppq:midi.header.ppq,timeRoundingToleranceSec:60/MIDI_REFERENCE_BPM/midi.header.ppq,

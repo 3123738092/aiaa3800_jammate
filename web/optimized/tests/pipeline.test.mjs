@@ -97,3 +97,23 @@ test('empty detection has an explicit no_notes state',()=>{
   assert.equal(doc.status,'no_notes');
   assert.equal(buildExports(doc).document.notes.length,0);
 });
+
+test('model playback matches Basic Pitch MIDI strength and preserves quiet and older notes',async()=>{
+  const {generateFileData}=await import('@spotify/basic-pitch/cjs/toMidi.js');
+  const decoded=[.21,.54,.92].map((amplitude,i)=>({...note(.3+i*.5,.25,60+i),amplitude}));
+  const native=new Midi(generateFileData(decoded));
+  const raw=standardizeNotes(decoded,3);
+  const legacy={...raw[0],startSec:2,modelActivation:null,velocity01:42/127};
+  const quiet={...raw[1],startSec:2.5,modelActivation:0};
+  const cleaned={notes:[...raw,legacy,quiet]};
+  const doc=createMelodyDocument({id:'dynamics',durationSec:3},{},raw,cleaned,0);
+  const before=structuredClone(doc);
+  const rendered=buildExports(doc,'cleaned','soft',{modelDynamics:true});
+  const strengths=rendered.playbackNotes.map(n=>n.velocity);
+  assert.deepEqual(strengths,[...native.tracks[0].notes.map(n=>n.velocity),42/127,1/127]);
+  assert.deepEqual(rendered.document.notes.map(n=>n.velocity01),strengths);
+  assert.deepEqual(rendered.document.results.cleaned.notes,rendered.document.notes);
+  assert.deepEqual(rendered.document.results.raw.notes.map(n=>n.velocity01),strengths.slice(0,3));
+  assert.deepEqual(buildExports(rendered.document).bytes,rendered.bytes);
+  assert.deepEqual(doc,before);
+});

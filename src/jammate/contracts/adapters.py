@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from jammate.rhythm import RhythmContext
 
-from .input_event import FRAME_EVENT_VERSION, FREE_RHYTHM_EVENT_VERSION, VERSION, InputEvent, InputEventError
+from .input_event import EDITED_HUMMING_VERSION, FRAME_EVENT_VERSION, FREE_RHYTHM_EVENT_VERSION, VERSION, InputEvent, InputEventError
 
 
 def _capture_end(started_at: float | None, duration: float) -> float | None:
@@ -96,9 +96,12 @@ def from_humming(document: dict[str, Any], *, session_id: str, event_id: str | N
     results = document.get("results")
     cleaned = results.get("cleaned") if isinstance(results, dict) else None
     frame_decoder = isinstance(cleaned, dict) and cleaned.get("forceMonophonic") is True
+    version = FRAME_EVENT_VERSION if frame_decoder else VERSION
+    if isinstance(cleaned, dict) and cleaned.get("userEdited") is True:
+        version = EDITED_HUMMING_VERSION
     return _event(session_id=session_id, event_id=event_id, source="humming", event_type="musical_phrase",
                   started_at=started_at, ended_at=ended_at, payload={"melody": document},
-                  provenance=provenance, schema_version=FRAME_EVENT_VERSION if frame_decoder else VERSION)
+                  provenance=provenance, schema_version=version)
 
 
 def from_free_rhythm(onset_seconds, accents, *, session_id: str, audio_duration_s: float,

@@ -22,6 +22,7 @@
     </div>
     <p class="muted">录制最多 30 秒，支持导入 0.5–30 秒的录音。</p>
     <div id="original-source" hidden>
+      <p class="muted">原始录音 · 编辑拍点后仍保留录入时的声音</p>
       <audio id="original" aria-label="原始录音" controls></audio>
       <a id="download-original" hidden>下载原始音频</a>
     </div>
@@ -35,18 +36,29 @@
         <h2 id="rhythm-result-title">节奏编辑</h2>
         <p id="summary" class="muted"></p>
       </div>
-      <button id="play-midi" type="button" disabled>听 MIDI</button>
+      <button id="play-midi" type="button" disabled>听当前 MIDI</button>
     </div>
-    <p id="rhythm-help">点击拍点编辑，拖动进度条定位。柱子的高度表示这一段录音内的相对力度。</p>
-    <div id="rhythm-roll" role="group" aria-label="打击乐拍点时间轴" aria-describedby="rhythm-help">
-      <div class="rhythm-lane-label" aria-hidden="true">打击乐</div>
-      <div class="rhythm-plot">
-        <div id="rhythm-grid" aria-hidden="true"></div>
-        <div id="rhythm-hits"></div>
-        <span id="rhythm-cursor" aria-hidden="true"></span>
-        <p id="no-hits" hidden>当前没有拍点</p>
+    <p id="rhythm-help">点击拍点编辑，拖动进度条定位。柱高表示相对力度；密集拍点可放大后横向滚动查看。</p>
+    <div class="rhythm-timeline-tools">
+      <label for="timeline-zoom">时间轴缩放</label>
+      <select id="timeline-zoom">
+        <option value="1">整段</option>
+        <option value="2">2 倍</option>
+        <option value="4">4 倍</option>
+        <option value="8">8 倍</option>
+      </select>
+    </div>
+    <div id="rhythm-viewport">
+      <div id="rhythm-roll" role="group" aria-label="打击乐拍点时间轴" aria-describedby="rhythm-help">
+        <div class="rhythm-lane-label" aria-hidden="true">打击乐</div>
+        <div class="rhythm-plot">
+          <div id="rhythm-grid" aria-hidden="true"></div>
+          <div id="rhythm-hits"></div>
+          <span id="rhythm-cursor" aria-hidden="true"></span>
+          <p id="no-hits" hidden>当前没有拍点</p>
+        </div>
+        <div id="rhythm-axis" aria-hidden="true"></div>
       </div>
-      <div id="rhythm-axis" aria-hidden="true"></div>
     </div>
     <div class="rhythm-transport">
       <label for="seek">播放位置</label>
