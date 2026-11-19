@@ -73,6 +73,36 @@ def test_published_state_schema_and_roundtrip():
     assert state.motifs and state.rhythm_sources
 
 
+def test_new_guitar_joins_at_faster_tempo_and_can_be_muted_and_resumed():
+    m = manager()
+    first = execute(m, staged(m, [text_event("保持")], plan_id="first"))
+    assert not notes_for(first, "guitar")
+
+    added = staged(m, [text_event("稍微快一点，加一个其他乐器进来", "text_2")], plan_id="guitar")
+    assert [(action["action"], action["scope"]) for action in added.actions] == [("INTRODUCE_LAYER", "guitar")]
+    before = m.state
+    with pytest.raises(StopIteration):
+        before.layer("guitar")
+    reference = render_plan(before, changed(added, actions=[]), sample_rate=8000)
+    second = execute(m, added)
+    assert second.tempo_bpm == 108 and second.start_bar == first.start_bar + first.bars
+    assert len(notes_for(second, "guitar")) == 4 * second.bars
+    assert tuple(n for n in second.notes if n.instrument != "guitar") == reference.notes
+    assert m.state.layer("guitar").active
+    assert JamState.from_dict(m.state.to_dict()) == m.state
+
+    muted = staged(m, [text_event("去掉吉他", "text_3")], plan_id="mute")
+    third = execute(m, muted)
+    assert not notes_for(third, "guitar")
+    assert notes_for(third, "bass") and notes_for(third, "keys") and notes_for(third, "drums")
+    assert m.state.playing and not m.state.layer("guitar").active and third.tempo_bpm == 108
+
+    restored = staged(m, [text_event("加回来吉他", "text_4")], plan_id="restore")
+    assert restored.actions[0]["action"] == "ADD_LAYER"
+    assert notes_for(execute(m, restored), "guitar")
+    assert sum(layer.name == "guitar" for layer in m.state.layers) == 1
+
+
 def test_simplify_sparse_keys_changes_actual_notes_across_bars():
     m = manager()
     p = staged(m, [text_event("键盘简化")])

@@ -66,6 +66,14 @@ def bass_bar(chord: Chord, energy: int) -> tuple[Note, ...]:
     return tuple(Note(p, s, d, velocity=95, instrument="bass") for p, s, d in rhythm)
 
 
+def guitar_bar(chord: Chord) -> tuple[Note, ...]:
+    """A sparse eighth-note acoustic-guitar arpeggio in the current chord."""
+    root, third, fifth = chord.voicing(55)[:3]
+    return tuple(Note(pitch, beat, .45, velocity, "guitar")
+                 for pitch, beat, velocity in ((root, .5, 64), (fifth, 1.5, 55),
+                                               (third, 2.5, 60), (fifth, 3.5, 54)))
+
+
 def comp_bar(chord: Chord, energy: int) -> tuple[Note, ...]:
     voicing = chord.voicing(COMP_LOW)
     if energy <= 1:

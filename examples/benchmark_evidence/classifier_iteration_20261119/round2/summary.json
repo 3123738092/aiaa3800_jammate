@@ -1,0 +1,46 @@
+{
+  "jev": {
+    "n": 17,
+    "passed": 17,
+    "outcomes": {
+      "applied": 9,
+      "held": 3,
+      "abstain": 5,
+      "error": 0
+    },
+    "provider_rows": 16,
+    "provider_attempts": 16,
+    "provider_p50_ms": 837.25,
+    "request_gate_rows": 0,
+    "request_gate_p50_ms": null,
+    "models": [
+      "jev-1.14.0"
+    ]
+  },
+  "llm": {
+    "n": 16,
+    "passed": 15,
+    "outcomes": {
+      "applied": 12,
+      "held": 3,
+      "abstain": 0,
+      "error": 1
+    },
+    "provider_rows": 13,
+    "provider_attempts": 14,
+    "provider_p50_ms": 3848.31,
+    "request_gate_rows": 3,
+    "request_gate_p50_ms": 14.8,
+    "models": [
+      "gpt-5.4-mini-2026-03-17"
+    ]
+  },
+  "fixture_sha256": "5e33e087b7e92185133b2a6f22ef0c404f02cdc4cde9e48c676febd70beb418e",
+  "pairs": 16,
+  "failures": {
+    "jev": [],
+    "llm": [
+      "mixed_mute"
+    ]
+  }
+}

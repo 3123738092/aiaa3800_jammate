@@ -10,25 +10,26 @@ import re
 import uuid
 
 from jammate.contracts.band_plan import BandPlan
+from jammate.interaction import CORE_LAYER_NAMES
 from jammate.state import JamState
 from .plans import make_plan
 
-LAYERS = ("drums", "bass", "keys", "lead")
-SCOPES = {"鼓": "drums", "贝斯": "bass", "键盘": "keys", "钢琴": "keys", "主旋律": "lead", "吉他": "guitar",
-          **{name: name for name in (*LAYERS, "guitar", "band")}}
+SCOPES = {"鼓": "drums", "贝斯": "bass", "键盘": "keys", "钢琴": "keys", "主旋律": "lead", "木吉他": "guitar", "吉他": "guitar",
+          **{name: name for name in (*CORE_LAYER_NAMES, "guitar", "band")}}
 GRAMMAR = {
     "keep": r"这个不错|不错|保持|保持这样|保留|刚才那句保留|就这样|就这个|keep(?: it)?|sounds good",
     "build": r"再炸一点|再?猛一点|更猛(?:一点)?|更有力|渐强|推上去|build|more powerful",
     "simplify": r"太满了|留点空间|留空间|收一点|少一点|简化(?:一点)?|simplify|less busy",
     "stop": r"停|停止|结束|stop",
     "start": r"继续|恢复|开始|start|resume|continue",
-    "faster": r"加速|快一点|快点|faster",
+    "faster": r"加速|(?:稍微)?快一点|快点|faster",
     "slower": r"减速|慢一点|慢点|slower",
     "tempo": r"速度不变|速度保持|别变速度|keep tempo",
     "groove": r"节奏保持|节奏别变|keep groove",
     "vary": r"变奏|变化一下|vary",
     "idea": r"你来|来一段|给个想法|new idea|your turn",
     "add": r"加|加上|加入|加回来|add",
+    "add_new_instrument": r"加一个(?:其他|别的|新)乐器(?:进来)?|add another instrument",
     "remove": r"去掉|移除|remove",
 }
 
@@ -70,12 +71,14 @@ def _action(name, scope="band", strength=.5, **parameters):
 
 
 class RuleAgent:
-    def decide(self, events, state: JamState, *, plan_id: str | None = None, history=(), vary_input=False) -> BandPlan:
+    def decide(self, events, state: JamState, *, plan_id: str | None = None, history=(),
+               vary_input=False, direct_bass_enabled=False) -> BandPlan:
         events = tuple(events)
         if not events or any(e.session_id != state.session_id for e in events):
             raise ValueError("Agent requires an accepted, nonempty session batch")
         plan_id = plan_id or f"plan_{uuid.uuid4().hex}"
         actions, transport, unresolved, reasons = [], {}, [], []
+        existing_layers = tuple(layer.name for layer in state.layers)
         preserve = ["tempo", "key"]
         if state.current_motif_id:
             preserve.append(f"motif:{state.current_motif_id}")
@@ -90,7 +93,10 @@ class RuleAgent:
             return self._plan(state, events, plan_id, "LISTEN", [], ["tempo", "key"], {"playing": False}, 1,
                               "Explicit stop takes priority over all musical requests", [])
         for original, scope, command, negative in commands:
-            if command is None or scope == "guitar":
+            if command == "add_new_instrument" and scope == "band" and "guitar" not in existing_layers:
+                scope, command = "guitar", "add"
+            missing_guitar = scope == "guitar" and scope not in existing_layers
+            if command is None or command == "add_new_instrument" or (missing_guitar and (command != "add" or negative)):
                 unresolved.append(f"Unsupported clause: {original}")
                 continue
             if scope != "band" and command not in {"keep", "build", "simplify", "add", "remove", "stop", "start"}:
@@ -102,7 +108,7 @@ class RuleAgent:
                 elif command in {"faster", "slower"}:
                     preserve.append("tempo")
                 elif command in {"build", "simplify", "add", "remove"}:
-                    preserve.extend(f"layer:{name}" for name in (LAYERS if scope == "band" else (scope,)))
+                    preserve.extend(f"layer:{name}" for name in (existing_layers if scope == "band" else (scope,)))
                 else:
                     unresolved.append(f"Unsupported negation: {original}")
                 reasons.append(f"Respect negation: {original}")
@@ -125,7 +131,10 @@ class RuleAgent:
                 if scope == "band":
                     unresolved.append("Layer command requires an instrument")
                 else:
-                    actions.append(_action("ADD_LAYER" if command == "add" else "REMOVE_LAYER", scope))
+                    name = "ADD_LAYER" if command == "add" else "REMOVE_LAYER"
+                    if command == "add" and scope not in existing_layers:
+                        name = "INTRODUCE_LAYER"
+                    actions.append(_action(name, scope))
             elif command in {"faster", "slower"}:
                 bpm = max(60., min(180., state.tempo_bpm + (8 if command == "faster" else -8)))
                 if "tempo_bpm" in transport and transport["tempo_bpm"] != bpm:
@@ -198,12 +207,15 @@ class RuleAgent:
             unresolved.append("Conflicting motif requests")
         for left in actions:
             for right in actions:
-                if {left["action"], right["action"]} in ({"BUILD", "SIMPLIFY"}, {"ADD_LAYER", "REMOVE_LAYER"}) and (left["scope"] == right["scope"] or "band" in {left["scope"], right["scope"]}):
+                if {left["action"], right["action"]} in ({"BUILD", "SIMPLIFY"}, {"ADD_LAYER", "REMOVE_LAYER"}, {"INTRODUCE_LAYER", "REMOVE_LAYER"}) and (left["scope"] == right["scope"] or "band" in {left["scope"], right["scope"]}):
                     unresolved.append("Contradictory actions on the same layer")
         # Explicit instrument scope keeps other layers unchanged unless another action touches them.
         modified = [a for a in actions if a["action"] != "PRESERVE"]
-        if modified and all(a["scope"] in LAYERS for a in modified):
-            preserve.extend(f"layer:{name}" for name in LAYERS if name not in {a["scope"] for a in modified})
+        if modified and all(a["scope"] in (*CORE_LAYER_NAMES, "guitar") for a in modified):
+            mutable_layers = {a["scope"] for a in modified}
+            if direct_bass_enabled and state.position.next_bar == 0 and strategy == "INITIATE":
+                mutable_layers.add("bass")
+            preserve.extend(f"layer:{layer.name}" for layer in state.layers if layer.name not in mutable_layers)
         if unresolved:
             return self._plan(state, events, plan_id, "LISTEN", [], ["tempo", "key", "playing"], {}, 1,
                               "Hold current arrangement; request needs clarification", list(dict.fromkeys(unresolved)))

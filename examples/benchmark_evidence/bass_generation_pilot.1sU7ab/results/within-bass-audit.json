@@ -1,0 +1,161 @@
+{
+  "rule": {
+    "passing_pairs_isolated_within_bass": 0,
+    "cases": [
+      {
+        "case": "tail",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "register",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "duration",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "tail",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "register",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "duration",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      }
+    ]
+  },
+  "patch": {
+    "passing_pairs_isolated_within_bass": 0,
+    "cases": [
+      {
+        "case": "tail",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "register",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "duration",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "tail",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "register",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": null
+      },
+      {
+        "case": "duration",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 2,
+        "passed": false,
+        "other_bass_properties_match": true
+      }
+    ]
+  },
+  "direct": {
+    "passing_pairs_isolated_within_bass": 0,
+    "cases": [
+      {
+        "case": "tail",
+        "repeat": 1,
+        "passed": false,
+        "other_bass_properties_match": null
+      },
+      {
+        "case": "register",
+        "repeat": 1,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "duration",
+        "repeat": 1,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 1,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "tail",
+        "repeat": 2,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "register",
+        "repeat": 2,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "duration",
+        "repeat": 2,
+        "passed": true,
+        "other_bass_properties_match": false
+      },
+      {
+        "case": "pitch_pattern",
+        "repeat": 2,
+        "passed": true,
+        "other_bass_properties_match": false
+      }
+    ]
+  }
+}

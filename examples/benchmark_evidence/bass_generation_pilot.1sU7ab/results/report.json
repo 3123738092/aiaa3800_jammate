@@ -1,0 +1,4001 @@
+{
+  "model": "gpt-5.4-mini",
+  "tempo_bpm": 100,
+  "bars": 2,
+  "comparison": "Same two-bar state, BandPlan, rhythm anchors, and context per A/B; one text value varies.",
+  "pairs": [
+    {
+      "case": "tail",
+      "repeat": 1,
+      "variants": [
+        "1",
+        "2"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 896,
+                    "output_tokens": 358,
+                    "total_tokens": 1254
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "The bass already follows the requested 0, 1.5, and 3 beat placement in both bars, and no eligible group can be added or shifted to create the extra short transition note after the second bar’s 3rd beat.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 5301.83,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 896,
+                    "output_tokens": 415,
+                    "total_tokens": 1311
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No editable note groups can realize the requested extra short passing notes, since this turn only allows velocity changes and no new onsets can be added. The existing bass pattern already keeps the first bar clear of added notes, so I leave it unchanged.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 4602.27,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": false,
+            "error": "LLM bass generation failed: bar 1: pitch violates key/chord",
+            "state_committed": false,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "none",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 875,
+                    "output_tokens": 849,
+                    "total_tokens": 1724
+                  },
+                  "status": "rejected",
+                  "failure": "bar 1: pitch violates key/chord"
+                }
+              ],
+              "status": "failed",
+              "failure": "bar 1: pitch violates key/chord",
+              "elapsed_ms": 7000.9
+            }
+          },
+          "B": {
+            "pass": false,
+            "error": "LLM bass generation failed: bar 0: pitch violates key/chord",
+            "state_committed": false,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "none",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 875,
+                    "output_tokens": 701,
+                    "total_tokens": 1576
+                  },
+                  "status": "rejected",
+                  "failure": "bar 0: pitch violates key/chord"
+                }
+              ],
+              "status": "failed",
+              "failure": "bar 0: pitch violates key/chord",
+              "elapsed_ms": 5837.81
+            }
+          },
+          "pair_pass": false
+        }
+      }
+    },
+    {
+      "case": "register",
+      "repeat": 1,
+      "variants": [
+        "36–47",
+        "48–59"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 469,
+                    "total_tokens": 1351
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No safe edit is available with the allowed controls: the bass hits already land on the requested 0, 1.5, and 3 beat positions in both bars, but one existing note is outside the requested MIDI 36–47 range and pitch cannot be edited here. To avoid unintended groove changes, I left the pattern unchanged.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 6155.37,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 207,
+                    "total_tokens": 1089
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No safe edit is justified: the bass groups are locked to velocity-only changes, so I can’t move the line to the requested MIDI 48–59 range or alter the pattern without violating the preserve constraints. I’m leaving the groove and fixed motif intact.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3292.28,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                84
+              ],
+              [
+                720,
+                1440,
+                40,
+                78
+              ],
+              [
+                1440,
+                1920,
+                43,
+                82
+              ],
+              [
+                1920,
+                2640,
+                43,
+                84
+              ],
+              [
+                2640,
+                3360,
+                47,
+                79
+              ],
+              [
+                3360,
+                3840,
+                38,
+                83
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 465,
+                    "total_tokens": 1326
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Two-bar monophonic bass line that hits every required anchor at steps 0, 6, and 12 in each bar, stays in the requested MIDI 36–47 register, and uses chord tones on the downbeats. The line moves simply and clearly to support the fixed groove and harmony.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 84
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 40,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 47,
+                  "velocity": 79
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 38,
+                  "velocity": 83
+                }
+              ],
+              "elapsed_ms": 4603.89
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                48,
+                82
+              ],
+              [
+                720,
+                1440,
+                52,
+                78
+              ],
+              [
+                1440,
+                1920,
+                55,
+                80
+              ],
+              [
+                1920,
+                2640,
+                55,
+                82
+              ],
+              [
+                2640,
+                3360,
+                59,
+                78
+              ],
+              [
+                3360,
+                3840,
+                50,
+                80
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 6,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 524,
+                    "total_tokens": 1385
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Kept the bass tightly on the requested downbeat/1.5-beat/3-beat anchors in each bar, staying in the 48–59 register. Strong beats use chord tones: C major in bar 0 and G major in bar 1, with a simple stepwise outline to support the fixed groove and harmony.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 48,
+                  "velocity": 82
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 52,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 55,
+                  "velocity": 80
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 55,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 59,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 50,
+                  "velocity": 80
+                }
+              ],
+              "elapsed_ms": 4809.17
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "duration",
+      "repeat": 1,
+      "variants": [
+        "0.25",
+        "0.50"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 166,
+                    "total_tokens": 1048
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No edit applied: all bass groups are locked to velocity-only changes, so the requested 0.25-beat durations cannot be realized without violating the allowed list. The existing bass onsets already satisfy the bar structure, so I left them unchanged.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3905.89,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 222,
+                    "total_tokens": 1104
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No valid edit is justified: the bass groups are velocity-only editable, but the request asks to change onset placement and shorten each bass note to 0.50 beats, which cannot be applied to the supplied groups. I therefore leave the pattern unchanged.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3458.92,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                120,
+                36,
+                86
+              ],
+              [
+                720,
+                840,
+                40,
+                78
+              ],
+              [
+                1440,
+                1560,
+                43,
+                82
+              ],
+              [
+                1920,
+                2040,
+                43,
+                86
+              ],
+              [
+                2640,
+                2760,
+                47,
+                78
+              ],
+              [
+                3360,
+                3480,
+                50,
+                82
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 403,
+                    "total_tokens": 1264
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Kept the bass tightly locked to the required anchor steps at 0, 6, and 12 in each bar, using chord tones on all downbeats and a simple root-to-third-to-fifth motion. The line stays monophonic, short, and in a supportive low register to preserve the fixed groove and harmony.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 1,
+                  "pitch": 36,
+                  "velocity": 86
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 1,
+                  "pitch": 40,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 1,
+                  "pitch": 43,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 1,
+                  "pitch": 43,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 1,
+                  "pitch": 47,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 1,
+                  "pitch": 50,
+                  "velocity": 82
+                }
+              ],
+              "elapsed_ms": 3812.57
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                240,
+                36,
+                88
+              ],
+              [
+                720,
+                960,
+                40,
+                84
+              ],
+              [
+                1440,
+                1680,
+                43,
+                86
+              ],
+              [
+                1920,
+                2160,
+                43,
+                88
+              ],
+              [
+                2640,
+                2880,
+                47,
+                84
+              ],
+              [
+                3360,
+                3600,
+                50,
+                86
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 535,
+                    "total_tokens": 1396
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "A simple two-bar bass line that locks to the requested onsets at beats 0, 1.5, and 3 in each bar, with each note lasting an eighth note. It stays in a low-to-mid bass register and outlines the harmony clearly: C major tones in bar 0, then G major tones in bar 1, while keeping a smooth rising contour that lightly echoes the lead’s phrasing.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 40,
+                  "velocity": 84
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 2,
+                  "pitch": 43,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 43,
+                  "velocity": 88
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 47,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 2,
+                  "pitch": 50,
+                  "velocity": 86
+                }
+              ],
+              "elapsed_ms": 4976.31
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "pitch_pattern",
+      "repeat": 1,
+      "variants": [
+        "根音、根音、根音",
+        "根音、五度音、根音"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 891,
+                    "output_tokens": 313,
+                    "total_tokens": 1204
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "The bass already enters at beats 0, 1.5, and 3 in both bars, so no note-level edit is needed under the current allowed constraints.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3991.6,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 892,
+                    "output_tokens": 279,
+                    "total_tokens": 1171
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No edit needed: the bass already enters at beats 0, 1.5, and 3 in each bar, and the existing contour follows a root–fifth–root style without disturbing the fixed groove or motif.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3583.44,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                80
+              ],
+              [
+                720,
+                1440,
+                36,
+                78
+              ],
+              [
+                1440,
+                1920,
+                36,
+                82
+              ],
+              [
+                1920,
+                2640,
+                43,
+                80
+              ],
+              [
+                2640,
+                3360,
+                43,
+                78
+              ],
+              [
+                3360,
+                3840,
+                43,
+                82
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 2,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 870,
+                    "output_tokens": 428,
+                    "total_tokens": 1298
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "I kept the bass strictly on the requested anchor starts at 0, 1.5, and 3 beats in each bar, and used the chord root each time: C in bar 0 and G in bar 1. The line stays low, steady, and monophonic to support the groove without adding extra onsets.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 80
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 36,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 80
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 82
+                }
+              ],
+              "elapsed_ms": 4165.14
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                78
+              ],
+              [
+                720,
+                1440,
+                43,
+                74
+              ],
+              [
+                1440,
+                1920,
+                36,
+                76
+              ],
+              [
+                1920,
+                2640,
+                43,
+                78
+              ],
+              [
+                2640,
+                3360,
+                38,
+                74
+              ],
+              [
+                3360,
+                3840,
+                43,
+                76
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 1,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 871,
+                    "output_tokens": 314,
+                    "total_tokens": 1185
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "I followed the requested three-note bass pattern in each bar at steps 0, 6, and 12, using root–fifth–root and staying within the given chord tones and bass register.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 74
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 36,
+                  "velocity": 76
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 38,
+                  "velocity": 74
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 76
+                }
+              ],
+              "elapsed_ms": 3329.95
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "tail",
+      "repeat": 2,
+      "variants": [
+        "1",
+        "2"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 896,
+                    "output_tokens": 319,
+                    "total_tokens": 1215
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No playable edit is justified from the available controls: the bass pattern and all note onsets are fixed in timing, and the request for one extra short passing note after beat 3 in the second bar cannot be realized without shift/add permissions. The existing bass already matches the requested bar placements.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3649.09,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 896,
+                    "output_tokens": 566,
+                    "total_tokens": 1462
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No permissible note edits are available for this bass request: the supplied bass groups can only change velocity, but the request needs added short passing notes and timing changes, which cannot be realized here without altering the existing onset layout. The current bass already covers beats 0, 1.5, and 3 in each bar, so I leave the groove intact.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 5836.8,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [
+              7.5
+            ],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                88
+              ],
+              [
+                720,
+                1440,
+                40,
+                82
+              ],
+              [
+                1440,
+                1920,
+                43,
+                84
+              ],
+              [
+                1920,
+                2640,
+                43,
+                86
+              ],
+              [
+                2640,
+                3360,
+                47,
+                80
+              ],
+              [
+                3360,
+                3600,
+                38,
+                86
+              ],
+              [
+                3600,
+                3840,
+                45,
+                74
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 5,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 875,
+                    "output_tokens": 1027,
+                    "total_tokens": 1902
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Bass stays simple and grounded: bar 0 outlines C major with a steady root–third–fifth motion, and bar 1 outlines G major with the requested short passing tone after beat 3. All anchor points are covered, and the line keeps a clean monophonic groove in the requested register.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 40,
+                  "velocity": 82
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 47,
+                  "velocity": 80
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 2,
+                  "pitch": 38,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 14,
+                  "length_steps": 2,
+                  "pitch": 45,
+                  "velocity": 74
+                }
+              ],
+              "elapsed_ms": 7798.93
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [
+              7.25,
+              7.5
+            ],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                88
+              ],
+              [
+                720,
+                1440,
+                40,
+                84
+              ],
+              [
+                1440,
+                1920,
+                43,
+                86
+              ],
+              [
+                1920,
+                2640,
+                43,
+                88
+              ],
+              [
+                2640,
+                3360,
+                47,
+                84
+              ],
+              [
+                3360,
+                3480,
+                38,
+                86
+              ],
+              [
+                3480,
+                3600,
+                40,
+                78
+              ],
+              [
+                3600,
+                3840,
+                41,
+                76
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 6,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 875,
+                    "output_tokens": 901,
+                    "total_tokens": 1776
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Kept the bass anchored to the requested downbeat, 1.5-beat, and 3-beat placements in both bars, using chord tones on the strong beats. The first bar stays spare as requested, while the second bar adds two short passing tones after beat 3 to create a brief turnaround into the loop.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 40,
+                  "velocity": 84
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 88
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 47,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 1,
+                  "pitch": 38,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 13,
+                  "length_steps": 1,
+                  "pitch": 40,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 14,
+                  "length_steps": 2,
+                  "pitch": 41,
+                  "velocity": 76
+                }
+              ],
+              "elapsed_ms": 9355.73
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "register",
+      "repeat": 2,
+      "variants": [
+        "36–47",
+        "48–59"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "error": "LLM arrangement failed: g4: forbidden edit for this plan",
+            "state_committed": false,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "none",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 609,
+                    "total_tokens": 1491
+                  },
+                  "status": "rejected",
+                  "failure": "g4: forbidden edit for this plan"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "failed",
+              "failure": "g4: forbidden edit for this plan",
+              "elapsed_ms": 6144.85,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 259,
+                    "total_tokens": 1141
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No valid edit is possible: the bass groups are locked to velocity-only changes, so I can’t move them to the requested beats or change them into MIDI 48–59 pitches while preserving the fixed groove and melody.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3941.82,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                240,
+                36,
+                84
+              ],
+              [
+                720,
+                960,
+                40,
+                78
+              ],
+              [
+                1440,
+                1920,
+                43,
+                82
+              ],
+              [
+                1920,
+                2160,
+                43,
+                84
+              ],
+              [
+                2640,
+                2880,
+                47,
+                78
+              ],
+              [
+                3360,
+                3840,
+                38,
+                82
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 527,
+                    "total_tokens": 1388
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Bass follows the requested anchor rhythm at steps 0, 6, and 12 in both bars, stays in the 36–47 MIDI register, and hits chord tones on the downbeats. The line outlines the harmony clearly and keeps a simple, steady feel without extra onsets.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 36,
+                  "velocity": 84
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 40,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 43,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 47,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 38,
+                  "velocity": 82
+                }
+              ],
+              "elapsed_ms": 4817.74
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                48,
+                88
+              ],
+              [
+                720,
+                1440,
+                52,
+                84
+              ],
+              [
+                1440,
+                1920,
+                55,
+                86
+              ],
+              [
+                1920,
+                2640,
+                55,
+                88
+              ],
+              [
+                2640,
+                3360,
+                59,
+                84
+              ],
+              [
+                3360,
+                3840,
+                50,
+                86
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 6,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 482,
+                    "total_tokens": 1343
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "The bass follows the requested 0, 1.5, and 3 beat anchors in each bar, stays in the 48–59 register, and lands on chord tones at integer beats. Bar 0 outlines C major with C–E–G, and bar 1 outlines G major with G–B–D for a clear, steady two-bar foundation.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 48,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 52,
+                  "velocity": 84
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 55,
+                  "velocity": 86
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 55,
+                  "velocity": 88
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 59,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 50,
+                  "velocity": 86
+                }
+              ],
+              "elapsed_ms": 4771.9
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "duration",
+      "repeat": 2,
+      "variants": [
+        "0.25",
+        "0.50"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 321,
+                    "total_tokens": 1203
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No editable bass changes are available under the group constraints: the requested 0.25-beat bass note length cannot be applied because all bass groups are velocity-only. The requested onsets are already present, so no safe edit is justified.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 3989.07,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 882,
+                    "output_tokens": 256,
+                    "total_tokens": 1138
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "No edit applied: the bass groups are locked to velocity-only changes, so I can’t move the onsets to beat 0, 1.5, and 3 or shorten them to 0.50 beats under the current constraints.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 5045.17,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                120,
+                36,
+                88
+              ],
+              [
+                720,
+                840,
+                40,
+                78
+              ],
+              [
+                1440,
+                1560,
+                43,
+                84
+              ],
+              [
+                1920,
+                2040,
+                43,
+                87
+              ],
+              [
+                2640,
+                2760,
+                47,
+                79
+              ],
+              [
+                3360,
+                3480,
+                38,
+                85
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 465,
+                    "total_tokens": 1326
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "Kept the requested 0, 1.5, and 3 beat bass attacks in both bars, with one-sixteenth note lengths for a tight, articulated feel. The line follows the harmony cleanly: C-E-G over bar 0 and G-B-D over bar 1, staying in a low electric-bass register while matching the fixed groove.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 1,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 1,
+                  "pitch": 40,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 1,
+                  "pitch": 43,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 1,
+                  "pitch": 43,
+                  "velocity": 87
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 1,
+                  "pitch": 47,
+                  "velocity": 79
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 1,
+                  "pitch": 38,
+                  "velocity": 85
+                }
+              ],
+              "elapsed_ms": 4229.03
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                240,
+                36,
+                88
+              ],
+              [
+                720,
+                960,
+                40,
+                82
+              ],
+              [
+                1440,
+                1680,
+                43,
+                84
+              ],
+              [
+                1920,
+                2160,
+                43,
+                88
+              ],
+              [
+                2640,
+                2880,
+                47,
+                82
+              ],
+              [
+                3360,
+                3600,
+                50,
+                84
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 4,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 861,
+                    "output_tokens": 484,
+                    "total_tokens": 1345
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "A simple two-bar bass interpretation that hits all required anchors with steady half-beat notes. It outlines the harmony clearly by using chord tones on each downbeat and keeps a smooth, low-register motion across the C major to G major change.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 40,
+                  "velocity": 82
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 2,
+                  "pitch": 43,
+                  "velocity": 84
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 2,
+                  "pitch": 43,
+                  "velocity": 88
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 2,
+                  "pitch": 47,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 2,
+                  "pitch": 50,
+                  "velocity": 84
+                }
+              ],
+              "elapsed_ms": 4688.56
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    },
+    {
+      "case": "pitch_pattern",
+      "repeat": 2,
+      "variants": [
+        "根音、根音、根音",
+        "根音、五度音、根音"
+      ],
+      "results": {
+        "rule": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true
+          },
+          "pair_pass": false
+        },
+        "patch": {
+          "A": {
+            "pass": false,
+            "requested_change": false,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 891,
+                    "output_tokens": 391,
+                    "total_tokens": 1282
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "Bass onsets already land at 0, 1.5, and 3 in each bar, but the group constraints do not allow pitch edits, so the requested root-note reinterpretation cannot be applied without violating the allowed list. No safe arrangement change is justified.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 4496.06,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                360,
+                36,
+                85
+              ],
+              [
+                720,
+                1080,
+                43,
+                69
+              ],
+              [
+                1440,
+                1800,
+                36,
+                78
+              ],
+              [
+                1920,
+                2280,
+                43,
+                85
+              ],
+              [
+                2640,
+                3000,
+                50,
+                69
+              ],
+              [
+                3360,
+                3720,
+                43,
+                78
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 0,
+            "state_committed": true,
+            "arrangement": {
+              "session_id": "bass-pilot",
+              "plan_id": "bass-pilot-plan",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 892,
+                    "output_tokens": 275,
+                    "total_tokens": 1167
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "requested_model": "gpt-5.4-mini",
+              "before_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              },
+              "status": "accepted",
+              "reason": "The bass already lands on 0, 1.5, and 3 in each bar, matching the requested pattern without any note moves or velocity changes.",
+              "edits": [],
+              "changed": false,
+              "elapsed_ms": 5542.67,
+              "after_counts": {
+                "bass": 6,
+                "drums": 12,
+                "keys": 18,
+                "lead": 4
+              }
+            }
+          },
+          "pair_pass": false
+        },
+        "direct": {
+          "A": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                82
+              ],
+              [
+                720,
+                1440,
+                36,
+                78
+              ],
+              [
+                1440,
+                1920,
+                36,
+                80
+              ],
+              [
+                1920,
+                2640,
+                43,
+                82
+              ],
+              [
+                2640,
+                3360,
+                43,
+                78
+              ],
+              [
+                3360,
+                3840,
+                43,
+                80
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 2,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 870,
+                    "output_tokens": 413,
+                    "total_tokens": 1283
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "I kept the bass strictly on the root at the requested three onsets per bar (0, 1.5, and 3 beats), using a simple, steady monophonic pulse that supports the fixed harmony and groove.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 82
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 78
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 36,
+                  "velocity": 80
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 78
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 80
+                }
+              ],
+              "elapsed_ms": 4341.01
+            }
+          },
+          "B": {
+            "pass": true,
+            "requested_change": true,
+            "transport_exact": true,
+            "untouched_voices_exact": true,
+            "anchor_coverage": 6,
+            "anchor_total": 6,
+            "extra_onsets_beats": [],
+            "bass_signature": [
+              [
+                0,
+                720,
+                36,
+                88
+              ],
+              [
+                720,
+                1440,
+                43,
+                82
+              ],
+              [
+                1440,
+                1920,
+                36,
+                90
+              ],
+              [
+                1920,
+                2640,
+                43,
+                88
+              ],
+              [
+                2640,
+                3360,
+                38,
+                82
+              ],
+              [
+                3360,
+                3840,
+                43,
+                90
+              ]
+            ],
+            "new_pitch_at_onset_vs_rule": 1,
+            "state_committed": true,
+            "arrangement": {
+              "plan_id": "bass-pilot-plan",
+              "session_id": "bass-pilot",
+              "based_on_state_version": 1,
+              "source": "llm",
+              "requested_model": "gpt-5.4-mini",
+              "attempts": [
+                {
+                  "number": 1,
+                  "model": "gpt-5.4-mini-2026-03-17",
+                  "usage": {
+                    "input_tokens": 871,
+                    "output_tokens": 467,
+                    "total_tokens": 1338
+                  },
+                  "status": "accepted"
+                }
+              ],
+              "status": "accepted",
+              "reason": "I followed the requested root–fifth–root pattern at steps 0, 6, and 12 in each bar, staying in the given key and using chord tones on the downbeats. The line is simple, monophonic, and sits in a low electric-bass register to support the fixed groove.",
+              "notes": [
+                {
+                  "bar": 0,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 36,
+                  "velocity": 88
+                },
+                {
+                  "bar": 0,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 82
+                },
+                {
+                  "bar": 0,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 36,
+                  "velocity": 90
+                },
+                {
+                  "bar": 1,
+                  "step": 0,
+                  "length_steps": 6,
+                  "pitch": 43,
+                  "velocity": 88
+                },
+                {
+                  "bar": 1,
+                  "step": 6,
+                  "length_steps": 6,
+                  "pitch": 38,
+                  "velocity": 82
+                },
+                {
+                  "bar": 1,
+                  "step": 12,
+                  "length_steps": 4,
+                  "pitch": 43,
+                  "velocity": 90
+                }
+              ],
+              "elapsed_ms": 4317.51
+            }
+          },
+          "pair_pass": true
+        }
+      }
+    }
+  ],
+  "summary": {
+    "rule": {
+      "pairs_total": 8,
+      "pairs_pass": 0,
+      "variants_total": 16,
+      "variants_pass": 2,
+      "rendered": 16,
+      "other_voices_preserved": 16,
+      "calls": 0,
+      "median_arrangement_ms": null
+    },
+    "patch": {
+      "pairs_total": 8,
+      "pairs_pass": 0,
+      "variants_total": 16,
+      "variants_pass": 2,
+      "rendered": 15,
+      "other_voices_preserved": 15,
+      "calls": 16,
+      "median_arrangement_ms": 4243.83
+    },
+    "direct": {
+      "pairs_total": 8,
+      "pairs_pass": 7,
+      "variants_total": 16,
+      "variants_pass": 14,
+      "rendered": 14,
+      "other_voices_preserved": 14,
+      "calls": 16,
+      "median_arrangement_ms": 4730.23
+    }
+  }
+}

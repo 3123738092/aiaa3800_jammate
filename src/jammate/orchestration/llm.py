@@ -15,6 +15,8 @@ from .plans import make_plan
 from .llm_config import LLMConfig, LLMConfigurationError
 from .transitions import project
 from .context import select_state
+from .tempo_intent import explicit_tempo, tempo_hold, validate_tempo_plan
+from .explicit_request import explicit_request, request_hold, validate_request_plan
 
 
 class ProviderFailure(RuntimeError):
@@ -33,9 +35,10 @@ class ModelReply:
 
 def decision_schema(state=None, plan_id=None):
     schema = json.loads(files(__package__).joinpath("llm_decision.schema.json").read_text(encoding="utf-8"))
-    schema["properties"]["preserve"]["items"]["pattern"] = "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead))$"
+    schema["properties"]["preserve"]["items"]["pattern"] = "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar))$"
     if state is not None:
-        allowed = ["tempo", "key", "groove", "playing", "layer:drums", "layer:bass", "layer:keys", "layer:lead"]
+        layer_names = [layer.name for layer in state.layers]
+        allowed = ["tempo", "key", "groove", "playing", *(f"layer:{name}" for name in layer_names)]
         if state.current_motif_id:
             allowed.append(f"motif:{state.current_motif_id}")
         schema["properties"]["preserve"]["items"] = {"type": "string", "enum": allowed}
@@ -43,6 +46,11 @@ def decision_schema(state=None, plan_id=None):
         for branch in schema["properties"]["actions"]["items"]["anyOf"]:
             name = branch["properties"]["action"]["enum"][0]
             params = branch["properties"]["parameters"]["properties"]
+            scopes = branch["properties"]["scope"]["enum"]
+            if name == "INTRODUCE_LAYER" and "guitar" in layer_names:
+                continue
+            if "guitar" in layer_names and name in {"PRESERVE", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "ADD_LAYER", "REMOVE_LAYER"}:
+                scopes.append("guitar")
             if name in {"ECHO_MOTIF", "VARY_MOTIF"}:
                 if not state.motifs:
                     continue
@@ -82,8 +90,9 @@ def build_context(events, state, plan_id, history=(), *, selection=None):
 
 
 class OpenAIProvider:
-    def __init__(self, config: LLMConfig, *, client=None):
+    def __init__(self, config: LLMConfig, *, client=None, schema_name="jammate_decision_v1"):
         self.config = config
+        self.schema_name = schema_name
         if client is None:
             try:
                 from openai import OpenAI
@@ -96,7 +105,7 @@ class OpenAIProvider:
     def complete(self, messages, schema, timeout_s):
         from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-        format_spec = {"type": "json_schema", "name": "jammate_decision_v1", "strict": True, "schema": schema}
+        format_spec = {"type": "json_schema", "name": self.schema_name, "strict": True, "schema": schema}
         try:
             client = self.client.with_options(timeout=timeout_s, max_retries=0)
             if self.config.api == "responses":
@@ -168,9 +177,9 @@ def validate_plan(plan, events, state):
         name, params = action["action"], action["parameters"]
         if name == "ADJUST_FEEL" and not params:
             raise PlanError("ADJUST_FEEL requires level_delta or rhythm_event_id")
-        prop = "level" if name == "BUILD" or "level_delta" in params else "density" if name == "SIMPLIFY" else "active" if name in {"ADD_LAYER", "REMOVE_LAYER"} else None
+        prop = "level" if name == "BUILD" or "level_delta" in params else "density" if name == "SIMPLIFY" else "active" if name in {"INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER"} else None
         if prop:
-            names = ("drums", "bass", "keys", "lead") if action["scope"] == "band" else (action["scope"],)
+            names = tuple(layer.name for layer in target.layers) if action["scope"] == "band" else (action["scope"],)
             for layer in names:
                 if (layer, prop) in writes:
                     raise PlanError("consolidate repeated writes to the same layer property")
@@ -179,7 +188,9 @@ def validate_plan(plan, events, state):
 
 
 class LLMAgent:
-    def __init__(self, config: LLMConfig, *, provider=None, max_attempts=2, fallback="hold", max_context_chars=100000, execution_validator=None):
+    def __init__(self, config: LLMConfig, *, provider=None, max_attempts=2, fallback="hold",
+                 max_context_chars=100000, execution_validator=None, arrangement_enabled=False,
+                 direct_bass_enabled=False):
         if max_attempts not in (1, 2) or fallback not in {"hold", "rule", "error"}:
             raise ValueError("use one or two attempts and fallback hold/rule/error")
         self.config, self.provider = config, provider or OpenAIProvider(config)
@@ -188,6 +199,8 @@ class LLMAgent:
             from .offline import prepare_plan
             execution_validator = prepare_plan
         self.execution_validator = execution_validator
+        self.arrangement_enabled = arrangement_enabled
+        self.direct_bass_enabled = direct_bass_enabled
         self.last_trace = {}
 
     def _compile(self, content, events, state, plan_id, *, schema=None):
@@ -214,6 +227,10 @@ class LLMAgent:
         for action in actions:
             if action["action"] == "INTRODUCE_MOTIF" and action["parameters"]["motif_id"] != f"motif_{plan_id}":
                 raise PlanError("INTRODUCE_MOTIF must use context.new_motif_id")
+        if request := explicit_request(events, state=state):
+            validate_request_plan(request, state, plan)
+        elif intent := explicit_tempo(events):
+            validate_tempo_plan(intent, state, plan)
         validate_plan(plan, events, state)
         self.execution_validator(state, plan)
         return plan
@@ -233,11 +250,46 @@ class LLMAgent:
             self.last_trace.update(source="system_control", elapsed_ms=0.)
             return make_plan(state, events, plan_id, "LISTEN", [], ["tempo", "key"], {"playing": False}, 1,
                                    "Runtime requested stop", [])
+        request = explicit_request(events, state=state)
+        tempo_intent = None if request else explicit_tempo(events)
+        grounded = request or tempo_intent
+        if grounded and (reason := grounded.refusal(state)):
+            self.last_trace.update(source="request_gate", elapsed_ms=round((time.monotonic() - started) * 1000, 2),
+                                   status="held", reason=reason)
+            hold = request_hold if request else tempo_hold
+            return hold(events, state, plan_id, reason)
         view, selection = select_state(events, state)
         schema = decision_schema(view, plan_id)
         context_data = build_context(events, view, plan_id, history, selection=selection)
         context = json.dumps(context_data, ensure_ascii=False, allow_nan=False)
-        messages = [{"role": "system", "content": files(__package__).joinpath("llm_prompt.md").read_text(encoding="utf-8")},
+        prompt = files(__package__).joinpath("llm_prompt.md").read_text(encoding="utf-8")
+        if request:
+            prompt += "\n\n" + request.guide(state)
+        if self.direct_bass_enabled:
+            prompt += (
+                "\n\nThe user selected direct bass arrangement. A separate model can write a complete bass part "
+                "for a 1–4 bar clip, while the renderer keeps all other parts from the plan. "
+                "For an explicit request to write or reshape the bass line, use FOLLOW or RESPOND with one "
+                "ADJUST_FEEL action scoped to bass, level_delta=0, and no other actions affecting the bass or band. "
+                "Preserve unrequested layers, tempo, key, and groove. Keep the number of bars within 1–4 when "
+                "compatible with the request. Do not mark the bass as preserved when authorizing a new bass line. "
+                "For an unqualified whole-band opening with INTRODUCE_MOTIF, leave bass available unless "
+                "the user asks to preserve it. "
+                "The original user request reaches the bass model; explain the delegation, not specific edits. "
+                "Keep stop, mute, preserve and ordinary band commands as their usual actions."
+            )
+        elif self.arrangement_enabled:
+            prompt += (
+                "\n\nThis session also has an optional note arranger, with access to the current event and final plan. "
+                "For explicit local timing, articulation, accent placement or hit-removal requests, use scoped "
+                "ADJUST_FEEL on drums, bass or keys and set level_delta to 0 if the overall level should stay the same. "
+                "That grants permission to edit the existing onset groups without changing the state-level setting. "
+                "For a local edit combined with an overall level change, use the actual signed level_delta in that same action. "
+                "Keep tempo, key, motif and unrequested layers preserved. Keep groove when compatible with the request. "
+                "Never choose timing or hit-removal edits against a user rhythm anchor, never change lead or invent notes. "
+                "Describe the requested local edit as delegated; only the arranger result establishes what changed."
+            )
+        messages = [{"role": "system", "content": prompt},
                     {"role": "user", "content": context}]
         request_size = lambda: len(json.dumps({"messages": messages, "schema": schema}, ensure_ascii=False, allow_nan=False))
         # Drop whole old turns, never slice the current user input or melody.
@@ -285,6 +337,10 @@ class LLMAgent:
             from .agent import RuleAgent
             try:
                 plan = RuleAgent().decide(events, state, plan_id=plan_id)
+                if request:
+                    validate_request_plan(request, state, plan)
+                elif tempo_intent:
+                    validate_tempo_plan(tempo_intent, state, plan)
                 validate_plan(plan, events, state)
                 self.execution_validator(state, plan)
                 self.last_trace["fallback"] = "rule"

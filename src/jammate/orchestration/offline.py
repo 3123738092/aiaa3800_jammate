@@ -61,6 +61,11 @@ def _layers(notes, state, *, bar=0):
     return tuple(sorted(output, key=lambda n: (n.start, n.instrument, n.pitch)))
 
 
+def prepare_bar(state: JamState, bar: int, lead: tuple[Note, ...] = ()) -> tuple[Note, ...]:
+    """Arrange one bar and apply the shared layer settings."""
+    return _layers(arrange_bar(state, bar, lead), state, bar=bar)
+
+
 def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerformance:
     """Compile/validate actual notes without synthesizing audio or changing state."""
     target, data = project(state, plan), plan.to_dict()
@@ -94,16 +99,17 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
             build = next((a for a in data["actions"] if a["action"] == "BUILD" and a["scope"] in {"band", layer.name}), None)
             if build:
                 fraction = min(1., (offset + 1) / build["parameters"].get("duration_bars", bars))
-                level = state.layer(layer.name).level + (layer.level - state.layer(layer.name).level) * fraction
+                previous = next((item.level for item in state.layers if item.name == layer.name), .5)
+                level = previous + (layer.level - previous) * fraction
                 layer = replace(layer, level=level)
             layers.append(layer)
         bar_state = target.with_updates(layers=tuple(layers))
-        notes = _layers(arrange_bar(bar_state, bar, lead_bars.get(bar, ())), bar_state, bar=bar)
+        notes = prepare_bar(bar_state, bar, lead_bars.get(bar, ()))
         # A preserved layer must also keep actual notes/velocities, not just metadata.
         # Explicit start/stop governs audibility globally. Compare preserved
         # arrangements under that same transport control, including a restart.
         reference = state.with_updates(playing=target.playing)
-        baseline = _layers(arrange_bar(reference, bar), reference, bar=bar) if reference.playing and reference.key is not None else ()
+        baseline = prepare_bar(reference, bar) if reference.playing and reference.key is not None else ()
         for preserved in data["preserve"]:
             if preserved.startswith("layer:"):
                 instrument = preserved[6:]
@@ -121,7 +127,10 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
 
 
 def render_plan(state: JamState, plan: BandPlan, *, seed=3800, sample_rate=22050) -> RenderedPlan:
-    performance = prepare_plan(state, plan, seed=seed)
+    return _render_performance(prepare_plan(state, plan, seed=seed), sample_rate)
+
+
+def _render_performance(performance, sample_rate):
     local = tuple(n.shifted(-performance.start_bar * 4) for n in performance.notes)
     audio = render(local, performance.tempo_bpm, sample_rate,
                    total_s=performance.bars * 4 * 60 / performance.tempo_bpm + TAIL_S)
@@ -130,19 +139,27 @@ def render_plan(state: JamState, plan: BandPlan, *, seed=3800, sample_rate=22050
 
 
 class OfflineRuntime:
-    def __init__(self, *, seed=3800, sample_rate=22050):
+    def __init__(self, *, seed=3800, sample_rate=22050, arranger=None):
         self.seed, self.sample_rate = seed, sample_rate
+        self.arranger = arranger
 
     def validate(self, state, plan):
         return prepare_plan(state, plan, seed=self.seed)
 
     def execute(self, manager: StateManager, plan: BandPlan) -> RenderedPlan:
-        state = manager.check_pending(plan)
+        state, events = manager.execution_snapshot(plan)
         data = plan.to_dict()
         bounds = {"effective_bar": data["effective_at"]["bar"],
                   "completed_bar": data["effective_at"]["bar"] + data["valid_for_bars"]}
         try:
-            result = render_plan(state, plan, seed=self.seed, sample_rate=self.sample_rate)
+            # Validation/preflight must never spend an extra model request.
+            if self.arranger is None:
+                result = render_plan(state, plan, seed=self.seed, sample_rate=self.sample_rate)
+            else:
+                performance = self.validate(state, plan)
+                performance = self.arranger.arrange(state, plan, performance, events)
+                manager.check_pending(plan)
+                result = _render_performance(performance, self.sample_rate)
         except Exception as exc:
             if manager.plan_status(plan.plan_id) == "pending":
                 manager.acknowledge(plan, succeeded=False, reason=str(exc), **bounds)

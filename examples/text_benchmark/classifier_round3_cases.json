@@ -1,0 +1,21 @@
+[
+  {"id":"archived_mixed_mute","text":"速度设到 96 BPM，同时让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":96,"layer_changes":{"drums":false},"bars":4},
+  {"id":"keep_tempo_mute","text":"保持速度，让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":102,"layer_changes":{"drums":false},"bars":4},
+  {"id":"explicit_groove_conflict","text":"让鼓停下来，保留原有鼓点。","bpm":102,"jev":"held","llm":"held"},
+  {"id":"mute_already_muted","text":"让鼓停下来。","bpm":97,"inactive":["drums"],"jev":"applied","llm":"applied","target":97,"layer_changes":{"drums":false},"bars":4},
+  {"id":"resume_already_muted","text":"让鼓恢复演奏。","bpm":97,"inactive":["drums"],"jev":"applied","llm":"applied","target":97,"layer_changes":{"drums":true},"bars":4},
+  {"id":"mute_two_layers","text":"让鼓和贝斯停下来。","bpm":102,"jev":"applied","llm":"applied","target":102,"layer_changes":{"drums":false,"bass":false},"bars":4},
+  {"id":"tempo_and_two_layers","text":"速度设到 96 BPM，让鼓和贝斯停下来。","bpm":102,"jev":"applied","llm":"applied","target":96,"layer_changes":{"drums":false,"bass":false},"bars":4},
+  {"id":"english_tempo_mute","text":"Set the tempo to 99 BPM, mute drums.","bpm":102,"jev":"applied","llm":"applied","target":99,"layer_changes":{"drums":false},"bars":4},
+  {"id":"one_bar","text":"生成一小节，速度设到 96 BPM，让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":96,"layer_changes":{"drums":false},"bars":1},
+  {"id":"two_bars","text":"生成两小节，速度设到 96 BPM，让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":96,"layer_changes":{"drums":false},"bars":2},
+  {"id":"eight_bars","text":"生成八小节，速度设到 96 BPM，让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":96,"layer_changes":{"drums":false},"bars":8},
+  {"id":"maximum_bars","text":"生成16小节，保持速度，让鼓停下来。","bpm":102,"jev":"applied","llm":"applied","target":102,"layer_changes":{"drums":false},"bars":16},
+  {"id":"too_many_bars","text":"生成17小节，保持速度，让鼓停下来。","bpm":102,"jev":"held","llm":"held"},
+  {"id":"resume_existing_guitar","text":"让吉他恢复演奏。","bpm":102,"guitar":true,"inactive":["guitar"],"jev":"applied","llm":"applied","target":102,"layer_changes":{"guitar":true},"bars":4},
+  {"id":"relative_with_bass_mute","text":"再慢 4 BPM，让贝斯停下来。","bpm":110,"jev":"applied","llm":"applied","target":106,"layer_changes":{"bass":false},"bars":4},
+  {"id":"ambiguous_reference","text":"把刚才那个声部停掉。","bpm":102,"jev":"abstain","llm":"held"},
+  {"id":"unsupported_instrument","text":"只添加小号声部。","bpm":102,"jev":"abstain","llm":"held"},
+  {"id":"partial_unsupported_key","text":"速度设到 96 BPM，另外换成 C 小调。","bpm":102,"jev":"abstain","llm":"applied","target":96,"bars":4,"unresolved":true},
+  {"id":"omitted_jev_clause","text":"速度设到 96 BPM，同时让鼓停下来。","bpm":102,"inject_jev":{"tempo":["set",96]},"jev":"abstain"}
+]

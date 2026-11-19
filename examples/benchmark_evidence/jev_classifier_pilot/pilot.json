@@ -1,0 +1,2857 @@
+{
+  "summary": {
+    "cases": 42,
+    "api_responses": 42,
+    "models": [
+      "jev-1.14.0"
+    ],
+    "exact": 33,
+    "per_question": {
+      "route": {
+        "correct": 36,
+        "total": 42
+      },
+      "tempo": {
+        "correct": 39,
+        "total": 40
+      },
+      "scope": {
+        "correct": 35,
+        "total": 38
+      }
+    },
+    "route_confidence_gates": {
+      "0.0": {
+        "accepted": 21,
+        "matched_every_scored_field": 19,
+        "false_fast_routes": 1
+      },
+      "0.8": {
+        "accepted": 15,
+        "matched_every_scored_field": 13,
+        "false_fast_routes": 1
+      },
+      "0.9": {
+        "accepted": 13,
+        "matched_every_scored_field": 11,
+        "false_fast_routes": 1
+      },
+      "0.95": {
+        "accepted": 12,
+        "matched_every_scored_field": 10,
+        "false_fast_routes": 1
+      }
+    },
+    "p50_ms": 846.3,
+    "p95_ms": 982.8
+  },
+  "rows": [
+    {
+      "case": {
+        "id": "set",
+        "group": "tempo",
+        "text": "把速度调到 92 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_1",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1031,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 1.0,
+          "probabilities": {
+            "fast": 1.0,
+            "agent": 0.0,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.98,
+          "probabilities": {
+            "none": 0.98,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 977.3
+    },
+    {
+      "case": {
+        "id": "up",
+        "group": "tempo",
+        "text": "从当前速度再加 4 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "up_1",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1043,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.99,
+          "probabilities": {
+            "fast": 0.99,
+            "agent": 0.01,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "up_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 1.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "up_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 983.1
+    },
+    {
+      "case": {
+        "id": "down",
+        "group": "tempo",
+        "text": "从当前速度再减 4 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "down_1",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1043,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.99,
+          "probabilities": {
+            "fast": 0.99,
+            "agent": 0.01,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "down_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 1.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.97,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.02,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "down_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 1004.4
+    },
+    {
+      "case": {
+        "id": "delta_second_state",
+        "group": "tempo",
+        "text": "从当前速度再减 4 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "down_1",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 110
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1029,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.99,
+          "probabilities": {
+            "fast": 0.99,
+            "agent": 0.01,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "down_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 1.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.98,
+          "probabilities": {
+            "none": 0.98,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "down_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 990.9
+    },
+    {
+      "case": {
+        "id": "correction",
+        "group": "tempo",
+        "text": "速度调到 100，不对，改成 92 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_2",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1130,
+        "output_tokens": 219
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 1.0,
+          "probabilities": {
+            "fast": 1.0,
+            "agent": 0.0,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_2",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 1.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_2",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 852.5
+    },
+    {
+      "case": {
+        "id": "correction_en",
+        "group": "tempo",
+        "text": "Set it to 105 BPM. Actually make that 96 BPM, and keep the keys.",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_2",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1133,
+        "output_tokens": 219
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.6,
+          "probabilities": {
+            "fast": 0.7,
+            "agent": 0.08,
+            "clarify": 0.01,
+            "unsupported": 0.21
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_2",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 1.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_2",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 895.3
+    },
+    {
+      "case": {
+        "id": "unit_mix",
+        "group": "tempo",
+        "text": "只出 2 小节，速度设到 110 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_2",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1127,
+        "output_tokens": 219
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.93,
+          "probabilities": {
+            "fast": 0.95,
+            "agent": 0.05,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_2",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 1.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_2",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 873.1
+    },
+    {
+      "case": {
+        "id": "bar_only",
+        "group": "tempo",
+        "text": "保持速度，只出 2 小节。",
+        "expected": {
+          "route": "fast",
+          "tempo": "keep",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1032,
+        "output_tokens": 190
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.63,
+          "probabilities": {
+            "fast": 0.72,
+            "agent": 0.26,
+            "clarify": 0.01,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "keep",
+          "confidence": 0.96,
+          "probabilities": {
+            "none": 0.03,
+            "keep": 0.97,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "keep",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 896.6
+    },
+    {
+      "case": {
+        "id": "lower_limit",
+        "group": "tempo",
+        "text": "设到 60 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_1",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1028,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 1.0,
+          "probabilities": {
+            "fast": 1.0,
+            "agent": 0.0,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 820.8
+    },
+    {
+      "case": {
+        "id": "upper_limit",
+        "group": "tempo",
+        "text": "设到 180 BPM。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_1",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1032,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 1.0,
+          "probabilities": {
+            "fast": 1.0,
+            "agent": 0.0,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 835.7
+    },
+    {
+      "case": {
+        "id": "outside",
+        "group": "tempo",
+        "text": "设到 203 BPM。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "set_1",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1032,
+        "output_tokens": 193
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "clarify",
+          "confidence": 1.0,
+          "probabilities": {
+            "fast": 0.0,
+            "agent": 0.0,
+            "clarify": 1.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "clarify",
+        "tempo": "set_1",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 831.1
+    },
+    {
+      "case": {
+        "id": "outside_relative",
+        "group": "tempo",
+        "text": "再快 10 BPM。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "up_1",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 176
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1028,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.96,
+          "probabilities": {
+            "fast": 0.97,
+            "agent": 0.01,
+            "clarify": 0.02,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "up_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 1.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.97,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.02
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "up_1",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 825.5
+    },
+    {
+      "case": {
+        "id": "preserve",
+        "group": "tempo",
+        "text": "别调到 92 BPM，速度保持现在的。",
+        "expected": {
+          "route": "fast",
+          "tempo": "keep",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1037,
+        "output_tokens": 190
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.68,
+          "probabilities": {
+            "fast": 0.76,
+            "agent": 0.18,
+            "clarify": 0.03,
+            "unsupported": 0.03
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "keep",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 1.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "keep",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 822.5
+    },
+    {
+      "case": {
+        "id": "contradiction",
+        "group": "tempo",
+        "text": "提到 110 BPM，BPM 同时必须保持原来的 100。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "unclear",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 100
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1140,
+        "output_tokens": 219
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "clarify",
+          "confidence": 0.89,
+          "probabilities": {
+            "fast": 0.04,
+            "agent": 0.04,
+            "clarify": 0.92,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.27,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.28,
+            "restore": 0.0,
+            "unclear": 0.34,
+            "set_1": 0.09,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 0.29,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.95,
+          "probabilities": {
+            "none": 0.96,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.04
+          }
+        }
+      },
+      "selected": {
+        "route": "clarify",
+        "tempo": "unclear",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 842.8
+    },
+    {
+      "case": {
+        "id": "go_back",
+        "group": "history",
+        "text": "速度改回第 1 轮开始前。",
+        "expected": {
+          "route": "fast",
+          "tempo": "restore",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        },
+        "history": [
+          {
+            "turn": 1,
+            "status": "applied",
+            "tempo_before": 100,
+            "tempo_after": 92
+          }
+        ]
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1079,
+        "output_tokens": 190
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.97,
+          "probabilities": {
+            "fast": 0.98,
+            "agent": 0.02,
+            "clarify": 0.0,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "restore",
+          "confidence": 0.96,
+          "probabilities": {
+            "none": 0.01,
+            "keep": 0.0,
+            "restore": 0.97,
+            "unclear": 0.02,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.97,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.02
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "restore",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 840.8
+    },
+    {
+      "case": {
+        "id": "history_missing",
+        "group": "history",
+        "text": "速度改回第 1 轮开始前。",
+        "expected": {
+          "route": "agent",
+          "tempo": "unclear",
+          "scope": "none"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1045,
+        "output_tokens": 190
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.77,
+          "probabilities": {
+            "fast": 0.05,
+            "agent": 0.83,
+            "clarify": 0.11,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "restore",
+          "confidence": 0.49,
+          "probabilities": {
+            "none": 0.03,
+            "keep": 0.01,
+            "restore": 0.56,
+            "unclear": 0.39,
+            "set_1": 0.01,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.95,
+          "probabilities": {
+            "none": 0.96,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.02,
+            "unclear": 0.02
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "restore",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 827.9
+    },
+    {
+      "case": {
+        "id": "restore_ambiguous",
+        "group": "history",
+        "text": "把之前那个比较松的感觉找回来，鼓别动。",
+        "expected": {
+          "route": "agent"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        },
+        "history": [
+          {
+            "turn": 1,
+            "status": "applied",
+            "tempo_before": 100,
+            "tempo_after": 92
+          }
+        ]
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1001,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.8,
+          "probabilities": {
+            "fast": 0.06,
+            "agent": 0.85,
+            "clarify": 0.01,
+            "unsupported": 0.08
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.69,
+          "probabilities": {
+            "none": 0.77,
+            "keep": 0.06,
+            "restore": 0.07,
+            "unclear": 0.1
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.63,
+          "probabilities": {
+            "none": 0.68,
+            "drums": 0.0,
+            "bass": 0.06,
+            "keys": 0.0,
+            "lead": 0.01,
+            "guitar": 0.01,
+            "multiple": 0.1,
+            "unclear": 0.14
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 812.2
+    },
+    {
+      "case": {
+        "id": "ambiguous",
+        "group": "history",
+        "text": "把刚才那个关掉。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "none",
+          "scope": "unclear"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "drums_active": true,
+          "bass_active": true
+        },
+        "history": [
+          {
+            "turn": 1,
+            "status": "applied",
+            "mentioned_layers": [
+              "drums",
+              "bass"
+            ]
+          }
+        ]
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 989,
+        "output_tokens": 165
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "clarify",
+          "confidence": 0.59,
+          "probabilities": {
+            "fast": 0.08,
+            "agent": 0.23,
+            "clarify": 0.69,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.58,
+          "probabilities": {
+            "none": 0.05,
+            "drums": 0.01,
+            "bass": 0.01,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.3,
+            "unclear": 0.63
+          }
+        }
+      },
+      "selected": {
+        "route": "clarify",
+        "tempo": "none",
+        "scope": "unclear"
+      },
+      "matched": true,
+      "elapsed_ms": 843.2
+    },
+    {
+      "case": {
+        "id": "mute",
+        "group": "layers",
+        "text": "停一下鼓，其他声部照旧继续。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 948,
+        "output_tokens": 164
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.64,
+          "probabilities": {
+            "fast": 0.73,
+            "agent": 0.2,
+            "clarify": 0.03,
+            "unsupported": 0.04
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.93,
+          "probabilities": {
+            "none": 0.95,
+            "keep": 0.05,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 1.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "drums"
+      },
+      "matched": true,
+      "elapsed_ms": 837.4
+    },
+    {
+      "case": {
+        "id": "unmute",
+        "group": "layers",
+        "text": "把贝斯恢复演奏，其他照旧。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "bass"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "bass_active": false
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 953,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.96,
+          "probabilities": {
+            "fast": 0.97,
+            "agent": 0.02,
+            "clarify": 0.0,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.37,
+          "probabilities": {
+            "none": 0.53,
+            "keep": 0.47,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "bass",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 1.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "bass"
+      },
+      "matched": true,
+      "elapsed_ms": 825.1
+    },
+    {
+      "case": {
+        "id": "guitar",
+        "group": "layers",
+        "text": "加木吉他，鼓和贝斯照原样。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "guitar"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 947,
+        "output_tokens": 165
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.28,
+          "probabilities": {
+            "fast": 0.21,
+            "agent": 0.46,
+            "clarify": 0.0,
+            "unsupported": 0.33
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.93,
+          "probabilities": {
+            "none": 0.95,
+            "keep": 0.05,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "guitar",
+          "confidence": 0.6,
+          "probabilities": {
+            "none": 0.01,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.65,
+            "multiple": 0.33,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "guitar"
+      },
+      "matched": false,
+      "elapsed_ms": 825.0
+    },
+    {
+      "case": {
+        "id": "guitar_en",
+        "group": "layers",
+        "text": "Mute the acoustic guitar, leave keys just as they are.",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "guitar"
+        },
+        "state": {
+          "tempo_bpm": 100,
+          "guitar_active": true
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 955,
+        "output_tokens": 165
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.95,
+          "probabilities": {
+            "fast": 0.96,
+            "agent": 0.03,
+            "clarify": 0.0,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "guitar",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 1.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "guitar"
+      },
+      "matched": true,
+      "elapsed_ms": 837.0
+    },
+    {
+      "case": {
+        "id": "level",
+        "group": "layers",
+        "text": "鼓整体力度加 0.1，保持原有打点。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1042,
+        "output_tokens": 191
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "unsupported",
+          "confidence": 0.28,
+          "probabilities": {
+            "fast": 0.12,
+            "agent": 0.41,
+            "clarify": 0.01,
+            "unsupported": 0.46
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 1.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "unsupported",
+        "tempo": "none",
+        "scope": "drums"
+      },
+      "matched": false,
+      "elapsed_ms": 835.2
+    },
+    {
+      "case": {
+        "id": "density",
+        "group": "layers",
+        "text": "只让鼓更稀疏些，力度别动。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 949,
+        "output_tokens": 164
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.81,
+          "probabilities": {
+            "fast": 0.86,
+            "agent": 0.11,
+            "clarify": 0.01,
+            "unsupported": 0.02
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "keep": 0.01,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 1.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "drums"
+      },
+      "matched": true,
+      "elapsed_ms": 835.6
+    },
+    {
+      "case": {
+        "id": "mixed_language",
+        "group": "layers",
+        "text": "bass 稍微 louder，drums keep as is。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "bass"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 947,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.4,
+          "probabilities": {
+            "fast": 0.55,
+            "agent": 0.26,
+            "clarify": 0.02,
+            "unsupported": 0.17
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "bass",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 1.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "bass"
+      },
+      "matched": true,
+      "elapsed_ms": 835.1
+    },
+    {
+      "case": {
+        "id": "negated",
+        "group": "layers",
+        "text": "不要关贝斯，维持现在的编制。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 948,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.25,
+          "probabilities": {
+            "fast": 0.44,
+            "agent": 0.36,
+            "clarify": 0.01,
+            "unsupported": 0.19
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.95,
+          "probabilities": {
+            "none": 0.96,
+            "keep": 0.04,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.74,
+          "probabilities": {
+            "none": 0.77,
+            "drums": 0.0,
+            "bass": 0.21,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 829.7
+    },
+    {
+      "case": {
+        "id": "multi",
+        "group": "layers",
+        "text": "速度设成 96 BPM，同时把鼓和键盘静音。",
+        "expected": {
+          "route": "fast",
+          "tempo": "set_1",
+          "scope": "multiple"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1040,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.88,
+          "probabilities": {
+            "fast": 0.91,
+            "agent": 0.07,
+            "clarify": 0.01,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "multiple",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.01,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "set_1",
+        "scope": "multiple"
+      },
+      "matched": true,
+      "elapsed_ms": 843.9
+    },
+    {
+      "case": {
+        "id": "multi_conflict",
+        "group": "layers",
+        "text": "把鼓静音，但同一段又必须让鼓继续演奏。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "none",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 953,
+        "output_tokens": 165
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "clarify",
+          "confidence": 0.83,
+          "probabilities": {
+            "fast": 0.04,
+            "agent": 0.08,
+            "clarify": 0.87,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.01,
+            "drums": 0.97,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "clarify",
+        "tempo": "none",
+        "scope": "drums"
+      },
+      "matched": true,
+      "elapsed_ms": 821.4
+    },
+    {
+      "case": {
+        "id": "transport_stop",
+        "group": "layers",
+        "text": "全队停止播放。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 941,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "fast",
+          "confidence": 0.96,
+          "probabilities": {
+            "fast": 0.97,
+            "agent": 0.02,
+            "clarify": 0.0,
+            "unsupported": 0.01
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.01
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "multiple",
+          "confidence": 0.94,
+          "probabilities": {
+            "none": 0.04,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.95,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "fast",
+        "tempo": "none",
+        "scope": "multiple"
+      },
+      "matched": false,
+      "elapsed_ms": 871.0
+    },
+    {
+      "case": {
+        "id": "continue",
+        "group": "layers",
+        "text": "这段很好，就这样接着演，什么都不用改。",
+        "expected": {
+          "route": "fast",
+          "tempo": "none",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 953,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.71,
+          "probabilities": {
+            "fast": 0.14,
+            "agent": 0.78,
+            "clarify": 0.02,
+            "unsupported": 0.06
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.63,
+          "probabilities": {
+            "none": 0.72,
+            "keep": 0.28,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 873.8
+    },
+    {
+      "case": {
+        "id": "note_velocity",
+        "group": "special",
+        "text": "把第 1.5 拍的踩镲力度加 8 个 MIDI 单位，速度保持。",
+        "expected": {
+          "route": "agent",
+          "tempo": "keep",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1139,
+        "output_tokens": 218
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.55,
+          "probabilities": {
+            "fast": 0.0,
+            "agent": 0.66,
+            "clarify": 0.01,
+            "unsupported": 0.33
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "keep",
+          "confidence": 0.98,
+          "probabilities": {
+            "none": 0.02,
+            "keep": 0.98,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 0.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 0.95,
+          "probabilities": {
+            "none": 0.03,
+            "drums": 0.96,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.01
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "keep",
+        "scope": "drums"
+      },
+      "matched": true,
+      "elapsed_ms": 897.6
+    },
+    {
+      "case": {
+        "id": "note_time",
+        "group": "special",
+        "text": "鼓的第 2 拍往后挪 0.125 拍。",
+        "expected": {
+          "route": "agent",
+          "tempo": "none",
+          "scope": "drums"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1136,
+        "output_tokens": 218
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.76,
+          "probabilities": {
+            "fast": 0.01,
+            "agent": 0.82,
+            "clarify": 0.01,
+            "unsupported": 0.16
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 0.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "drums",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.03,
+            "drums": 0.97,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "drums"
+      },
+      "matched": true,
+      "elapsed_ms": 851.4
+    },
+    {
+      "case": {
+        "id": "bass_tail",
+        "group": "special",
+        "text": "给第二小节的贝斯句尾再加 2 个经过音，其他声部照旧。",
+        "expected": {
+          "route": "agent",
+          "tempo": "none",
+          "scope": "bass"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1045,
+        "output_tokens": 190
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.84,
+          "probabilities": {
+            "fast": 0.0,
+            "agent": 0.88,
+            "clarify": 0.01,
+            "unsupported": 0.11
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "bass",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 1.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "bass"
+      },
+      "matched": true,
+      "elapsed_ms": 933.2
+    },
+    {
+      "case": {
+        "id": "bass_register",
+        "group": "special",
+        "text": "完整重写两小节贝斯，MIDI 音域 48–59。",
+        "expected": {
+          "route": "agent",
+          "tempo": "none",
+          "scope": "bass"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1130,
+        "output_tokens": 217
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.8,
+          "probabilities": {
+            "fast": 0.01,
+            "agent": 0.85,
+            "clarify": 0.01,
+            "unsupported": 0.13
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 0.0,
+            "up_1": 0.0,
+            "down_1": 0.0,
+            "set_2": 0.0,
+            "up_2": 0.0,
+            "down_2": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "bass",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 1.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "bass"
+      },
+      "matched": true,
+      "elapsed_ms": 868.2
+    },
+    {
+      "case": {
+        "id": "echo",
+        "group": "special",
+        "text": "原样复奏我刚哼的旋律。",
+        "expected": {
+          "route": "agent",
+          "tempo": "none",
+          "scope": "lead"
+        },
+        "state": {
+          "tempo_bpm": 92,
+          "current_motif_id": "motif_h1"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 959,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.91,
+          "probabilities": {
+            "fast": 0.01,
+            "agent": 0.93,
+            "clarify": 0.0,
+            "unsupported": 0.06
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.99,
+          "probabilities": {
+            "none": 0.99,
+            "keep": 0.01,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.55,
+          "probabilities": {
+            "none": 0.61,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.37,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.02
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 868.5
+    },
+    {
+      "case": {
+        "id": "imagery",
+        "group": "special",
+        "text": "像电梯门打开的一瞬间，冷一点，留出空气。",
+        "expected": {
+          "route": "agent"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 954,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.83,
+          "probabilities": {
+            "fast": 0.02,
+            "agent": 0.87,
+            "clarify": 0.01,
+            "unsupported": 0.1
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.96,
+          "probabilities": {
+            "none": 0.97,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.03
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.81,
+          "probabilities": {
+            "none": 0.83,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.01,
+            "lead": 0.01,
+            "guitar": 0.0,
+            "multiple": 0.02,
+            "unclear": 0.13
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 848.8
+    },
+    {
+      "case": {
+        "id": "imagery_constraint",
+        "group": "special",
+        "text": "像快要按捺不住，但别加速，也别让鼓更响。",
+        "expected": {
+          "route": "agent",
+          "tempo": "keep"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 955,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.89,
+          "probabilities": {
+            "fast": 0.02,
+            "agent": 0.92,
+            "clarify": 0.02,
+            "unsupported": 0.04
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "keep",
+          "confidence": 0.97,
+          "probabilities": {
+            "none": 0.01,
+            "keep": 0.98,
+            "restore": 0.0,
+            "unclear": 0.01
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.79,
+          "probabilities": {
+            "none": 0.82,
+            "drums": 0.04,
+            "bass": 0.01,
+            "keys": 0.0,
+            "lead": 0.02,
+            "guitar": 0.0,
+            "multiple": 0.02,
+            "unclear": 0.09
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "keep",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 907.9
+    },
+    {
+      "case": {
+        "id": "harmony",
+        "group": "special",
+        "text": "改到 C 小调。",
+        "expected": {
+          "route": "unsupported",
+          "tempo": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 942,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "unsupported",
+          "confidence": 0.99,
+          "probabilities": {
+            "fast": 0.0,
+            "agent": 0.01,
+            "clarify": 0.0,
+            "unsupported": 0.99
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.52,
+          "probabilities": {
+            "none": 0.58,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.03,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.15,
+            "unclear": 0.24
+          }
+        }
+      },
+      "selected": {
+        "route": "unsupported",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": true,
+      "elapsed_ms": 891.2
+    },
+    {
+      "case": {
+        "id": "instrument",
+        "group": "special",
+        "text": "加一条小提琴长音。",
+        "expected": {
+          "route": "unsupported",
+          "tempo": "none",
+          "scope": "unclear"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 943,
+        "output_tokens": 164
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "unsupported",
+          "confidence": 0.47,
+          "probabilities": {
+            "fast": 0.04,
+            "agent": 0.36,
+            "clarify": 0.0,
+            "unsupported": 0.6
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.63,
+          "probabilities": {
+            "none": 0.03,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.28,
+            "guitar": 0.01,
+            "multiple": 0.0,
+            "unclear": 0.68
+          }
+        }
+      },
+      "selected": {
+        "route": "unsupported",
+        "tempo": "none",
+        "scope": "unclear"
+      },
+      "matched": true,
+      "elapsed_ms": 900.8
+    },
+    {
+      "case": {
+        "id": "reverb",
+        "group": "special",
+        "text": "只把贝斯加一点混响。",
+        "expected": {
+          "route": "unsupported",
+          "tempo": "none",
+          "scope": "bass"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 944,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "unsupported",
+          "confidence": 0.99,
+          "probabilities": {
+            "fast": 0.0,
+            "agent": 0.01,
+            "clarify": 0.0,
+            "unsupported": 0.99
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 1.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "bass",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "drums": 0.0,
+            "bass": 1.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "selected": {
+        "route": "unsupported",
+        "tempo": "none",
+        "scope": "bass"
+      },
+      "matched": true,
+      "elapsed_ms": 885.3
+    },
+    {
+      "case": {
+        "id": "partial",
+        "group": "special",
+        "text": "提到 96 BPM，再改成 C 小调。",
+        "expected": {
+          "route": "agent",
+          "tempo": "set_1",
+          "scope": "none"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 1037,
+        "output_tokens": 192
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "unsupported",
+          "confidence": 0.61,
+          "probabilities": {
+            "fast": 0.02,
+            "agent": 0.26,
+            "clarify": 0.01,
+            "unsupported": 0.71
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "set_1",
+          "confidence": 1.0,
+          "probabilities": {
+            "none": 0.0,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.0,
+            "set_1": 1.0,
+            "up_1": 0.0,
+            "down_1": 0.0
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.61,
+          "probabilities": {
+            "none": 0.66,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.03,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.16,
+            "unclear": 0.15
+          }
+        }
+      },
+      "selected": {
+        "route": "unsupported",
+        "tempo": "set_1",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 832.4
+    },
+    {
+      "case": {
+        "id": "unknown_target",
+        "group": "special",
+        "text": "再改一点。",
+        "expected": {
+          "route": "clarify",
+          "tempo": "none",
+          "scope": "unclear"
+        }
+      },
+      "model": "jev-1.14.0",
+      "usage": {
+        "input_tokens": 939,
+        "output_tokens": 163
+      },
+      "answers": {
+        "route": {
+          "type": "choice",
+          "choice": "agent",
+          "confidence": 0.53,
+          "probabilities": {
+            "fast": 0.02,
+            "agent": 0.65,
+            "clarify": 0.33,
+            "unsupported": 0.0
+          }
+        },
+        "tempo": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.45,
+          "probabilities": {
+            "none": 0.59,
+            "keep": 0.0,
+            "restore": 0.0,
+            "unclear": 0.41
+          }
+        },
+        "scope": {
+          "type": "choice",
+          "choice": "none",
+          "confidence": 0.7,
+          "probabilities": {
+            "none": 0.74,
+            "drums": 0.0,
+            "bass": 0.0,
+            "keys": 0.0,
+            "lead": 0.0,
+            "guitar": 0.0,
+            "multiple": 0.0,
+            "unclear": 0.26
+          }
+        }
+      },
+      "selected": {
+        "route": "agent",
+        "tempo": "none",
+        "scope": "none"
+      },
+      "matched": false,
+      "elapsed_ms": 864.2
+    }
+  ]
+}

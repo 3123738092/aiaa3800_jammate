@@ -19,12 +19,13 @@ class MRT2Runtime(KevinRuntime):
     backend_name = "magenta_rt2"
 
     def __init__(self, output, *, prompt="a warm instrumental band", model="mrt2_small",
-                 engine="jax", allow_preview=False, seed=3800, generator=None):
+                 engine="jax", allow_preview=False, seed=3800, generator=None, arranger=None):
         if not isinstance(prompt, str) or not prompt.strip():
             raise ValueError("a nonempty MRT2 style prompt is required")
         if model not in {"mrt2_small", "mrt2_base"} or engine not in {"jax", "mlx"}:
             raise ValueError("unsupported MRT2 model/engine")
-        super().__init__(output, executable=Path("."), soundfont=Path("."), sample_rate=48000, seed=seed)
+        super().__init__(output, executable=Path("."), soundfont=Path("."), sample_rate=48000, seed=seed,
+                         arranger=arranger)
         self.prompt, self.model, self.engine = prompt, model, engine
         self.allow_preview, self.generator = allow_preview, generator or generate
 

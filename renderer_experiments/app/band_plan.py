@@ -18,11 +18,12 @@ import soundfile as sf
 from jammate.contracts import PlanError
 from jammate.orchestration.offline import prepare_plan, RenderedPlan
 from jammate.render.capabilities import capability_report, segment_seconds
+from jammate.render.midi_out import GUITAR_PROGRAM
 from .midi.events import MidiEvent
 from .midi.files import write_midi, write_events, render_with_fluidsynth
 from .presets import get_instrument
 
-CHANNELS = {"drums": 9, "bass": 2, "keys": 1, "lead": 4}
+CHANNELS = {"drums": 9, "bass": 2, "keys": 1, "lead": 4, "guitar": 5}
 
 
 def midi_events(performance):
@@ -88,7 +89,7 @@ class KevinRuntime:
     backend_name = "kevin_midi_fluidsynth"
 
     def __init__(self, output: Path, *, executable: Path, soundfont: Path,
-                 profile="electric", lead_program=73, sample_rate=44100, seed=3800):
+                 profile="electric", lead_program=73, sample_rate=44100, seed=3800, arranger=None):
         self.output = Path(output)
         self.executable, self.soundfont = Path(executable), Path(soundfont)
         self.programs = {k: v for k, v in get_instrument(profile).programs.items() if k in (1, 2)}
@@ -98,6 +99,7 @@ class KevinRuntime:
             raise ValueError("sample_rate must be within 8000-96000")
         self.programs[4] = lead_program
         self.profile, self.sample_rate, self.seed = profile, sample_rate, seed
+        self.arranger = arranger
         self.last_artifacts = None
         self.last_receipt = None
         self._execution_lock = threading.Lock()
@@ -113,6 +115,10 @@ class KevinRuntime:
 
     def validate(self, state, plan):
         performance = prepare_plan(state, plan, seed=self.seed)
+        self._validate_midi(performance)
+        return performance
+
+    def _validate_midi(self, performance):
         # Reject ambiguous same-pitch overlaps on one channel rather than silently
         # shortening one note with another note-off. Polyphonic different pitches work.
         import mido
@@ -128,7 +134,6 @@ class KevinRuntime:
             if tick(note.end) <= tick(note.start):
                 raise PlanError("note duration is shorter than MIDI tick resolution")
             ends[key] = tick(note.end)
-        return performance
 
     def execute(self, manager, plan):
         # One worker per runtime instance. New input can still invalidate the
@@ -137,7 +142,7 @@ class KevinRuntime:
             return self._execute(manager, plan)
 
     def _execute(self, manager, plan):
-        state = manager.check_pending(plan)
+        state, triggered_events = manager.execution_snapshot(plan)
         data = plan.to_dict()
         bounds = {"effective_bar": data["effective_at"]["bar"],
                   "completed_bar": data["effective_at"]["bar"] + data["valid_for_bars"]}
@@ -156,13 +161,22 @@ class KevinRuntime:
             plan.write(folder / "plan.json")
             _write(folder / "state_observed.json", state.to_dict())
             performance = self.validate(state, plan)
+            if self.arranger is not None:
+                performance = self.arranger.arrange(state, plan, performance, triggered_events)
+                receipt["arrangement"] = self.arranger.last_trace
+                manager.check_pending(plan)
+                self._validate_midi(performance)
             capabilities = self.capabilities(plan, performance)
             receipt["capabilities"] = capabilities
             events = midi_events(performance)
             duration = performance.bars * 4 * 60 / performance.tempo_bpm
             write_events(folder / "events.json", events)
-            write_midi(folder / "band.mid", events, performance.tempo_bpm, self.programs, duration_s=duration)
-            verification = verify_midi(folder / "band.mid", events, self.programs, duration)
+            programs = dict(self.programs)
+            guitar_channel = CHANNELS["guitar"]
+            if any(event.channel == guitar_channel for event in events):
+                programs[guitar_channel] = GUITAR_PROGRAM
+            write_midi(folder / "band.mid", events, performance.tempo_bpm, programs, duration_s=duration)
+            verification = verify_midi(folder / "band.mid", events, programs, duration)
             metadata = self.render_audio(folder, performance)
             audio, sr = sf.read(folder / "band.wav", dtype="float32", always_2d=True)
             if sr != self.sample_rate or len(audio) < round(duration * sr) - 2 or not np.isfinite(audio).all():
@@ -201,6 +215,8 @@ class KevinRuntime:
             return RenderedPlan(performance.notes, performance.lead_notes, performance.generated_motif,
                                 performance.tempo_bpm, performance.start_bar, performance.bars, audio, sr)
         except Exception as exc:
+            if self.arranger is not None and self.arranger.last_trace.get("plan_id") == plan.plan_id:
+                receipt["arrangement"] = self.arranger.last_trace
             if hasattr(exc, "report"):
                 receipt["capabilities"] = exc.report
             receipt.update(reason=type(exc).__name__ + ": " + str(exc), plan_status=manager.plan_status(plan.plan_id))

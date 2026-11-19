@@ -1,0 +1,19 @@
+{
+  "requested_model": "gpt-5.4-mini",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-5.4-mini-2026-03-17"
+  ],
+  "passed": 18,
+  "total": 18,
+  "model_responses": 18,
+  "attempts": 18,
+  "usage": {
+    "input_tokens": 88144,
+    "output_tokens": 4957,
+    "total_tokens": 93101
+  },
+  "latency_median_ms": 3477.0,
+  "failed_cases": [],
+  "renderer": "Kevin / FluidSynth"
+}

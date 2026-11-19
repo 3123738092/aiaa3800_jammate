@@ -23,6 +23,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 from jammate.contracts import load_input_event
 from jammate.contracts.adapters import from_text, from_system
 from jammate.orchestration.agent import RuleAgent
+from jammate.orchestration.decision_gate import should_execute
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import OfflineRuntime
 from jammate.render.midi_out import write_midi
@@ -73,6 +74,9 @@ def run(batches, output: Path, *, tempo_bpm=100., seed=3800, agent=None, runtime
     log = SessionLog(output / "trace.jsonl")
     m = StateManager(JamState(session_id=batches[0][0].session_id, tempo_bpm=tempo_bpm), log=log)
     agent, runtime = agent or RuleAgent(), runtime or OfflineRuntime(seed=seed)
+    arranger = getattr(runtime, "arranger", None)
+    if arranger is not None and arranger.log is None:
+        arranger.log = log
     external_renderer = hasattr(runtime, "last_artifacts")
     segments, report, all_notes, cursor = [], [], [], 0
     tempos = set()
@@ -86,7 +90,6 @@ def run(batches, output: Path, *, tempo_bpm=100., seed=3800, agent=None, runtime
         plan = agent.decide(accepted, snapshot, plan_id=f"demo_plan_{index:02d}", history=history)
         decision_trace = getattr(agent, "last_trace", {"source": "rule", "plan_id": plan.plan_id})
         log.write("agent_decision", **decision_trace)
-        m.stage(plan)
         turn = output / f"turn_{index:02d}"
         turn.mkdir()
         for event in accepted:
@@ -95,7 +98,17 @@ def run(batches, output: Path, *, tempo_bpm=100., seed=3800, agent=None, runtime
         plan.write(turn / "plan.json")
         write_json(turn / "agent_decision.json", decision_trace)
         write_json(turn / "state_observed.json", m.state.to_dict())
+        if not should_execute(snapshot, plan, local_arrangement=arranger is not None):
+            m.hold(plan)
+            row = {"turn": index, "plan_id": plan.plan_id, "result": "held", "decision_source": decision_trace["source"],
+                   "state_version": m.state.state_version, "unresolved": plan.to_dict()["unresolved"]}
+            report.append(row)
+            print(json.dumps(row, ensure_ascii=False))
+            continue
+        m.stage(plan)
         result = runtime.execute(m, plan)
+        if arranger is not None:
+            write_json(turn / "arrangement.json", arranger.last_trace)
         sf.write(turn / "band.wav", result.audio, result.sample_rate)
         if external_renderer:
             # Keep Kevin's verified programs, exact tick encoding and end marker.
@@ -116,6 +129,8 @@ def run(batches, output: Path, *, tempo_bpm=100., seed=3800, agent=None, runtime
                "bars": result.bars, "note_count": len(result.notes),
                "decision_source": decision_trace["source"],
                "decision_ms": decision_trace.get("elapsed_ms"),
+               "arrangement_source": arranger.last_trace.get("source") if arranger else "rule",
+               "arrangement_status": arranger.last_trace.get("status") if arranger else None,
                "execution_persistence_warnings": runtime.last_receipt.get("persistence_warnings", []) if external_renderer else [],
                "unresolved": plan.to_dict()["unresolved"]}
         report.append(row)
@@ -130,7 +145,8 @@ def run(batches, output: Path, *, tempo_bpm=100., seed=3800, agent=None, runtime
     peak = float(np.max(np.abs(audio))) if audio.size else 0
     if peak > .98:
         audio *= .98 / peak
-    sf.write(output / "band.wav", audio, runtime.sample_rate)
+    if segments:
+        sf.write(output / "band.wav", audio, runtime.sample_rate)
     combined_midi = len(tempos) == 1 and not external_renderer
     if combined_midi:
         write_midi(tuple(all_notes), next(iter(tempos)), output / "band.mid")
@@ -153,6 +169,8 @@ def main():
     parser.add_argument("--bpm", type=float, default=100.)
     parser.add_argument("--seed", type=int, default=3800)
     parser.add_argument("--agent", choices=("llm", "rule"), default="llm")
+    parser.add_argument("--arranger", choices=("rule", "llm"), default="rule")
+    parser.add_argument("--arrangement-fallback", choices=("rule", "error"), default="rule")
     parser.add_argument("--renderer", choices=("reference", "kevin"), default="reference")
     parser.add_argument("--fluidsynth", type=Path, help="FluidSynth executable; required by --renderer kevin")
     parser.add_argument("--soundfont", type=Path, help="local .sf2 file; required by --renderer kevin")
@@ -176,17 +194,9 @@ def main():
         batches = [[load_input_event(path) for path in batch] for batch in args.batch]
     else:
         batches = expressive_batches() if args.scenario == "expressive" else default_batches()
-    runtime = OfflineRuntime(seed=args.seed)
-    if args.renderer == "kevin":
-        if not args.fluidsynth or not args.fluidsynth.is_file() or not args.soundfont or not args.soundfont.is_file():
-            parser.error("--renderer kevin requires existing --fluidsynth and --soundfont files")
-        from renderer_experiments.app.band_plan import KevinRuntime
-        runtime = KevinRuntime(args.out / "renderer", executable=args.fluidsynth, soundfont=args.soundfont,
-                               profile=args.instrument_profile, lead_program=args.lead_program, seed=args.seed)
-    agent = RuleAgent()
-    if args.agent == "llm":
+    agent, arranger = RuleAgent(), None
+    if "llm" in (args.agent, args.arranger):
         from dataclasses import replace
-        from jammate.orchestration.llm import LLMAgent
         from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
         try:
             config = LLMConfig.load(args.config)
@@ -194,9 +204,23 @@ def main():
                 config = replace(config, model=args.model)
             if args.reasoning_effort:
                 config = replace(config, reasoning_effort=None if args.reasoning_effort == "default" else args.reasoning_effort)
-            agent = LLMAgent(config, fallback=args.fallback, execution_validator=runtime.validate)
+            if args.arranger == "llm":
+                from jammate.orchestration.arrangement import LLMArranger
+                arranger = LLMArranger(config, fallback=args.arrangement_fallback)
         except LLMConfigurationError as exc:
             parser.error(str(exc))
+    runtime = OfflineRuntime(seed=args.seed, arranger=arranger)
+    if args.renderer == "kevin":
+        if not args.fluidsynth or not args.fluidsynth.is_file() or not args.soundfont or not args.soundfont.is_file():
+            parser.error("--renderer kevin requires existing --fluidsynth and --soundfont files")
+        from renderer_experiments.app.band_plan import KevinRuntime
+        runtime = KevinRuntime(args.out / "renderer", executable=args.fluidsynth, soundfont=args.soundfont,
+                               profile=args.instrument_profile, lead_program=args.lead_program, seed=args.seed,
+                               arranger=arranger)
+    if args.agent == "llm":
+        from jammate.orchestration.llm import LLMAgent
+        agent = LLMAgent(config, fallback=args.fallback, execution_validator=runtime.validate,
+                         arrangement_enabled=arranger is not None)
     run(batches, args.out, tempo_bpm=args.bpm, seed=args.seed, agent=agent, runtime=runtime)
     print(f"Artifacts: {args.out.resolve()}")
 

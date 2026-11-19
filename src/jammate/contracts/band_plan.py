@@ -38,9 +38,11 @@ class BandPlan:
             allowed = {"PRESERVE": set(), "ECHO_MOTIF": {"motif_id"}, "VARY_MOTIF": {"motif_id"},
                        "INTRODUCE_MOTIF": {"motif_id"}, "BUILD": {"duration_bars"}, "SIMPLIFY": {"duration_bars"},
                        "ADJUST_FEEL": {"rhythm_event_id", "level_delta", "brightness"},
-                       "ADD_LAYER": set(), "REMOVE_LAYER": set(), "FILL": set()}
+                       "INTRODUCE_LAYER": set(), "ADD_LAYER": set(), "REMOVE_LAYER": set(), "FILL": set()}
             if not set(params) <= allowed[action["action"]]:
                 raise PlanError("parameters do not belong to this action")
+            if action["action"] == "INTRODUCE_LAYER" and action["scope"] != "guitar":
+                raise PlanError("INTRODUCE_LAYER only supports guitar")
             if params.get("duration_bars", 1) > data["valid_for_bars"]:
                 raise PlanError("action duration exceeds plan lifetime")
             if action["action"] in {"ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF"} and "motif_id" not in params:

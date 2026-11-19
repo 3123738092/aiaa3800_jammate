@@ -12,11 +12,11 @@
     "strategy": {"enum": ["LISTEN", "FOLLOW", "RESPOND", "INITIATE"]},
     "effective_at": {"type": "object", "additionalProperties": false, "required": ["bar", "beat"], "properties": {"bar": {"type": "integer", "minimum": 0}, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}}},
     "valid_for_bars": {"type": "integer", "minimum": 1, "maximum": 16},
-    "preserve": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead))$"}},
+    "preserve": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(tempo|key|groove|playing|motif:.+|layer:(drums|bass|keys|lead|guitar))$"}},
     "actions": {"type": "array", "items": {
       "type": "object", "additionalProperties": false, "required": ["action", "scope", "strength", "parameters"],
       "properties": {
-        "action": {"enum": ["PRESERVE", "ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "ADD_LAYER", "REMOVE_LAYER", "FILL"]},
+        "action": {"enum": ["PRESERVE", "ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF", "BUILD", "SIMPLIFY", "ADJUST_FEEL", "INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER", "FILL"]},
         "scope": {"enum": ["band", "drums", "bass", "keys", "lead", "guitar", "motif"]},
         "strength": {"type": "number", "minimum": 0, "maximum": 1},
         "parameters": {

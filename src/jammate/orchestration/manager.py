@@ -74,15 +74,15 @@ class StateManager:
         """One coherent snapshot plus recent observed/executed turn history.
 
         History is evidence, never a second mutable music state. Stale input is
-        excluded, and pending/failed/cancelled plans retain their real status.
+        excluded, and plans retain their real status, including requests on hold.
         """
         if type(history_limit) is not int or not 0 <= history_limit <= 20:
             raise ValueError("history_limit must be within 0..20")
         with self._lock:
             history = []
-            failed_batches = {tuple(p.to_dict()["trigger_event_ids"]) for key, p in self._plans.items()
-                              if self._status[key] == "failed"}
-            prior = [turn for turn in self._turns if turn["event_ids"] != self._batch_ids or turn["event_ids"] in failed_batches]
+            attempted_batches = {tuple(p.to_dict()["trigger_event_ids"]) for key, p in self._plans.items()
+                                 if self._status[key] in {"failed", "held"}}
+            prior = [turn for turn in self._turns if turn["event_ids"] != self._batch_ids or turn["event_ids"] in attempted_batches]
             for turn in prior[-history_limit:] if history_limit else ():
                 plans = [{"plan": p.to_dict(), "status": self._status[p.plan_id]} for p in self._plans.values()
                          if tuple(p.to_dict()["trigger_event_ids"]) == turn["event_ids"]]
@@ -156,6 +156,15 @@ class StateManager:
 
     def stage(self, plan: BandPlan) -> bool:
         """Validate a candidate without claiming its musical effects happened."""
+        return self._record_plan(plan, "pending")
+
+    def hold(self, plan: BandPlan) -> bool:
+        """Keep the clarification in history without opening an execution slot."""
+        if not plan.to_dict()["unresolved"]:
+            raise PlanError("a held plan needs an unresolved item")
+        return self._record_plan(plan, "held")
+
+    def _record_plan(self, plan: BandPlan, status: str) -> bool:
         with self._lock:
             if plan.plan_id in self._plans:
                 if self._plans[plan.plan_id] != plan:
@@ -171,8 +180,10 @@ class StateManager:
             project(self._state, plan)
             self._cancel_pending("replacement plan")
             self._plans[plan.plan_id] = plan
-            self._status[plan.plan_id] = "pending"
+            self._status[plan.plan_id] = status
             self._emit("band_plan", plan=plan.to_dict())
+            if status == "held":
+                self._emit("plan_held", plan_id=plan.plan_id, unresolved=data["unresolved"])
             return True
 
     def check_pending(self, plan: BandPlan) -> JamState:
@@ -184,14 +195,23 @@ class StateManager:
                 raise PlanError("plan missed its execution boundary")
             return self._state
 
-    def update_transport(self, *, bar: int, beat: float, next_bar: int):
+    def execution_snapshot(self, plan: BandPlan):
+        """Read the pending plan's state and triggering events under one lock."""
+        with self._lock:
+            state = self.check_pending(plan)
+            return state, tuple(self._events[key] for key in plan.to_dict()["trigger_event_ids"])
+
+    def update_transport(self, *, bar: int, beat: float, next_bar: int, completed_previous_bar: bool = False):
         """Runtime-owned position updates do not increment semantic state_version."""
         position = TransportPosition(bar, beat, next_bar)
         with self._lock:
             old = self._state.position
             if (bar, beat) < (old.bar, old.beat) or next_bar < old.next_bar:
                 raise ValueError("transport cannot move backwards")
-            self._state = self._state.with_updates(position=position)
+            if completed_previous_bar and bar != old.bar + 1:
+                raise ValueError("completion must advance exactly one playback bar")
+            section_bars = self._state.section_bars + int(completed_previous_bar and self._state.playing)
+            self._state = self._state.with_updates(position=position, section_bars=section_bars)
             for plan_id, plan in self._plans.items():
                 if self._status[plan_id] == "pending" and plan.to_dict()["effective_at"]["bar"] < next_bar:
                     self._status[plan_id] = "expired"
@@ -220,38 +240,65 @@ class StateManager:
                 # an explicit retry creates a new plan against the same version.
                 self._emit("execution_receipt", plan_id=plan.plan_id, succeeded=False, reason=reason)
                 return True
-            target = project(state, plan)
-            motif_actions = [a for a in data["actions"] if a["action"] in {"INTRODUCE_MOTIF", "ECHO_MOTIF", "VARY_MOTIF"}]
-            if motif_actions:
-                action = motif_actions[0]
-                if not lead_notes:
-                    raise PlanError("motif execution receipt needs actual lead notes")
-                if action["action"] == "INTRODUCE_MOTIF":
-                    if generated_motif is None or generated_motif.motif_id != action["parameters"]["motif_id"] or generated_motif.owner != "ai" or generated_motif.notes != tuple(lead_notes) or generated_motif.source_event_ids != tuple(data["trigger_event_ids"]):
-                        raise PlanError("missing or inconsistent generated motif receipt")
-                    target = target.with_updates(motifs=target.motifs + (generated_motif,), current_motif_id=generated_motif.motif_id)
-                elif generated_motif is not None:
-                    raise PlanError("unexpected generated motif")
-                elif action["action"] == "ECHO_MOTIF":
-                    expected = tuple(replace(n, instrument="lead") for n in state.motif(action["parameters"]["motif_id"]).notes)
-                    if tuple(lead_notes) != expected:
-                        raise PlanError("ECHO_MOTIF receipt changed the user's motif")
-                target = target.with_updates(last_ai_motif=tuple(lead_notes), interaction=replace(target.interaction,
-                         strategy=Strategy.LISTEN, initiative=0., current_lead="user",
-                         awaiting_user=action["action"] == "INTRODUCE_MOTIF"))
-            elif lead_notes or generated_motif is not None:
-                raise PlanError("receipt supplied unsolicited musical material")
-            section = "build" if any(a["action"] == "BUILD" for a in data["actions"]) else "space" if any(a["action"] == "SIMPLIFY" for a in data["actions"]) else target.section
-            committed = target.with_updates(state_version=state.state_version + 1, section=section,
-                section_bars=(state.section_bars if section == state.section else 0) + data["valid_for_bars"],
-                position=TransportPosition(completed_bar, 0., completed_bar))
-            self._state = JamState.from_dict(committed.to_dict())
-            self._turns[-1]["state_after"] = self._context_state(self._state)
-            self._status[plan.plan_id] = "applied"
-            self._batch_ids = ()
-            self._emit("execution_receipt", plan_id=plan.plan_id, succeeded=True, effective_bar=effective_bar, completed_bar=completed_bar)
-            self._emit("state_applied", plan_id=plan.plan_id, state=self._state.to_dict())
+            self._apply_plan(state, plan, lead_notes=lead_notes, generated_motif=generated_motif,
+                             position=TransportPosition(completed_bar, 0., completed_bar),
+                             completed_bars=data["valid_for_bars"], receipt="execution_receipt",
+                             receipt_data={"succeeded": True, "effective_bar": effective_bar, "completed_bar": completed_bar})
             return True
+
+    def playback_started(self, plan: BandPlan, *, bar: int, start_sample: int,
+                         lead_notes: tuple[Note, ...] = (), generated_motif: Motif | None = None) -> bool:
+        """Commit the selected plan at its first live bar without jumping to its end."""
+        with self._lock:
+            if (type(bar) is not int or bar != plan.to_dict()["effective_at"]["bar"]
+                    or type(start_sample) is not int or start_sample < 0):
+                raise PlanError("playback start does not match the plan boundary")
+            if self._plans.get(plan.plan_id) != plan:
+                raise PlanError("playback start does not match the submitted plan")
+            if self._status[plan.plan_id] == "applied":
+                return False
+            state = self.check_pending(plan)
+            if state.position.next_bar != bar:
+                raise PlanError("playback start is ahead of the transport")
+            self._apply_plan(state, plan, lead_notes=lead_notes, generated_motif=generated_motif,
+                             position=TransportPosition(bar, 0., bar + 1), completed_bars=0,
+                             receipt="playback_started", receipt_data={"bar": bar, "start_sample": start_sample})
+            return True
+
+    def _apply_plan(self, state, plan, *, lead_notes, generated_motif, position, completed_bars,
+                    receipt, receipt_data):
+        data = plan.to_dict()
+        target = project(state, plan)
+        motif_actions = [a for a in data["actions"] if a["action"] in {"INTRODUCE_MOTIF", "ECHO_MOTIF", "VARY_MOTIF"}]
+        if motif_actions:
+            action = motif_actions[0]
+            if not lead_notes:
+                raise PlanError("motif execution receipt needs actual lead notes")
+            if action["action"] == "INTRODUCE_MOTIF":
+                if generated_motif is None or generated_motif.motif_id != action["parameters"]["motif_id"] or generated_motif.owner != "ai" or generated_motif.notes != tuple(lead_notes) or generated_motif.source_event_ids != tuple(data["trigger_event_ids"]):
+                    raise PlanError("missing or inconsistent generated motif receipt")
+                target = target.with_updates(motifs=target.motifs + (generated_motif,), current_motif_id=generated_motif.motif_id)
+            elif generated_motif is not None:
+                raise PlanError("unexpected generated motif")
+            elif action["action"] == "ECHO_MOTIF":
+                expected = tuple(replace(n, instrument="lead") for n in state.motif(action["parameters"]["motif_id"]).notes)
+                if tuple(lead_notes) != expected:
+                    raise PlanError("ECHO_MOTIF receipt changed the user's motif")
+            target = target.with_updates(last_ai_motif=tuple(lead_notes), interaction=replace(target.interaction,
+                     strategy=Strategy.LISTEN, initiative=0., current_lead="user",
+                     awaiting_user=action["action"] == "INTRODUCE_MOTIF"))
+        elif lead_notes or generated_motif is not None:
+            raise PlanError("receipt supplied unsolicited musical material")
+        section = "build" if any(a["action"] == "BUILD" for a in data["actions"]) else "space" if any(a["action"] == "SIMPLIFY" for a in data["actions"]) else target.section
+        committed = target.with_updates(state_version=state.state_version + 1, section=section,
+            section_bars=(state.section_bars if section == state.section else 0) + completed_bars,
+            position=position)
+        self._state = JamState.from_dict(committed.to_dict())
+        self._turns[-1]["state_after"] = self._context_state(self._state)
+        self._status[plan.plan_id] = "applied"
+        self._batch_ids = ()
+        self._emit(receipt, plan_id=plan.plan_id, **receipt_data)
+        self._emit("state_applied", plan_id=plan.plan_id, state=self._state.to_dict())
 
     def acknowledge_and_snapshot(self, plan: BandPlan, **receipt):
         """Return the immutable state at this receipt, before another writer runs."""

@@ -1,0 +1,53 @@
+{
+  "total": 18,
+  "archived": 14,
+  "baseline_passed": 10,
+  "guarded_passed": 17,
+  "groups": {
+    "failed_boundary": {
+      "n": 6,
+      "baseline": 0,
+      "guarded": 5
+    },
+    "hold_control": {
+      "n": 1,
+      "baseline": 1,
+      "guarded": 1
+    },
+    "continuation_control": {
+      "n": 2,
+      "baseline": 2,
+      "guarded": 2
+    },
+    "transport_control": {
+      "n": 3,
+      "baseline": 3,
+      "guarded": 3
+    },
+    "partial_control": {
+      "n": 2,
+      "baseline": 2,
+      "guarded": 2
+    },
+    "state_relative_pair": {
+      "n": 2,
+      "baseline": 2,
+      "guarded": 2
+    },
+    "zero_effect_control": {
+      "n": 2,
+      "baseline": 0,
+      "guarded": 2
+    }
+  },
+  "residual": [
+    "outside_range_no_substitute"
+  ],
+  "fixture_sha256": "038eb4c6e0779aadb98cc271fe4a56d87b2f7da7735da8e3e9fa33e710eaf7a5",
+  "trace_sha256": {
+    "demo_out/jev_text_shadow_20261119/mainline_extended_1/turns.jsonl": "bc52c84de64f483b3c3be5878dfe00a7842b342a84b7e335e0ba6c94783fa125",
+    "demo_out/jev_text_shadow_20261119/mainline_extended_2/turns.jsonl": "0dbf974b68bedc7c1cf4d2631d0dbeed7ff29525f59b88c54fa11f3bdf11621b",
+    "demo_out/jev_text_shadow_20261119/mainline_extended_3/turns.jsonl": "e0af8b378e6414b231a8ef04e1a81d74657c3b6abc22d1ac10d588b4e85991ec",
+    "demo_out/text_benchmark_20261118/mini_baseline/turns.jsonl": "5b856e58b474a77181460be4862058e74fd367b974b2c7463f0dd7ac2c78f8ed"
+  }
+}

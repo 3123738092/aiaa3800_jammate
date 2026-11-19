@@ -1,0 +1,23 @@
+{
+  "protocol": "Round 1, frozen before guarded output. A hold keeps current music, the next bar and the post-ingestion state version, returns no clip, and never stages a render plan. Apply cases must render and commit exactly the declared number of bars, target BPM, playing state and layer changes. Source saved rows are isolated at each recorded before-state. Synthetic inputs pair a specified interpreter proposal with a genuinely different starting state. No new model calls are included.",
+  "cases": [
+    {"id":"outside_range_no_substitute","group":"failed_boundary","source":"mainline_extended_1","scenario":"tempo_bounds","expect":{"execute":false,"bars":0}},
+    {"id":"no_unequal_instrument_substitution","group":"failed_boundary","source":"mainline_extended_2","scenario":"separate_supported_from_unavailable","expect":{"execute":false,"bars":0}},
+    {"id":"ask_when_reference_is_ambiguous","group":"failed_boundary","source":"mainline_extended_3","scenario":"clarification_repair","expect":{"execute":false,"bars":0}},
+    {"id":"conflicting_tempo_same_turn","group":"failed_boundary","source":"mainline_extended_3","scenario":"clarification_repair","expect":{"execute":false,"bars":0}},
+    {"id":"density_restore_is_not_volume","group":"failed_boundary","source":"mainline_extended_3","scenario":"specific_control_limits","expect":{"execute":false,"bars":0}},
+    {"id":"effect_only_no_alias_to_gain","group":"failed_boundary","source":"mainline_extended_3","scenario":"specific_control_limits","expect":{"execute":false,"bars":0}},
+    {"id":"old_label_outside_read_view","group":"hold_control","source":"mainline_extended_3","scenario":"bounded_history_lookup","expect":{"execute":false,"bars":0}},
+    {"id":"no_change","group":"continuation_control","source":"mini_baseline","scenario":"tempo_level_density","expect":{"execute":true,"bars":4}},
+    {"id":"do_not_unmute_when_continuing","group":"continuation_control","source":"mainline_extended_1","scenario":"negation_and_mix","expect":{"execute":true,"bars":4}},
+    {"id":"stop_without_reset","group":"transport_control","source":"mainline_extended_2","scenario":"stopped_state_and_tempo","expect":{"execute":true,"bars":1,"playing":false}},
+    {"id":"set_speed_while_stopped","group":"transport_control","source":"mainline_extended_2","scenario":"stopped_state_and_tempo","expect":{"execute":true,"bars":4,"tempo":108,"playing":false}},
+    {"id":"resume_at_prepared_speed","group":"transport_control","source":"mainline_extended_2","scenario":"stopped_state_and_tempo","expect":{"execute":true,"bars":4,"playing":true}},
+    {"id":"tempo_and_trumpet","group":"partial_control","source":"mainline_extended_2","scenario":"separate_supported_from_unavailable","expect":{"execute":true,"bars":4,"tempo":112,"unresolved":true}},
+    {"id":"mute_and_key","group":"partial_control","source":"mainline_extended_2","scenario":"separate_supported_from_unavailable","expect":{"execute":true,"bars":4,"layer_overrides":{"keys":{"active":false}},"unresolved":true}},
+    {"id":"subtract_4_from_92","group":"state_relative_pair","input":"从现在的速度减 4 BPM，其他都不要变。","initial_bpm":92,"tempo_delta":-4,"expect":{"execute":true,"bars":4,"tempo":88}},
+    {"id":"subtract_4_from_110","group":"state_relative_pair","input":"从现在的速度减 4 BPM，其他都不要变。","initial_bpm":110,"tempo_delta":-4,"expect":{"execute":true,"bars":4,"tempo":106}},
+    {"id":"preserve_only_unresolved","group":"zero_effect_control","input":"只给键盘加混响，不能做就先等着。","initial_bpm":100,"actions":[{"action":"PRESERVE","scope":"keys","strength":1,"parameters":{}}],"unresolved":["当前不能单独给键盘加混响。"],"expect":{"execute":false,"bars":0}},
+    {"id":"zero_level_delta_unresolved","group":"zero_effect_control","input":"调一调当前鼓，等我确认具体要改哪里。","initial_bpm":100,"actions":[{"action":"ADJUST_FEEL","scope":"drums","strength":0.5,"parameters":{"level_delta":0.0}}],"unresolved":["请说明你想改鼓的哪个属性。"],"expect":{"execute":false,"bars":0}}
+  ]
+}

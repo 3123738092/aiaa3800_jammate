@@ -1,0 +1,151 @@
+{
+  "bpm": 96,
+  "scenarios": [
+    {
+      "id": "tempo_revision",
+      "tier": "regression",
+      "turns": [
+        {"id": "final_number_wins", "text": "先设一百二……不对，我说错了，最终设成 103 BPM。就改速度。", "state": {"tempo": 103}, "preserve_other_layers": []},
+        {"id": "subtract_from_current", "text": "刚刚还是赶了点，从现在这个数减 6 BPM，配器别碰。", "state": {"tempo": 97}, "preserve_other_layers": []},
+        {"id": "mirror_previous_delta", "text": "把上一轮减掉的那 6 拍每分钟加回去，鼓和其他乐器都照旧。", "state": {"tempo": ["=", "turn.final_number_wins.tempo"]}, "preserve_other_layers": []},
+        {"id": "restore_project_start", "text": "回到这件作品开头、我还没说 103 之前的起始速度。别撤回其他设置。", "state": {"tempo": 96}, "preserve_other_layers": []}
+      ]
+    },
+    {
+      "id": "tempo_bounds",
+      "tier": "diagnostic",
+      "turns": [
+        {"id": "inclusive_minimum", "text": "试试严格 60 BPM，其他照原样。", "state": {"tempo": 60}, "preserve_other_layers": []},
+        {"id": "inclusive_maximum", "text": "现在只把 BPM 改为 180。我想听上限的样子。", "state": {"tempo": 180}, "preserve_other_layers": []},
+        {"id": "outside_range_no_substitute", "text": "能做到 203 BPM 就用 203；这个数超出范围的话请告诉我，别自行换成别的数，也别往下一段走。", "outcome": "unsupported", "state": {"tempo": 180, "next_bar": ["=", "before.next_bar"]}, "feedback_contains": ["203", "上限", "范围", "180"]},
+        {"id": "valid_after_rejection", "text": "好，那改成 92 BPM 吧，编配仍然不要变。", "state": {"tempo": 92}, "preserve_other_layers": []}
+      ]
+    },
+    {
+      "id": "negation_and_mix",
+      "tier": "regression",
+      "turns": [
+        {"id": "softer_without_sparser", "text": "鼓收着点，我说的是轻一点，打点的样子照旧，谁都别停。", "state": {"tempo": 96, "playing": true, "layers.drums.level": ["<", "before.layers.drums.level"], "layers.drums.density": ["=", "before.layers.drums.density"], "layers.drums.active": true}, "notes": {"drums": [">", 0]}, "preserve_other_layers": ["drums"]},
+        {"id": "sparser_without_quieter", "text": "现在键盘少垫几次，但每一下仍然用原来的力度。不要顺手调鼓。", "state": {"layers.keys.density": ["<", "before.layers.keys.density"], "layers.keys.level": ["=", "before.layers.keys.level"], "tempo": 96}, "preserve_other_layers": ["keys"]},
+        {"id": "mute_bass_only", "text": "另外啊，先让贝斯一个人歇歇，其余照演，别整队按停。", "state": {"playing": true, "layers.bass.active": false, "tempo": 96}, "notes": {"bass": 0, "keys": [">", 0], "drums": [">", 0]}, "preserve_other_layers": ["bass"]},
+        {"id": "do_not_unmute_when_continuing", "text": "继续同样的伴奏。贝斯还不用跟进来，鼓也别停。", "state": {"music": ["=", "before.music"], "layers.bass.active": false, "layers.drums.active": true}, "notes": {"bass": 0, "drums": [">", 0]}}
+      ]
+    },
+    {
+      "id": "selective_history_restore",
+      "tier": "regression",
+      "turns": [
+        {"id": "level_reference_a", "text": "把键盘推到比现在明显一点，鼓压轻一点，速度别变。", "state": {"layers.keys.level": [">", "before.layers.keys.level"], "layers.drums.level": ["<", "before.layers.drums.level"], "tempo": 96}, "preserve_other_layers": ["keys", "drums"]},
+        {"id": "level_reference_b", "text": "键盘现在又太靠前，降到比刚才轻。鼓保持刚压轻的状态。", "state": {"layers.keys.level": ["<", "before.layers.keys.level"], "tempo": 96}, "preserve_other_layers": ["keys"]},
+        {"id": "independent_density_change", "text": "键盘还可以更疏一点，但键盘音量留在现在这档。其他都别动。", "state": {"layers.keys.level": ["=", "before.layers.keys.level"], "layers.keys.density": ["<", "before.layers.keys.density"], "tempo": 96}, "preserve_other_layers": ["keys"]},
+        {"id": "restore_only_keys_level_a", "text": "把键盘音量恢复到我第一次把它推前的那一档，刚减少的打点留着，鼓也别跟着恢复。", "state": {"layers.keys.level": ["=", "turn.level_reference_a.layers.keys.level"], "layers.keys.density": ["=", "before.layers.keys.density"], "tempo": 96}, "preserve_other_layers": ["keys"]},
+        {"id": "restore_only_drums_to_initial", "text": "最后只把鼓音量恢复到这首作品刚打开时的默认值。键盘维持刚才那版，贝斯别动。", "state": {"layers.drums.level": 0.5, "layers.drums.density": ["=", "before.layers.drums.density"], "tempo": 96}, "preserve_other_layers": ["drums"]}
+      ]
+    },
+    {
+      "id": "cross_language_reference",
+      "tier": "regression",
+      "turns": [
+        {"id": "english_scoped_mute", "text": "Mute just the bass for the coming section. Let the drums and keys carry it at the same tempo.", "state": {"layers.bass.active": false, "playing": true, "tempo": 96}, "notes": {"bass": 0, "drums": [">", 0], "keys": [">", 0]}, "preserve_other_layers": ["bass"]},
+        {"id": "mixed_reference_restore", "text": "把刚才那个 muted part 加回来，keep everything else as is.", "state": {"layers.bass.active": true, "tempo": 96}, "notes": {"bass": [">", 0]}, "preserve_other_layers": ["bass"]},
+        {"id": "mixed_keep_target_low", "text": "Keys a touch quieter，鼓和 bass 都照旧。Tempo stay put.", "state": {"layers.keys.level": ["<", "before.layers.keys.level"], "layers.keys.density": ["=", "before.layers.keys.density"], "tempo": 96}, "preserve_other_layers": ["keys"]},
+        {"id": "english_undo_last_change", "text": "Undo only the last mix change, please. Keep the bass playing and don't touch the BPM.", "state": {"layers.keys.level": ["=", "turn.mixed_reference_restore.layers.keys.level"], "layers.bass.active": true, "tempo": 96}, "preserve_other_layers": ["keys"]}
+      ]
+    },
+    {
+      "id": "segment_lengths",
+      "tier": "regression",
+      "turns": [
+        {"id": "one_bar", "text": "给我一小节接进来用，编配与速度都延续当前设置。只需要 1 小节。", "plan": {"valid_for_bars": 1}, "state": {"next_bar": 1, "music": ["=", "before.music"]}, "notes": {"all": [">", 0]}},
+        {"id": "two_bars", "text": "紧接着来两小节，其他一个参数都别动。", "plan": {"valid_for_bars": 2}, "state": {"next_bar": 3, "music": ["=", "before.music"]}, "notes": {"all": [">", 0]}},
+        {"id": "explicit_eight", "text": "下一段留给我八小节，保持相同的配器和速度，直接接在前一段后。", "plan": {"valid_for_bars": 8}, "state": {"next_bar": 11, "music": ["=", "before.music"]}, "notes": {"all": [">", 0]}},
+        {"id": "explicit_three_with_change", "text": "最后接三小节。只让鼓弱一点，速度照旧。", "plan": {"valid_for_bars": 3}, "state": {"next_bar": 14, "tempo": 96, "layers.drums.level": ["<", "before.layers.drums.level"]}, "preserve_other_layers": ["drums"]}
+      ]
+    },
+    {
+      "id": "select_nonrecent_motif",
+      "tier": "regression",
+      "turns": [
+        {"id": "lead_a", "text": "主奏先写一句新的，我把这一句叫 A。速度保持。", "state": {"motif": ["!=", "before.motif"], "tempo": 96}, "notes": {"lead": [">", 0]}},
+        {"id": "lead_b", "text": "重新来一句新的独立主旋律 B，先把 A 放一边。既不要复奏 A，也不要拿 A 来变奏。", "state": {"motif": ["!=", "turn.lead_a.motif"], "tempo": 96}, "notes": {"lead": [">", 0]}, "actions": [["INTRODUCE_MOTIF", "lead"]]},
+        {"id": "replay_a_after_b", "text": "现在原样弹最开始叫 A 的那句，起点和音符都照它。不要误弹刚才的 B。", "state": {"motif": ["=", "turn.lead_a.motif"], "tempo": 96}, "notes": {"lead": ["=", "turn.lead_a.lead"]}, "same_pitched_notes_as": {"turn": "lead_a", "layer": "lead"}},
+        {"id": "replay_b_after_a", "text": "换回第二句 B 原样再弹一次，别拿现在这句 A 代替。", "state": {"motif": ["=", "turn.lead_b.motif"], "tempo": 96}, "notes": {"lead": ["=", "turn.lead_b.lead"]}, "same_pitched_notes_as": {"turn": "lead_b", "layer": "lead"}}
+      ]
+    },
+    {
+      "id": "stopped_state_and_tempo",
+      "tier": "regression",
+      "turns": [
+        {"id": "keyboard_mutes_first", "text": "先拿掉键盘，低音和鼓照常往下演。", "state": {"layers.keys.active": false, "playing": true}, "notes": {"keys": 0, "bass": [">", 0]}, "preserve_other_layers": ["keys"]},
+        {"id": "stop_without_reset", "text": "先都暂停，暂时不出声，但别清掉前面已经设好的编制。", "state": {"playing": false, "layers.keys.active": false}, "notes": {"all": 0}, "preserve_other_layers": []},
+        {"id": "set_speed_while_stopped", "text": "把速度预先设成 108 BPM，先别响，等我下一句叫你再开。键盘现在还是休息。", "state": {"playing": false, "tempo": 108, "layers.keys.active": false}, "notes": {"all": 0}, "preserve_other_layers": []},
+        {"id": "resume_at_prepared_speed", "text": "可以开了，从预设好的速度开始。还是不要键盘。", "state": {"playing": true, "tempo": 108, "layers.keys.active": false}, "notes": {"keys": 0, "bass": [">", 0], "drums": [">", 0]}, "preserve_other_layers": []}
+      ]
+    },
+    {
+      "id": "guitar_program_and_composition",
+      "tier": "regression",
+      "turns": [
+        {"id": "add_explicit_guitar", "text": "给现有乐队加一条木吉他的分解和弦，别把电钢琴换掉。", "state": {"layers.guitar.active": true, "tempo": 96}, "notes": {"guitar": [">", 0], "keys": [">", 0]}, "programs": {"guitar": 25}, "preserve_other_layers": ["guitar"]},
+        {"id": "mute_guitar_add_lead", "text": "让木吉他先停一段，腾出来的位置给主奏一句简短旋律。其他伴奏和速度保持。", "state": {"layers.guitar.active": false, "tempo": 96}, "notes": {"guitar": 0, "lead": [">", 0], "keys": [">", 0]}, "preserve_other_layers": ["guitar", "lead"]},
+        {"id": "restore_known_guitar_no_new_voice", "text": "刚才停掉的那把木吉他回到原来的位置就好，别另开一把，也别再弹主奏句子。", "state": {"layers.guitar.active": true, "layers.guitar.level": ["=", "turn.add_explicit_guitar.layers.guitar.level"], "tempo": 96}, "notes": {"guitar": [">", 0], "lead": 0}, "programs": {"guitar": 25}, "actions": [["ADD_LAYER", "guitar"]], "preserve_other_layers": ["guitar"]},
+        {"id": "guitar_track_scope", "text": "只让这把木吉他轻一点，别降密度。其他乐器继续按原来的力度。", "state": {"layers.guitar.level": ["<", "before.layers.guitar.level"], "layers.guitar.density": ["=", "before.layers.guitar.density"], "tempo": 96}, "notes": {"guitar": [">", 0]}, "programs": {"guitar": 25}, "preserve_other_layers": ["guitar"]}
+      ]
+    },
+    {
+      "id": "separate_supported_from_unavailable",
+      "tier": "diagnostic",
+      "turns": [
+        {"id": "tempo_and_trumpet", "text": "只把速度改成 112 BPM，再帮我进一把小号，小号加不了也先把速度改掉。", "outcome": "partial", "state": {"tempo": 112}, "notes": {"guitar": 0}, "feedback_contains": ["小号"], "preserve_other_layers": []},
+        {"id": "mute_and_key", "text": "让键盘先休息，另外换到 D 小调。换调做不到的话，键盘照样先停。", "outcome": "partial", "state": {"layers.keys.active": false, "tempo": 112, "key": ["=", "before.key"]}, "notes": {"keys": 0}, "feedback_contains": ["调", "和声"], "preserve_other_layers": ["keys"]},
+        {"id": "no_unequal_instrument_substitution", "text": "请加手风琴。没有手风琴就告诉我，别拿别的乐器顶，先等着。", "outcome": "unsupported", "state": {"next_bar": ["=", "before.next_bar"]}, "feedback_contains": ["手风琴"]},
+        {"id": "valid_followup_after_partial", "text": "不用手风琴了。把刚才停的键盘加回来，速度沿用现有值。", "state": {"layers.keys.active": true, "tempo": 112}, "notes": {"keys": [">", 0]}, "preserve_other_layers": ["keys"]}
+      ]
+    },
+    {
+      "id": "clarification_repair",
+      "tier": "diagnostic",
+      "turns": [
+        {"id": "two_plausible_targets", "text": "鼓和键盘都再有一点存在感，然后就保持。速度别变。", "state": {"layers.drums.level": [">", "before.layers.drums.level"], "layers.keys.level": [">", "before.layers.keys.level"], "tempo": 96}, "preserve_other_layers": ["drums", "keys"]},
+        {"id": "ask_when_reference_is_ambiguous", "text": "把刚才调过的两个声部里的其中一个关掉，你先问我具体是哪个。", "outcome": "clarify", "state": {"next_bar": ["=", "before.next_bar"]}},
+        {"id": "clarification_selects_one", "text": "我指的是键盘。鼓刚才那点提升留着，其他都不动。", "state": {"layers.keys.active": false, "layers.drums.level": ["=", "turn.two_plausible_targets.layers.drums.level"], "tempo": 96}, "notes": {"keys": 0, "drums": [">", 0]}, "preserve_other_layers": ["keys"]},
+        {"id": "conflicting_tempo_same_turn", "text": "我手头两条意见互相冲突，一条说现在立刻加速，另一条说现在保持原速。先帮我问清采用哪条，别先改速度或生成下一段。", "outcome": "clarify", "state": {"next_bar": ["=", "before.next_bar"]}}
+      ]
+    },
+    {
+      "id": "bounded_history_lookup",
+      "tier": "diagnostic",
+      "turns": [
+        {"id": "named_old_tempo", "text": "我把这段私下叫「银线」。现在只把速度设到 91 BPM。", "state": {"tempo": 91}, "preserve_other_layers": []},
+        {"id": "switch_tempo", "text": "下一段速度改到 104 BPM，编制照旧。", "state": {"tempo": 104}, "preserve_other_layers": []},
+        {"id": "drum_gain", "text": "鼓往前站一点，速度和别的声部保持。", "state": {"tempo": 104, "layers.drums.level": [">", "before.layers.drums.level"]}, "preserve_other_layers": ["drums"]},
+        {"id": "bass_gain", "text": "现在只把低音调轻点，鼓保留。", "state": {"tempo": 104, "layers.bass.level": ["<", "before.layers.bass.level"]}, "preserve_other_layers": ["bass"]},
+        {"id": "tempo_108", "text": "速度对齐到 108 BPM，这下只动速度。", "state": {"tempo": 108}, "preserve_other_layers": []},
+        {"id": "thin_keys", "text": "键盘打点稍微疏一点，音量与速度原样。", "state": {"tempo": 108, "layers.keys.density": ["<", "before.layers.keys.density"], "layers.keys.level": ["=", "before.layers.keys.level"]}, "preserve_other_layers": ["keys"]},
+        {"id": "tempo_101", "text": "把表设成 101 BPM，给我同样的伴奏。", "state": {"tempo": 101}, "preserve_other_layers": []},
+        {"id": "tempo_115", "text": "调到 115 BPM，除此之外都别动。", "state": {"tempo": 115}, "preserve_other_layers": []},
+        {"id": "old_label_outside_read_view", "text": "帮我找回以前我叫「银线」那段的精确速度。找不到那段时先问我数值，别猜，也先别生成。", "outcome": "clarify", "state": {"tempo": 115, "next_bar": ["=", "before.next_bar"]}}
+      ]
+    },
+    {
+      "id": "imagery_with_objective_direction",
+      "tier": "regression",
+      "turns": [
+        {"id": "old_elevator", "text": "像旧电梯在楼道里慢慢上行。鼓声比现在轻一点，贝斯在四小节里渐强，速度不要变，别动键盘。", "plan": {"valid_for_bars": 4}, "state": {"tempo": 96, "layers.drums.level": ["<", "before.layers.drums.level"], "layers.bass.level": [">", "before.layers.bass.level"]}, "actions": [["BUILD", "bass"]], "preserve_other_layers": ["drums", "bass"]},
+        {"id": "lightbox_keyboard", "text": "门打开像照进来一道光。只把键盘音量提高一点，靠层次出来，不要加快，也别把鼓与贝斯重新调一遍。", "state": {"tempo": 96, "layers.keys.level": [">", "before.layers.keys.level"], "layers.keys.density": ["=", "before.layers.keys.density"]}, "preserve_other_layers": ["keys"]},
+        {"id": "empty_archive", "text": "接着像走进空档案室。保持现在的音量和速度，只把鼓点打得更稀，不要加旋律。", "state": {"tempo": 96, "layers.drums.density": ["<", "before.layers.drums.density"], "layers.drums.level": ["=", "before.layers.drums.level"]}, "notes": {"lead": 0}, "preserve_other_layers": ["drums"]},
+        {"id": "keep_gap_no_new_instruction", "text": "这种空隙挺好，像灯灭了以后还能听见房间里一点回声。继续用刚才那个编排，别真的加回声效果。", "state": {"music": ["=", "before.music"]}, "notes": {"all": [">", 0]}}
+      ]
+    },
+    {
+      "id": "specific_control_limits",
+      "tier": "diagnostic",
+      "turns": [
+        {"id": "kick_only_fallback_to_tempo", "text": "先把速度改成 99 BPM。再只加大底鼓力度，军鼓和踩镲别动；如果不能单独调底鼓，就只做速度。", "outcome": "partial", "state": {"tempo": 99}, "feedback_contains": ["底鼓", "鼓件"], "preserve_other_layers": []},
+        {"id": "lower_density_via_supported_control", "text": "先不区分鼓件了，把整条鼓轨的打点收疏，音量和速度维持。", "state": {"tempo": 99, "layers.drums.density": ["<", "before.layers.drums.density"], "layers.drums.level": ["=", "before.layers.drums.level"]}, "preserve_other_layers": ["drums"]},
+        {"id": "density_restore_is_not_volume", "text": "鼓点次数恢复到刚打开时的密度，响度不要变。如果做不到增加密度就先告诉我，其他暂时不要做。", "outcome": "unsupported", "state": {"next_bar": ["=", "before.next_bar"]}, "feedback_contains": ["密度", "鼓点", "打点"]},
+        {"id": "effect_only_no_alias_to_gain", "text": "只给键盘加长混响，音量和打点都不改。如果没有混响控制，就先保留并告诉我。", "outcome": "unsupported", "state": {"next_bar": ["=", "before.next_bar"]}, "feedback_contains": ["混响", "效果"]}
+      ]
+    }
+  ]
+}

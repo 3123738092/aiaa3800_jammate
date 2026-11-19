@@ -369,6 +369,41 @@
               "action": {
                 "type": "string",
                 "enum": [
+                  "INTRODUCE_LAYER"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "guitar"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
                   "ADD_LAYER"
                 ]
               },

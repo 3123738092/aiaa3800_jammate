@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import hashlib
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -28,7 +29,16 @@ from jammate.orchestration.offline import OfflineRuntime
 from jammate.pipeline_rhythm import jam_rhythm
 from jammate.render.midi_out import to_pretty_midi
 from jammate.rhythm import RhythmContext, RhythmMode
+from jammate.session_log import SessionLog
 from jammate.state import JamState
+
+if importlib.util.find_spec("jammate.orchestration.decision_gate") is not None:
+    from jammate.orchestration.decision_gate import should_execute
+else:
+    # The pinned historical checkout does not contain the shared gate.
+    def should_execute(state, plan, *, local_arrangement=False):
+        data = plan.to_dict()
+        return not data["unresolved"] or bool(data["actions"] or data["transport"])
 
 
 PROFILES = ("electric", "acoustic", "synth")
@@ -86,6 +96,7 @@ class TextWork:
     manager: StateManager
     settings: tuple
     pending: tuple | None = None
+    held_message: str | None = None
     applied: AppliedTurn | None = None
     completed: dict = field(default_factory=dict)
     recent: dict = field(default_factory=dict)
@@ -104,8 +115,14 @@ class ReferenceService:
         except LLMConfigurationError:
             raise ValueError("文字大模型尚未配置。可先选用原版本地规则。") from None
 
+    def make_llm_agent(self, config, **options):
+        return LLMAgent(config, **options)
+
     def status(self):
         capabilities = {"soundfont": bool(self.fluidsynth),
+                        "llm_arranger_available": importlib.util.find_spec("jammate.orchestration.arrangement") is not None,
+                        "llm_direct_bass_available": importlib.util.find_spec(
+                            "jammate.orchestration.bass_generation") is not None,
                         "mrt2_installed": importlib.util.find_spec("magenta_rt") is not None
                             and importlib.util.find_spec("jammate.render.runtime") is not None}
         try:
@@ -129,9 +146,12 @@ class ReferenceService:
         if profile != "electric" and not self.fluidsynth:
             raise ValueError("选择音色需要本机 FluidSynth。")
         backend, preview = body.get("renderer", "default"), body.get("allow_preview", False)
+        arrangement = body.get("arranger", "rule")
         if backend not in {"default", "fluidsynth", "mrt2"} or type(preview) is not bool:
             raise ValueError("无效的渲染后端或试听选项。")
-        settings = (mode, bpm, profile, backend, preview)
+        if arrangement not in {"rule", "llm", "llm_direct_bass"}:
+            raise ValueError("无效的音符编排方式。")
+        settings = (mode, bpm, profile, backend, preview, arrangement)
         work = self.works.get(sid)
         if work is not None:
             if settings != work.settings:
@@ -151,12 +171,31 @@ class ReferenceService:
             if work.pending != (rid, text):
                 raise ValueError("上一轮已执行。请保留上一条要求重试以取回文件，或开始新作品。")
             return self.deliver(work)
+        if work is not None and work.held_message is not None and work.pending[0] == rid:
+            if work.pending[1] != text:
+                raise ValueError("请求标识已使用。")
+            raise ValueError(work.held_message)
 
-        config = self.config() if mode == "llm" else None
+        config = self.config() if mode == "llm" or arrangement != "rule" else None
+        arranger = None
+        log = None
+        if arrangement != "rule":
+            try:
+                if arrangement == "llm_direct_bass":
+                    from jammate.orchestration.bass_generation import LLMBassArranger as Arranger
+                else:
+                    from jammate.orchestration.arrangement import LLMArranger as Arranger
+            except ImportError:
+                raise ValueError("LLM 音符编排需要工作区版本。") from None
+            session_hash = hashlib.sha256(sid.encode()).hexdigest()[:20]
+            log = SessionLog(Path("demo_out/arrangement_logs") / f"{session_hash}.jsonl")
+            arranger = Arranger(config, log=log)
         if work is None:
             if len(self.works) >= 8:
                 self.works.popitem(last=False)
-            work = TextWork(StateManager(JamState(session_id=sid, tempo_bpm=bpm)), settings)
+            initial = JamState(session_id=sid, tempo_bpm=bpm)
+            manager = StateManager(initial) if log is None else StateManager(initial, log=log)
+            work = TextWork(manager, settings)
             self.works[sid] = work
         if len(work.completed) >= 16:
             raise ValueError("作品已生成 16 段，请下载结果后开始新作品。")
@@ -171,17 +210,34 @@ class ReferenceService:
         if len(accepted) != 1 or accepted[0].event_id != rid:
             raise ValueError("此请求已被新的指令替换。")
         work.pending = (rid, text)
+        work.held_message = None
 
         snapshot, history = manager.decision_snapshot()
         directory = TemporaryDirectory(prefix="render-", ignore_cleanup_errors=True)
         try:
-            runtime = self.runtime(directory.name, profile) if backend == "default" else self.backend_runtime(
-                directory.name, profile, backend, preview)
-            agent = LLMAgent(config, fallback="error", execution_validator=runtime.validate) if config else RuleAgent()
-            plan = agent.decide(accepted, snapshot, plan_id=f"web_{uuid4().hex}", history=history)
+            decision_options = {"plan_id": f"web_{uuid4().hex}", "history": history}
+            if backend == "default" and arranger is None:
+                runtime = self.runtime(directory.name, profile)
+            else:
+                runtime = self.backend_runtime(directory.name, profile, backend, preview, arranger)
+            if mode == "llm":
+                agent_options = {"fallback": "error", "execution_validator": runtime.validate}
+                if arrangement == "llm":
+                    agent_options["arrangement_enabled"] = True
+                elif arrangement == "llm_direct_bass":
+                    agent_options["direct_bass_enabled"] = True
+                agent = self.make_llm_agent(config, **agent_options)
+            else:
+                agent = RuleAgent()
+                if arrangement == "llm_direct_bass":
+                    decision_options["direct_bass_enabled"] = True
+            plan = agent.decide(accepted, snapshot, **decision_options)
             decision = plan.to_dict()
-            if not decision["actions"] and not decision["transport"]:
-                raise ValueError("这条要求无法执行：" + "；".join(decision["unresolved"] or [decision["reason"]]))
+            if not should_execute(snapshot, plan, local_arrangement=arranger is not None):
+                if hasattr(manager, "hold"):
+                    manager.hold(plan)
+                work.held_message = "这条要求无法执行：" + "；".join(decision["unresolved"])
+                raise ValueError(work.held_message)
             if not manager.stage(plan):
                 raise ValueError("当前计划已失效，请重试。")
             rendered = runtime.execute(manager, plan)
@@ -191,7 +247,8 @@ class ReferenceService:
         receipt = getattr(runtime, "last_receipt", None)
         result = {"session_id": sid, "request_id": rid, "turn": len(work.completed) + 1,
                   "tempo_bpm": rendered.tempo_bpm, "start_bar": rendered.start_bar, "bars": rendered.bars,
-                  "plan": decision, "agent": mode,
+                  "plan": decision, "agent": mode, "arranger": arrangement,
+                  "arrangement": arranger.last_trace if arranger else None,
                   "decision_trace": getattr(agent, "last_trace", {"source": "rule"}),
                   "receipt": receipt,
                   "renderer": "MRT2 / generated preview" if backend == "mrt2" else (
@@ -232,7 +289,7 @@ class ReferenceService:
             return KevinRuntime(Path(output), executable=self.fluidsynth, soundfont=self.soundfont, profile=profile)
         return OfflineRuntime()
 
-    def backend_runtime(self, output, profile, backend, preview):
+    def backend_runtime(self, output, profile, backend, preview, arranger=None):
         # Pinned a63a0f5 has no new runtime module. Never import a second copy
         # of JamState beside it to make the backend seem available.
         try:
@@ -240,7 +297,7 @@ class ReferenceService:
         except ImportError:
             raise ValueError("新后端需要 --implementation workspace；固定历史版本不包含 MRT2。") from None
         return create_runtime(output, backend=backend, fluidsynth=self.fluidsynth,
-                              soundfont=self.soundfont, profile=profile, allow_preview=preview)
+                              soundfont=self.soundfont, profile=profile, allow_preview=preview, arranger=arranger)
 
     def style_sample(self, body):
         from renderer_experiments.app.midi.files import render_with_fluidsynth, write_midi

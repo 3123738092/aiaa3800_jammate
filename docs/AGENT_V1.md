@@ -109,7 +109,8 @@ Agent **不直接生成 MIDI 音符，也不直接修改共享状态**。它保�
 | SIMPLIFY | 指定伴奏层 density 减少 `0.5 * strength`，下限 0；按起音组删减，和弦同组保留；每小节仅一组时按绝对小节分配休止，避免参数变了却始终保留唯一和弦 |
 | ADJUST_FEEL | 使用 rhythm_event_id 切换节奏，或 level_delta 调整层音量；不自动改 BPM |
 | ADD_LAYER / REMOVE_LAYER | 指定声部 active 开关 |
-| FILL / guitar / brightness | 预留或未支持，明确拒绝执行，不声称已完成 |
+| INTRODUCE_LAYER | 新增木吉他声部，按当前和弦生成分解和弦。后续使用 ADD_LAYER / REMOVE_LAYER 启用或静音 |
+| FILL / brightness | 预留，暂未支持 |
 
 本版全部节奏输入都沿用会话 BPM；输入分析的 tempo_source 和 BPM 保留作证据。改变会话速度需要显式“加速/减速”指令（±8 BPM，限制在 60–180）。节奏 confidence≥0.65 且非空才采用；这个门槛只用于规则防抖，不是识别准确率保证。低分/空输入保留原 groove。
 

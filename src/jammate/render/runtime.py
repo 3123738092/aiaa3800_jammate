@@ -3,11 +3,11 @@ from pathlib import Path
 
 
 def create_runtime(output, *, backend="default", fluidsynth=None, soundfont=None,
-                   profile="electric", allow_preview=False):
+                   profile="electric", allow_preview=False, arranger=None):
     if backend == "mrt2":
         import os
         from renderer_experiments.app.mrt2 import MRT2Runtime
-        return MRT2Runtime(Path(output), allow_preview=allow_preview,
+        return MRT2Runtime(Path(output), allow_preview=allow_preview, arranger=arranger,
                            engine=os.environ.get("JAMMATE_MRT2_ENGINE", "jax"),
                            model=os.environ.get("JAMMATE_MRT2_MODEL", "mrt2_small"),
                            prompt=os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band"))
@@ -17,6 +17,7 @@ def create_runtime(output, *, backend="default", fluidsynth=None, soundfont=None
         raise ValueError("FluidSynth executable and SoundFont are required")
     if fluidsynth:
         from renderer_experiments.app.band_plan import KevinRuntime
-        return KevinRuntime(Path(output), executable=Path(fluidsynth), soundfont=Path(soundfont), profile=profile)
+        return KevinRuntime(Path(output), executable=Path(fluidsynth), soundfont=Path(soundfont),
+                            profile=profile, arranger=arranger)
     from jammate.orchestration.offline import OfflineRuntime
-    return OfflineRuntime()
+    return OfflineRuntime(arranger=arranger)

@@ -337,7 +337,7 @@
         "layers": {
           "type": "array",
           "minItems": 4,
-          "maxItems": 4,
+          "maxItems": 5,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -354,7 +354,8 @@
                   "drums",
                   "bass",
                   "keys",
-                  "lead"
+                  "lead",
+                  "guitar"
                 ]
               },
               "active": {

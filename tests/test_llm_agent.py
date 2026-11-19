@@ -14,6 +14,10 @@ from jammate.orchestration.llm import LLMAgent, ModelReply, OpenAIProvider, Prov
 from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import OfflineRuntime
+from jammate.orchestration.decision_gate import should_execute
+from jammate.orchestration.explicit_request import compile_jev_request
+from jammate.orchestration.jev_hybrid import JevHybridAgent
+from jammate.orchestration.tempo_intent import compile_jev_tempo
 from jammate.state import JamState
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -311,3 +315,69 @@ def test_provider_error_body_with_secret_is_not_logged_or_retried():
         assert SECRET not in json.dumps(plan.to_dict()) + json.dumps(agent.last_trace)
     finally:
         client.close()
+
+
+def test_out_of_range_explicit_tempo_holds_without_model_call():
+    m = StateManager(JamState(session_id="jam_demo", tempo_bpm=176))
+    events = m.ingest([from_text("再快 10 BPM", session_id="jam_demo")])
+    fake = FakeProvider()
+    agent = LLMAgent(LLMConfig(SECRET), provider=fake)
+    plan = agent.decide(events, m.state)
+    assert not fake.calls
+    assert agent.last_trace["source"] == "request_gate"
+    assert "186" in plan.to_dict()["unresolved"][0]
+    assert not should_execute(m.state, plan)
+    assert m.state.tempo_bpm == 176 and m.state.position.next_bar == 0
+
+
+def test_llm_repairs_wrong_exact_tempo_before_staging():
+    m = StateManager(JamState(session_id="jam_demo", tempo_bpm=100))
+    events = m.ingest([from_text("速度设到 92 BPM，其他照旧。", session_id="jam_demo")])
+    choices = [decision(preserve=["key"], actions=[], transport={"playing": None, "tempo_bpm": bpm})
+               for bpm in (90, 92)]
+    fake = FakeProvider(*choices)
+    agent = LLMAgent(LLMConfig(SECRET), provider=fake)
+    plan = agent.decide(events, m.state)
+    assert len(fake.calls) == 2
+    assert agent.last_trace["attempts"][0]["status"] == "invalid_output"
+    assert plan.to_dict()["transport"]["tempo_bpm"] == 92 and m.state.tempo_bpm == 100
+
+
+def test_jev_requires_exact_candidate_and_complete_request():
+    state = JamState(session_id="jam_demo", tempo_bpm=92)
+    events = [from_text("再慢 4 BPM", session_id=state.session_id)]
+    assert compile_jev_tempo(events, state, "wrong", mode="up", value=4) is None
+    assert compile_jev_tempo(events, state, "wrong", mode="down", value=8) is None
+    assert compile_jev_tempo(events, state, "right", mode="down", value=4).to_dict()["transport"] == {"tempo_bpm": 88}
+    mixed = [from_text("速度调到 96 BPM，同时关掉鼓。", session_id=state.session_id)]
+    assert compile_jev_tempo(mixed, state, "mixed", mode="set", value=96) is None
+
+
+def test_hybrid_falls_back_when_jev_omits_a_layer_switch():
+    manager = StateManager(JamState(session_id="jam_demo", tempo_bpm=102))
+    events = manager.ingest([from_text("速度设到 96 BPM，让鼓停下来。", session_id="jam_demo")])
+    state = manager.state
+    choices = [decision(actions=[action("REMOVE_LAYER", "drums")], preserve=["key"],
+                        transport={"playing": None, "tempo_bpm": 96})]
+    fake = FakeProvider(*choices)
+    llm = LLMAgent(LLMConfig(SECRET), provider=fake)
+    agent = JevHybridAgent(lambda _events, _state: ({"tempo": ("set", 96)}, {}), llm)
+    plan = agent.decide(events, state)
+    assert agent.last_trace["source"] == "llm_fallback"
+    assert len(fake.calls) == 1 and manager.state == state
+    assert compile_jev_request(events, state, "complete", tempo=("set", 96), layer_changes={"drums": False})
+    assert manager.stage(plan)
+    OfflineRuntime(sample_rate=8000).execute(manager, plan)
+    assert manager.state.tempo_bpm == 96 and not manager.state.layer("drums").active
+
+
+def test_play_in_a_stopped_session_keeps_transport_interpretation_with_the_llm():
+    state = JamState(session_id="jam_demo", tempo_bpm=102, playing=False)
+    events = [from_text("Play 2 bars.", session_id="jam_demo")]
+    fake = FakeProvider(decision(actions=[], preserve=["key"], valid_for_bars=2,
+                                 transport={"playing": True, "tempo_bpm": None}))
+    llm = LLMAgent(LLMConfig(SECRET), provider=fake)
+    agent = JevHybridAgent(lambda *_: pytest.fail("the selector should not handle playback restart"), llm)
+    plan = agent.decide(events, state)
+    assert agent.last_trace["source"] == "llm_fallback"
+    assert plan.to_dict()["transport"] == {"playing": True}

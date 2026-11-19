@@ -1,0 +1,41 @@
+{
+  "fixture_sha256": "0ffbf8561582c2f7acecfdb80dfdb45fa9d4d3b0ba88297a48c1feca5c405521",
+  "results": {
+    "direct": {
+      "cases": 3,
+      "passed": 3,
+      "failures": {},
+      "outcomes": {},
+      "provider_attempts": 0,
+      "models": []
+    },
+    "live": {
+      "cases": 3,
+      "passed": 3,
+      "failures": {},
+      "outcomes": {
+        "applied": 2,
+        "held": 1
+      },
+      "provider_attempts": 3,
+      "models": [
+        "gpt-5.4-mini-2026-03-17"
+      ]
+    },
+    "scripted": {
+      "cases": 11,
+      "passed": 11,
+      "failures": {},
+      "outcomes": {
+        "applied": 4,
+        "held": 2,
+        "rejected": 4,
+        "cached": 1
+      },
+      "provider_attempts": 5,
+      "models": [
+        "scripted"
+      ]
+    }
+  }
+}

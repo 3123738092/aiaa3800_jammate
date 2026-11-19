@@ -1,0 +1,48 @@
+{
+  "requested_model": "gpt-5.4-mini",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-5.4-mini-2026-03-17"
+  ],
+  "passed": 17,
+  "total": 21,
+  "model_responses": 22,
+  "attempts": 22,
+  "usage": {
+    "input_tokens": 128497,
+    "output_tokens": 5318,
+    "total_tokens": 133815
+  },
+  "latency_median_ms": 3578.0,
+  "failed_cases": [
+    {
+      "case": "ask_when_reference_is_ambiguous",
+      "checks": [
+        "state.next_bar"
+      ],
+      "execution_error": {}
+    },
+    {
+      "case": "conflicting_tempo_same_turn",
+      "checks": [
+        "state.next_bar"
+      ],
+      "execution_error": {}
+    },
+    {
+      "case": "density_restore_is_not_volume",
+      "checks": [
+        "state.next_bar"
+      ],
+      "execution_error": {}
+    },
+    {
+      "case": "effect_only_no_alias_to_gain",
+      "checks": [
+        "state.next_bar"
+      ],
+      "execution_error": {}
+    }
+  ],
+  "renderer": "Kevin / FluidSynth"
+}

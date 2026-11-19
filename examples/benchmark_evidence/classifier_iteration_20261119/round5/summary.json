@@ -1,0 +1,173 @@
+{
+  "fixture_sha256": "5281011b02274bdee86e5aa44c6420f705ba053eb14f02e36df0bb235f01b186",
+  "renderer": "ReferenceService NumPy WAV/MIDI",
+  "sessions": 6,
+  "pairs": 18,
+  "arms": {
+    "mini": {
+      "passed": 18,
+      "turns": 18,
+      "outcomes": {
+        "applied": 13,
+        "held": 5
+      },
+      "routes": {
+        "llm": 14,
+        "request_gate": 4
+      },
+      "models": [
+        "gpt-5.4-mini-2026-03-17"
+      ],
+      "jev_requests": 0,
+      "mini_requests": 14,
+      "all_ms": {
+        "n": 18,
+        "p50": 2959.64,
+        "p95": 4565.19
+      },
+      "successful_ms": {
+        "n": 18,
+        "p50": 2959.64,
+        "p95": 4565.19
+      },
+      "successful_artifact_ms": {
+        "n": 13,
+        "p50": 3215.25,
+        "p95": 4665.52
+      },
+      "by_route": {
+        "llm": {
+          "latency_ms": {
+            "n": 14,
+            "p50": 3147.02,
+            "p95": 4645.45
+          },
+          "passed": 14,
+          "artifacts": 13
+        },
+        "request_gate": {
+          "latency_ms": {
+            "n": 4,
+            "p50": 15.39,
+            "p95": 517.75
+          },
+          "passed": 4,
+          "artifacts": 0
+        }
+      }
+    },
+    "hybrid": {
+      "passed": 18,
+      "turns": 18,
+      "outcomes": {
+        "applied": 13,
+        "held": 5
+      },
+      "routes": {
+        "jev": 8,
+        "request_gate": 4,
+        "llm_fallback/outside_supported_requests": 6
+      },
+      "models": [
+        "gpt-5.4-mini-2026-03-17",
+        "jev-1.14.0"
+      ],
+      "jev_requests": 8,
+      "mini_requests": 6,
+      "all_ms": {
+        "n": 18,
+        "p50": 917.89,
+        "p95": 4035.95
+      },
+      "successful_ms": {
+        "n": 18,
+        "p50": 917.89,
+        "p95": 4035.95
+      },
+      "successful_artifact_ms": {
+        "n": 13,
+        "p50": 987.43,
+        "p95": 3815.32
+      },
+      "by_route": {
+        "jev": {
+          "latency_ms": {
+            "n": 8,
+            "p50": 873.74,
+            "p95": 1349.49
+          },
+          "passed": 8,
+          "artifacts": 8
+        },
+        "request_gate": {
+          "latency_ms": {
+            "n": 4,
+            "p50": 15.66,
+            "p95": 515.07
+          },
+          "passed": 4,
+          "artifacts": 0
+        },
+        "llm_fallback/outside_supported_requests": {
+          "latency_ms": {
+            "n": 6,
+            "p50": 3632.72,
+            "p95": 4060.78
+          },
+          "passed": 6,
+          "artifacts": 5
+        }
+      }
+    }
+  },
+  "common_success_ms": {
+    "mini": {
+      "n": 18,
+      "p50": 2959.64,
+      "p95": 4565.19
+    },
+    "hybrid": {
+      "n": 18,
+      "p50": 917.89,
+      "p95": 4035.95
+    }
+  },
+  "common_success_artifact_ms": {
+    "mini": {
+      "n": 13,
+      "p50": 3215.25,
+      "p95": 4665.52
+    },
+    "hybrid": {
+      "n": 13,
+      "p50": 987.43,
+      "p95": 3815.32
+    }
+  },
+  "first_prestate_divergences": {
+    "orchard": null,
+    "ceiling": null,
+    "room_mix": null,
+    "english": null,
+    "lights": null,
+    "muted": null
+  },
+  "failed": {
+    "mini": [],
+    "hybrid": []
+  },
+  "diagnostic": {
+    "mini": {
+      "passed": true,
+      "route": "llm",
+      "reason": null,
+      "elapsed_ms": 2662.72
+    },
+    "hybrid": {
+      "passed": true,
+      "route": "llm_fallback",
+      "reason": "candidate_does_not_cover_request",
+      "elapsed_ms": 3974.4
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "set": {
+    "initial": 100,
+    "proposed": 92.0,
+    "final": 92.0,
+    "status": "applied",
+    "jev_tempo_choice": "set_1"
+  },
+  "down": {
+    "initial": 92,
+    "proposed": 88.0,
+    "final": 88.0,
+    "status": "applied",
+    "jev_tempo_choice": "down_1"
+  },
+  "delta_second_state": {
+    "initial": 110,
+    "proposed": 106.0,
+    "final": 106.0,
+    "status": "applied",
+    "jev_tempo_choice": "down_1"
+  },
+  "outside_relative": {
+    "initial": 176,
+    "proposed": 186.0,
+    "final": 176,
+    "status": "rejected_by_bandplan",
+    "jev_tempo_choice": "up_1"
+  }
+}

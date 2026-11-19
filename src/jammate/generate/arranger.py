@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from jammate.generate.harmony import progression
-from jammate.generate.patterns import bass_bar, comp_bar, drum_bar
+from jammate.generate.patterns import bass_bar, comp_bar, drum_bar, guitar_bar
 from jammate.generate.rhythm import rhythm_parts
 from jammate.music import BEATS_PER_BAR, Chord, Note
 from jammate.state import JamState
@@ -30,6 +30,8 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         backing = (drum_bar(state.energy, phrase_pos)
                    + bass_bar(chord, state.energy)
                    + comp_bar(chord, state.energy))
+    if any(layer.name == "guitar" and layer.active for layer in state.layers):
+        backing += guitar_bar(chord)
     bar_notes = backing + tuple(lead)
     offset = bar_index * BEATS_PER_BAR
     return tuple(n.shifted(offset) for n in bar_notes)

@@ -1,0 +1,53 @@
+{
+  "bpm": 96,
+  "scenarios": [
+    {
+      "id": "kite_short",
+      "turns": [
+        {"id": "kite_short", "text": "来一段轻巧、疏朗、带点俏皮的伴奏。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "kite_scene",
+      "turns": [
+        {"id": "kite_scene", "text": "午后的操场空荡荡的，小孩牵着纸鸢跑了两步。风一停，纸尾在半空轻轻抖了一下。给这段画面配乐。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "kite_contrast",
+      "turns": [
+        {"id": "kite_contrast", "text": "想要纸鸢忽然离地那一刻的小雀跃，别做成热闹的游行。保留现在的速度，留一点空隙，好让一个短短的音乐念头浮出来。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "kite_direction",
+      "turns": [
+        {"id": "kite_direction", "text": "写四小节纸鸢起飞的配乐。速度保持，鼓点减一些，但鼓的力度别变。主奏弹一句短旋律，最后给它留一点空。", "state": {"tempo": 96, "layers.drums.density": ["<", "before.layers.drums.density"], "layers.drums.level": ["=", "before.layers.drums.level"]}, "notes": {"lead": [">", 0]}, "actions": [["INTRODUCE_MOTIF", "lead"]]}
+      ]
+    },
+    {
+      "id": "station_short",
+      "turns": [
+        {"id": "station_short", "text": "来一段安静、空旷、有一点慢慢逼近的紧张感的伴奏。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "station_scene",
+      "turns": [
+        {"id": "station_scene", "text": "给凌晨最后一班车走后的站台配乐。灯管还亮着，隧道那头空空的，等了一会儿，才听见很远的低低震动慢慢靠过来。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "station_contrast",
+      "turns": [
+        {"id": "station_contrast", "text": "想要有人逐渐走近那种悬着的紧张感，别做成突然吓人的段落。压力可以从低处一点点起来，别靠加速或重鼓制造惊吓。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "station_direction",
+      "turns": [
+        {"id": "station_direction", "text": "给空站台做四小节配乐。速度保持，鼓声稍微轻一点，贝斯在这四小节里逐步变响，键盘和主奏保持原样。", "state": {"tempo": 96, "layers.drums.level": ["<", "before.layers.drums.level"], "layers.bass.level": [">", "before.layers.bass.level"]}, "preserve_other_layers": ["drums", "bass"], "actions": [["BUILD", "bass"]]}
+      ]
+    }
+  ]
+}

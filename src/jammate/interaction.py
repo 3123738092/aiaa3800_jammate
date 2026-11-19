@@ -9,6 +9,9 @@ from jammate.music import Note
 from jammate.rhythm import RhythmContext
 
 
+CORE_LAYER_NAMES = ("drums", "bass", "keys", "lead")
+
+
 class Strategy(str, Enum):
     LISTEN = "LISTEN"
     FOLLOW = "FOLLOW"
@@ -24,6 +27,7 @@ class JamAction(str, Enum):
     BUILD = "BUILD"
     SIMPLIFY = "SIMPLIFY"
     ADJUST_FEEL = "ADJUST_FEEL"
+    INTRODUCE_LAYER = "INTRODUCE_LAYER"
     ADD_LAYER = "ADD_LAYER"
     REMOVE_LAYER = "REMOVE_LAYER"
     FILL = "FILL"
@@ -56,7 +60,7 @@ class Layer:
     role: str = "support"
 
     def __post_init__(self):
-        if self.name not in {"drums", "bass", "keys", "lead"} or type(self.active) is not bool:
+        if self.name not in (*CORE_LAYER_NAMES, "guitar") or type(self.active) is not bool:
             raise ValueError("invalid layer name/active flag")
         unit(self.level, "layer level")
         unit(self.density, "layer density")

@@ -1,0 +1,312 @@
+{
+  "version": 1,
+  "rhythms": {
+    "syncopated": {
+      "duration_ms": 3000,
+      "detected_bpm": 108,
+      "onsets": [
+        0,
+        0.75,
+        2,
+        3.25
+      ],
+      "accents": [
+        1,
+        0.58,
+        0.81,
+        0.66
+      ],
+      "confidence": 0.91
+    },
+    "syncopated_weak": {
+      "duration_ms": 3000,
+      "detected_bpm": 108,
+      "onsets": [
+        0,
+        0.75,
+        2,
+        3.25
+      ],
+      "accents": [
+        1,
+        0.58,
+        0.81,
+        0.66
+      ],
+      "confidence": 0.64
+    },
+    "no_onsets": {
+      "duration_ms": 3000,
+      "detected_bpm": 108,
+      "onsets": [],
+      "accents": [],
+      "confidence": 0.15
+    },
+    "dense": {
+      "duration_ms": 3300,
+      "detected_bpm": 84,
+      "onsets": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5
+      ],
+      "accents": [
+        1,
+        0.52,
+        0.75,
+        0.58,
+        0.92,
+        0.61,
+        0.79,
+        0.56
+      ],
+      "confidence": 0.94
+    }
+  },
+  "melodies": {
+    "short_upward": {
+      "duration_ms": 1850,
+      "notes": [
+        [
+          100,
+          60,
+          300,
+          0.68
+        ],
+        [
+          660,
+          64,
+          360,
+          0.8
+        ],
+        [
+          1250,
+          67,
+          410,
+          0.72
+        ]
+      ]
+    },
+    "descending_overlap": {
+      "duration_ms": 3050,
+      "notes": [
+        [
+          380,
+          74,
+          630,
+          0.82
+        ],
+        [
+          840,
+          69,
+          720,
+          0.66
+        ],
+        [
+          1460,
+          67,
+          480,
+          0.77
+        ],
+        [
+          2240,
+          65,
+          490,
+          0.63
+        ]
+      ]
+    },
+    "empty": {
+      "duration_ms": 1700,
+      "notes": []
+    }
+  },
+  "scenarios": [
+    {"id":"decision_on_deadline","split":"dev","family":"decision_deadline","bpm":96,"finish_ms":8500,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"鼓收一点"}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]},"decision_ms":1950}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"decision_one_sample_late","split":"dev","family":"decision_deadline","bpm":96,"finish_ms":8500,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"鼓收一点"}],"expect":{"status":"applied","bar":2,"actions":[["SIMPLIFY","drums"]]},"decision_ms":1951}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":2,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"decision_past_window","split":"dev","family":"decision_deadline","bpm":96,"finish_ms":8500,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"鼓收一点"}],"expect":{"status":"decision_late"},"decision_ms":6951}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":3,"notes":{"drums":1},"baseline":{"drums":"same"}}]
+    },
+    {"id":"prepare_on_deadline","split":"dev","family":"prepare_deadline","bpm":96,"finish_ms":5300,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"鼓收一点"}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]},"prepare_ms":2300}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"prepare_one_sample_late","split":"dev","family":"prepare_deadline","bpm":96,"finish_ms":5300,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"鼓收一点"}],"expect":{"status":"prepare_late","bar":1},"prepare_ms":2301}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1},"baseline":{"drums":"same"}}]
+    },
+    {"id":"rapid_update_supersedes_returning_decision","split":"dev","family":"quick_revision","bpm":96,"finish_ms":5600,
+      "turns":[
+        {"id":"old","at_ms":180,"events":[{"kind":"text","id":"old","text":"鼓更有力"}],"expect":{"status":"stale"},"decision_ms":1250},
+        {"id":"latest","at_ms":210,"events":[{"kind":"text","id":"new","text":"慢一点"}],"expect":{"status":"applied","bar":1,"tempo":88}}
+      ],
+      "final":{"bpm":88},
+      "bar_checks":[{"bar":1,"notes":{"drums":1},"baseline":{"drums":"same"}}]
+    },
+    {"id":"new_input_cancels_buffered_update","split":"dev","family":"quick_revision","bpm":96,"finish_ms":6100,
+      "turns":[
+        {"id":"first","at_ms":50,"events":[{"kind":"text","id":"first","text":"鼓更有力"}],"expect":{"status":"cancelled","bar":1}},
+        {"id":"replacement","at_ms":2350,"events":[{"kind":"text","id":"latest","text":"快一点"}],"expect":{"status":"applied","bar":2,"tempo":104}}
+      ],
+      "final":{"bpm":104},
+      "bar_checks":[{"bar":1,"notes":{"drums":1},"baseline":{"drums":"same"}}]
+    },
+    {"id":"duplicate_retry_does_not_cancel","split":"dev","family":"duplicate","bpm":96,"finish_ms":5550,
+      "turns":[
+        {"id":"first","at_ms":90,"events":[{"kind":"text","id":"only","text":"鼓收一点"}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]}},
+        {"id":"retry","at_ms":440,"events":[{"repeat":"only"}],"expect":{"status":"ignored"}}
+      ],
+      "final":{"bpm":96,"version":2},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"older_capture_arrives_after_newer_text","split":"dev","family":"duplicate","bpm":96,"finish_ms":5600,
+      "turns":[
+        {"id":"first","at_ms":940,"events":[{"kind":"text","id":"fresh","text":"鼓收一点","occurred_ms":930}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]}},
+        {"id":"late_history","at_ms":960,"events":[{"kind":"text","id":"old","text":"快一点","occurred_ms":500}],"expect":{"status":"ignored"}}
+      ],
+      "final":{"bpm":96,"version":2},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"ready_syncopated_pulse_keeps_session_bpm","split":"dev","family":"rhythm_quality","bpm":96,"finish_ms":8400,
+      "turns":[
+        {"id":"rhythm","at_ms":3430,"events":[{"kind":"rhythm","id":"pulse","profile":"syncopated"}],"expect":{"status":"applied","bar":2,"strategy":"RESPOND","actions":[["ADJUST_FEEL","band"]],"tempo":96}}
+      ],
+      "final":{"bpm":96,"rhythm":[0,0.75,2,3.25]},
+      "bar_checks":[{"bar":2,"notes":{"drums":4,"bass":4,"keys":4}}]
+    },
+    {"id":"weak_timing_evidence_keeps_existing_pattern","split":"dev","family":"rhythm_quality","bpm":96,"finish_ms":8400,
+      "turns":[
+        {"id":"rhythm","at_ms":3430,"events":[{"kind":"rhythm","id":"pulse","profile":"syncopated_weak"}],"expect":{"status":["applied","held"],"bar":2}}
+      ],
+      "final":{"bpm":96,"rhythm":null},
+      "bar_checks":[{"bar":2,"notes":{"drums":1},"baseline":{"drums":"same","bass":"same","keys":"same"}}]
+    },
+    {"id":"empty_pulse_retains_default","split":"dev","family":"rhythm_quality","bpm":96,"finish_ms":8400,
+      "turns":[
+        {"id":"rhythm","at_ms":3430,"events":[{"kind":"rhythm","id":"pulse","profile":"no_onsets"}],"expect":{"status":["applied","held"],"bar":2}}
+      ],
+      "final":{"bpm":96,"rhythm":null},
+      "bar_checks":[{"bar":2,"notes":{"drums":1},"baseline":{"drums":"same"}}]
+    },
+    {"id":"indirect_chinese_thin_only_drums","split":"holdout","family":"wording_zh","bpm":96,"finish_ms":8600,
+      "turns":[
+        {"id":"feedback","at_ms":340,"events":[{"kind":"text","id":"spoken","text":"鼓点可不可以少来几下？贝斯和键盘照现在这样。"}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]}}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"indirect_english_thin_only_keys","split":"holdout","family":"wording_en","bpm":96,"finish_ms":12600,
+      "turns":[
+        {"id":"feedback","at_ms":940,"events":[{"kind":"text","id":"spoken","text":"Could you thin out just the keyboard part? Keep the drums and bass as they are."}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","keys"]]}}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1},"baseline_bars":4,"baseline":{"drums":"same","bass":"same","keys":"fewer_onsets"}}]
+    },
+    {"id":"ambiguity_then_scoped_clarification","split":"holdout","family":"two_turn_repair","bpm":96,"finish_ms":9550,
+      "turns":[
+        {"id":"unclear","at_ms":150,"events":[{"kind":"text","id":"ambiguous","text":"把它再推一点？"}],"expect":{"status":"held"}},
+        {"id":"clarify","at_ms":3300,"events":[{"kind":"text","id":"clear","text":"bass more powerful."}],"expect":{"status":"applied","bar":2,"actions":[["BUILD","bass"]]}}
+      ],
+      "final":{"bpm":96},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1},"baseline":{"drums":"same","bass":"same"}},{"bar":2,"notes":{"drums":1,"bass":1},"baseline":{"drums":"same","keys":"same","bass":"stronger"}}]
+    },
+    {"id":"stop_wins_combined_batch_and_audio_cannot_restart","split":"holdout","family":"transport_control","bpm":96,"finish_ms":14100,
+      "turns":[
+        {"id":"stop","at_ms":430,"events":[{"kind":"stop","id":"stop"},{"kind":"text","id":"resume-words","text":"继续"}],"expect":{"status":"applied","bar":1,"strategy":"LISTEN"}},
+        {"id":"pattern_while_stopped","at_ms":3900,"events":[{"kind":"rhythm","id":"while-stopped","profile":"dense"}],"expect":{"status":"applied","bar":2,"strategy":"LISTEN"}},
+        {"id":"explicit_restart","at_ms":7600,"events":[{"kind":"start","id":"start"}],"expect":{"status":"applied","bar":4}}
+      ],
+      "final":{"bpm":96,"playing":true,"rhythm":null},
+      "bar_checks":[{"bar":1,"notes":{"drums":0,"bass":0,"keys":0,"lead":0}},{"bar":2,"notes":{"drums":0,"bass":0,"keys":0,"lead":0}},{"bar":3,"notes":{"drums":0,"bass":0,"keys":0,"lead":0}},{"bar":4,"notes":{"drums":1,"bass":1,"keys":1}}]
+    },
+    {"id":"rhythm_and_humming_atomic_batch","split":"holdout","family":"multimodal_window","bpm":96,"finish_ms":16500,
+      "turns":[
+        {"id":"both","at_ms":4800,"events":[{"kind":"rhythm","id":"pulse","profile":"dense"},{"kind":"humming","id":"phrase","profile":"short_upward"}],"expect":{"status":"applied","bar":3,"strategy":"RESPOND","accepted_ids":["pulse","phrase"],"actions":[["ADJUST_FEEL","band"],["ECHO_MOTIF","lead"]]}}
+      ],
+      "final":{"bpm":96,"rhythm":[0,0.5,1,1.5,2,2.5,3,3.5],"motif":"motif_phrase"},
+      "bar_checks":[{"bar":3,"notes":{"drums":8,"lead":3},"echo":"phrase"}]
+    },
+    {"id":"rhythm_then_humming_150ms_within_prepare_window","split":"holdout","family":"multimodal_window","bpm":96,"finish_ms":16500,
+      "turns":[
+        {"id":"first","at_ms":4650,"events":[{"kind":"rhythm","id":"pulse","profile":"dense"}],"expect":{"status":"cancelled","bar":3}},
+        {"id":"latest","at_ms":4800,"events":[{"kind":"humming","id":"phrase","profile":"short_upward"}],"expect":{"status":"applied","bar":3,"strategy":"RESPOND","accepted_ids":["phrase"],"actions":[["ECHO_MOTIF","lead"]]}}
+      ],
+      "final":{"bpm":96,"rhythm":null,"motif":"motif_phrase"},
+      "bar_checks":[{"bar":3,"notes":{"lead":3},"echo":"phrase"}]
+    },
+    {"id":"rhythm_then_humming_after_playback_commits","split":"holdout","family":"multimodal_window","bpm":96,"finish_ms":16500,
+      "turns":[
+        {"id":"first","at_ms":3500,"events":[{"kind":"rhythm","id":"pulse","profile":"dense"}],"expect":{"status":"applied","bar":2,"strategy":"RESPOND","actions":[["ADJUST_FEEL","band"]]}},
+        {"id":"next","at_ms":8300,"events":[{"kind":"humming","id":"phrase","profile":"short_upward"}],"expect":{"status":"applied","bar":4,"strategy":"RESPOND","actions":[["ECHO_MOTIF","lead"]]}}
+      ],
+      "final":{"bpm":96,"rhythm":[0,0.5,1,1.5,2,2.5,3,3.5],"motif":"motif_phrase"},
+      "bar_checks":[{"bar":2,"notes":{"lead":0,"drums":8}},{"bar":4,"notes":{"lead":3,"drums":8},"echo":"phrase"}]
+    },
+    {"id":"late_completed_hum_while_user_has_started_another_phrase","split":"holdout","family":"activity_order","bpm":96,"finish_ms":16300,
+      "turns":[
+        {"id":"active","at_ms":4200,"events":[{"kind":"activity","id":"performing","active":true}],"expect":{"status":"applied","bar":2,"strategy":"LISTEN"}},
+        {"id":"delayed_phrase","at_ms":5730,"events":[{"kind":"humming","id":"old-hum","profile":"short_upward","occurred_ms":4100}],"expect":{"status":"ignored"}},
+        {"id":"finish","at_ms":8250,"events":[{"kind":"humming","id":"new-hum","profile":"descending_overlap"},{"kind":"activity","id":"done","active":false}],"expect":{"status":"applied","bar":4,"strategy":"RESPOND","actions":[["ECHO_MOTIF","lead"]]}}
+      ],
+      "final":{"bpm":96,"motif":"motif_new-hum","motif_count":1,"user_active":false},
+      "bar_checks":[{"bar":2,"notes":{"lead":0,"drums":1}},{"bar":3,"notes":{"lead":0}},{"bar":4,"notes":{"lead":1},"echo":"new-hum"}]
+    },
+    {"id":"long_idle_then_human_reply_with_leading_rest","split":"holdout","family":"long_handoff","bpm":96,"finish_ms":29500,
+      "turns":[
+        {"id":"first_pause","at_ms":5100,"events":[{"kind":"idle","id":"silent2","bars":2}],"expect":{"status":"applied","bar":3,"strategy":"INITIATE","actions":[["INTRODUCE_MOTIF","lead"]]}},
+        {"id":"longer_pause","at_ms":17400,"events":[{"kind":"idle","id":"silent5","bars":5}],"expect":{"status":"applied","bar":8,"strategy":"LISTEN"}},
+        {"id":"hum","at_ms":21500,"events":[{"kind":"humming","id":"long-reply","profile":"descending_overlap"}],"expect":{"status":"applied","bar":9,"strategy":"RESPOND","actions":[["ECHO_MOTIF","lead"]]}}
+      ],
+      "final":{"bpm":96,"motif_count":2,"motif":"motif_long-reply"},
+      "bar_checks":[{"bar":3,"notes":{"lead":1}},{"bar":4,"notes":{"lead":0,"drums":1}},{"bar":8,"notes":{"lead":0,"drums":1}},{"bar":9,"notes":{"lead":1},"echo":"long-reply"}]
+    },
+    {"id":"empty_weak_humming_does_not_create_motif","split":"holdout","family":"empty_phrase","bpm":96,"finish_ms":9300,
+      "turns":[
+        {"id":"empty","at_ms":3100,"events":[{"kind":"humming","id":"empty","profile":"empty"}],"expect":{"status":["applied","held"],"bar":2}}
+      ],
+      "final":{"bpm":96,"motif":null,"motif_count":0},
+      "bar_checks":[{"bar":2,"notes":{"lead":0,"bass":1}}]
+    },
+    {"id":"fast_session_same_delay_misses_first_bar","split":"holdout","family":"tempo_timing","bpm":120,"finish_ms":7300,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"drums less busy"}],"expect":{"status":"applied","bar":2,"actions":[["SIMPLIFY","drums"]]},"decision_ms":1950}
+      ],
+      "final":{"bpm":120},
+      "bar_checks":[{"bar":1,"notes":{"drums":1},"baseline":{"drums":"same"}},{"bar":2,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    },
+    {"id":"slow_session_same_delay_reaches_first_bar","split":"holdout","family":"tempo_timing","bpm":75,"finish_ms":7800,
+      "turns":[
+        {"id":"feedback","at_ms":0,"events":[{"kind":"text","id":"thin","text":"drums less busy"}],"expect":{"status":"applied","bar":1,"actions":[["SIMPLIFY","drums"]]},"decision_ms":1950}
+      ],
+      "final":{"bpm":75},
+      "bar_checks":[{"bar":1,"notes":{"drums":1,"bass":1,"keys":1,"lead":0},"baseline":{"drums":"fewer_onsets","bass":"same","keys":"same"}}]
+    }
+  ]
+}

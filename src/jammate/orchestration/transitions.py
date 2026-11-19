@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 from jammate.contracts.band_plan import BandPlan, PlanError
-from jammate.interaction import Strategy
+from jammate.interaction import Layer, Strategy
 from jammate.state import JamState
 
 
@@ -13,8 +13,15 @@ def project(state: JamState, plan: BandPlan) -> JamState:
     target = state.with_updates(**{("tempo_bpm" if k == "tempo_bpm" else "playing"): v for k, v in data["transport"].items()})
     for action in data["actions"]:
         name, scope, strength, params = (action[k] for k in ("action", "scope", "strength", "parameters"))
-        if name == "FILL" or scope == "guitar":
-            raise PlanError("offline renderer does not implement FILL/guitar")
+        if name == "FILL":
+            raise PlanError("offline renderer does not implement FILL")
+        if name == "INTRODUCE_LAYER":
+            if any(layer.name == scope for layer in target.layers):
+                raise PlanError(f"layer already exists: {scope}")
+            target = target.with_updates(layers=(*target.layers, Layer(scope)))
+            continue
+        if scope == "guitar" and not any(layer.name == scope for layer in target.layers):
+            raise PlanError("guitar must be introduced before it can be adjusted")
         if name == "SIMPLIFY" and scope == "lead":
             raise PlanError("baseline cannot simplify a lead motif without losing its notes")
         if name == "PRESERVE":
@@ -74,8 +81,12 @@ def project(state: JamState, plan: BandPlan) -> JamState:
             changes_motif = any(a["action"] in {"VARY_MOTIF", "INTRODUCE_MOTIF"} for a in data["actions"])
             if motif_id not in {m.motif_id for m in state.motifs} or target.current_motif_id != state.current_motif_id or changes_motif:
                 raise PlanError("plan violates preserve motif")
-        if preserved.startswith("layer:") and target.layer(preserved[6:]) != state.layer(preserved[6:]):
-            raise PlanError("plan violates preserved layer")
+        if preserved.startswith("layer:"):
+            name = preserved[6:]
+            before = next((layer for layer in state.layers if layer.name == name), None)
+            after = next((layer for layer in target.layers if layer.name == name), None)
+            if before is None or after != before:
+                raise PlanError("plan violates preserved layer")
     strategy = Strategy(data["strategy"])
     return target.with_updates(interaction=replace(target.interaction, strategy=strategy,
                                initiative=1.0 if strategy is Strategy.INITIATE else 0.0))

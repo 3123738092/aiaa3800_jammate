@@ -63,6 +63,43 @@ def test_original_text_turns_keep_state_and_do_not_reapply_successful_requests(b
         bridge.request("text/turn", {**command, "request_id": "stale-new", "text": "加上贝斯"})
 
 
+def test_workspace_text_worker_renders_a_valid_empty_plan(monkeypatch):
+    from jammate.orchestration.llm_config import LLMConfig
+    from jammate.orchestration.plans import make_plan
+    from scripts import reference_worker
+
+    class EmptyPlanAgent:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def decide(self, events, state, *, plan_id, **_kwargs):
+            calls.append(events[0].event_id)
+            if events[0].event_id == "follow":
+                assert _kwargs["history"][-1]["plans"][0]["status"] == "held"
+                assert _kwargs["history"][-1]["state_after"] is None
+            unresolved = ["未指定声部"] if events[0].event_id == "ambiguous" else []
+            transport = {"tempo_bpm": state.tempo_bpm, "playing": state.playing} if unresolved else {}
+            return make_plan(state, events, plan_id, "FOLLOW", [], ["tempo", "key"], transport,
+                             4, "继续当前伴奏", unresolved)
+
+    service = reference_worker.ReferenceService(None, None)
+    calls = []
+    monkeypatch.setattr(service, "config", lambda: LLMConfig(api_key="unit-test"))
+    monkeypatch.setattr(reference_worker, "LLMAgent", EmptyPlanAgent)
+    body = {"session_id": "empty-plan-test", "agent": "llm", "bpm": 100, "profile": "electric"}
+
+    first = service.text_turn({**body, "after_turn": 0, "request_id": "first", "text": "保持现状"})
+    assert first["tempo_bpm"] == 100 and len(midi(first).instruments) > 0
+    with pytest.raises(ValueError, match="未指定声部"):
+        service.text_turn({**body, "after_turn": 1, "request_id": "ambiguous", "text": "改一下它"})
+    with pytest.raises(ValueError, match="未指定声部"):
+        service.text_turn({**body, "after_turn": 1, "request_id": "ambiguous", "text": "改一下它"})
+    assert calls == ["first", "ambiguous"]
+    follow = service.text_turn({**body, "after_turn": 1, "request_id": "follow", "text": "照样接着演"})
+    assert follow["turn"] == 2 and follow["start_bar"] == first["bars"]
+    assert follow["tempo_bpm"] == 100 and len(midi(follow).instruments) > 0
+
+
 def test_pinned_llm_uses_the_original_context_validation_and_renderer(bridge):
     # Run in a fresh interpreter so the upstream jammate package owns the
     # imports. Substitute only the external provider, never the Agent.

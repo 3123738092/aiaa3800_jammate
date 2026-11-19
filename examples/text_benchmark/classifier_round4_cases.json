@@ -1,0 +1,26 @@
+{
+  "start_bpm": 110,
+  "scripted": [
+    {"id":"seed","request":"seed","after_turn":0,"text":"速度设到 102 BPM。","outcome":"applied","tempo":102,"bar":4,"calls":1,"keys":true,"drums":true},
+    {"id":"ambiguity","request":"question","after_turn":1,"text":"鼓和键盘里，先暂停我想的那个声部。请先问我是哪一个，等我回答再继续。","outcome":"held","tempo":102,"bar":4,"calls":2,"keys":true,"drums":true},
+    {"id":"retry_held","request":"question","after_turn":1,"same_as":"ambiguity","outcome":"held","tempo":102,"bar":4,"calls":2,"keys":true,"drums":true},
+    {"id":"changed_held_id","request":"question","after_turn":1,"text":"改成 123 BPM。","outcome":"rejected","tempo":102,"bar":4,"calls":2,"keys":true,"drums":true},
+    {"id":"clarification","request":"answer","after_turn":1,"text":"我指的是键盘。鼓照原样。","outcome":"applied","tempo":102,"bar":8,"calls":3,"keys":false,"drums":true,"requires_held_context":true},
+    {"id":"superseded_held","request":"question","after_turn":2,"same_as":"ambiguity","outcome":"rejected","tempo":102,"bar":8,"calls":3,"keys":false,"drums":true},
+    {"id":"retry_applied","request":"answer","after_turn":1,"same_as":"clarification","outcome":"cached","tempo":102,"bar":8,"calls":3,"keys":false,"drums":true},
+    {"id":"changed_applied_id","request":"answer","after_turn":2,"text":"改成 123 BPM。","outcome":"rejected","tempo":102,"bar":8,"calls":3,"keys":false,"drums":true},
+    {"id":"stale_client","request":"stale","after_turn":1,"text":"速度设到 123 BPM。","outcome":"rejected","tempo":102,"bar":8,"calls":3,"keys":false,"drums":true},
+    {"id":"relative_after_clarification","request":"relative","after_turn":2,"text":"再慢 4 BPM。","outcome":"applied","tempo":98,"bar":12,"calls":4,"keys":false,"drums":true},
+    {"id":"partial","request":"partial","after_turn":3,"text":"速度设到 96 BPM，顺便改成 C 小调。","outcome":"applied","tempo":96,"bar":16,"calls":5,"keys":false,"drums":true,"unresolved":true}
+  ],
+  "direct": [
+    {"id":"held_cannot_execute","outcome":"rejected"},
+    {"id":"preempted_plan","outcome":"rejected"},
+    {"id":"jev_after_previous_commit","outcome":"applied","tempo":92,"bar":20,"keys":false,"drums":true}
+  ],
+  "live": [
+    {"id":"seed","request":"seed","after_turn":0,"text":"速度设到 102 BPM。","outcome":"applied","tempo":102,"bar":4,"keys":true,"drums":true},
+    {"id":"ambiguity","request":"question","after_turn":1,"text":"鼓和键盘里，先暂停我想的那个声部。请先问我是哪一个，等我回答再继续。","outcome":"held","tempo":102,"bar":4,"keys":true,"drums":true},
+    {"id":"clarification","request":"answer","after_turn":1,"text":"我指的是键盘。鼓照原样。","outcome":"applied","tempo":102,"bar":8,"keys":false,"drums":true,"requires_held_context":true}
+  ]
+}

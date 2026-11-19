@@ -1,0 +1,19 @@
+[
+  {"id":"archived_conditional_203","text":"能做到 203 BPM 就用 203；这个数超出范围的话请告诉我，别自行换成别的数，也别往下一段走。","bpm":180,"jev":"held","llm":"held"},
+  {"id":"fresh_conditional_199","text":"如果支持 199 BPM 就设为 199；超范围请告诉我，不要替换数值，不要继续生成。","bpm":110,"jev":"held","llm":"held"},
+  {"id":"relative_outside","text":"再快 10 BPM","bpm":176,"jev":"held","llm":"held"},
+  {"id":"relative_92","text":"再慢 4 BPM","bpm":92,"jev":"applied","llm":"applied","target":88},
+  {"id":"relative_110","text":"再慢 4 BPM","bpm":110,"jev":"applied","llm":"applied","target":106},
+  {"id":"decimal","text":"把速度调到 92.5 BPM，其他全部保持。","bpm":104,"jev":"applied","llm":"applied","target":92.5},
+  {"id":"lower_inclusive","text":"设到 60 BPM。","bpm":95,"jev":"applied","llm":"applied","target":60},
+  {"id":"upper_inclusive","text":"速度设到 180 BPM。","bpm":95,"jev":"applied","llm":"applied","target":180},
+  {"id":"english_absolute","text":"Set the tempo to 99 BPM.","bpm":95,"jev":"applied","llm":"applied","target":99},
+  {"id":"english_relative","text":"Increase tempo by 3 BPM.","bpm":95,"jev":"applied","llm":"applied","target":98},
+  {"id":"already_at_target","text":"速度设为 96 BPM。","bpm":96,"jev":"applied","llm":"applied","target":96},
+  {"id":"stopped_transport","text":"速度设为 92 BPM。","bpm":96,"playing":false,"jev":"applied","llm":"applied","target":92},
+  {"id":"mixed_key","text":"速度设到 96 BPM，另外换成 C 小调。","bpm":102,"jev":"abstain","llm":"applied","target":96,"unresolved":true},
+  {"id":"mixed_mute","text":"速度设到 96 BPM，同时让鼓停下来。","bpm":102,"jev":"abstain","llm":"applied","target":96,"drums_active":false},
+  {"id":"negated","text":"不要调到 92 BPM，保持当前速度，原样继续。","bpm":102,"jev":"abstain","llm":"applied","target":102},
+  {"id":"unrelated_numeric","text":"鼓整体力度提高 0.1，速度和打点保持。","bpm":102,"jev":"abstain","llm":"applied","target":102,"drums_level":0.6},
+  {"id":"fabricated_candidate","text":"速度设为 92 BPM。","bpm":96,"inject_jev":{"mode":"set","value":93},"jev":"abstain"}
+]

@@ -1,0 +1,27 @@
+{
+  "requested_model": "gpt-6-luna",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-6-luna"
+  ],
+  "passed": 7,
+  "total": 8,
+  "model_responses": 10,
+  "attempts": 10,
+  "usage": {
+    "input_tokens": 33796,
+    "output_tokens": 3304,
+    "total_tokens": 37100
+  },
+  "latency_median_ms": 6195.5,
+  "failed_cases": [
+    {
+      "case": "nordic_anchored",
+      "checks": [
+        "result: no unresolved items"
+      ],
+      "execution_error": {}
+    }
+  ],
+  "renderer": "Kevin / FluidSynth"
+}

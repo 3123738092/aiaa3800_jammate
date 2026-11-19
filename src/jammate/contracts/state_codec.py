@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from jsonschema import Draft202012Validator
+from jammate.interaction import CORE_LAYER_NAMES
 from .input_event import _json_values, input_event_schema
 
 
@@ -31,7 +32,7 @@ def state_schema():
         "feel": obj({"energy": {"type": "integer", "minimum": 0, "maximum": 3}, "density": score, "brightness": score, "tension": score, "tags": {"type": "array", "items": text}}),
         "motifs": obj({"current_id": {"type": ["string", "null"]}, "last_user": notes, "last_ai": notes,
                        "items": {"type": "array", "items": obj({"motif_id": text, "owner": {"enum": ["user", "ai"]}, "source_event_ids": {"type": "array", "uniqueItems": True, "items": text}, "notes": notes})}}),
-        "arrangement": obj({"layers": {"type": "array", "minItems": 4, "maxItems": 4, "items": obj({"name": {"enum": ["drums", "bass", "keys", "lead"]}, "active": boolean, "level": score, "density": score, "role": text})}}),
+        "arrangement": obj({"layers": {"type": "array", "minItems": 4, "maxItems": 5, "items": obj({"name": {"enum": [*CORE_LAYER_NAMES, "guitar"]}, "active": boolean, "level": score, "density": score, "role": text})}}),
         "interaction": obj({"strategy": {"enum": ["LISTEN", "FOLLOW", "RESPOND", "INITIATE"]}, "initiative": score,
                             "current_lead": {"enum": ["user", "ai", None]}, "user_active": boolean, "awaiting_user": boolean, "last_feedback": {"type": ["string", "null"]}}),
         "rhythm": {"anyOf": [{"type": "null"}, rhythm]}, "rhythm_mode": {"enum": ["follow", "vary", "simplify"]},

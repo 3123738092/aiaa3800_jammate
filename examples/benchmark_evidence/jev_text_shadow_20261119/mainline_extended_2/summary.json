@@ -1,0 +1,27 @@
+{
+  "requested_model": "gpt-5.4-mini",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-5.4-mini-2026-03-17"
+  ],
+  "passed": 19,
+  "total": 20,
+  "model_responses": 21,
+  "attempts": 21,
+  "usage": {
+    "input_tokens": 106213,
+    "output_tokens": 4996,
+    "total_tokens": 111209
+  },
+  "latency_median_ms": 3375.5,
+  "failed_cases": [
+    {
+      "case": "no_unequal_instrument_substitution",
+      "checks": [
+        "state.next_bar"
+      ],
+      "execution_error": {}
+    }
+  ],
+  "renderer": "Kevin / FluidSynth"
+}

@@ -17,7 +17,7 @@ from jammate.music import Note, midi_to_hz
 SR = 22050
 PEAK_LIMIT = 0.98
 TAIL_S = 1.5  # room after the last note for releases and the crash cymbal
-_GAINS = {"drums": 0.8, "bass": 0.55, "keys": 0.16, "lead": 0.32, "user": 0.3}
+_GAINS = {"drums": 0.8, "bass": 0.55, "keys": 0.16, "lead": 0.32, "user": 0.3, "guitar": 0.22}
 
 
 def _time(seconds: float, sr: int) -> np.ndarray:
@@ -77,6 +77,13 @@ def _keys(freq: float, hold_s: float, sr: int) -> np.ndarray:
     return tone * _envelope(t, 0.01, hold_s, 0.25, sustain=0.6, decay_tau_s=0.3)
 
 
+def _guitar(freq: float, hold_s: float, sr: int) -> np.ndarray:
+    t = _time(hold_s + 0.10, sr)
+    tone = sum(np.sin(2 * np.pi * harmonic * freq * t) * np.exp(-harmonic * t * 8) / harmonic
+               for harmonic in range(1, 6))
+    return tone * _envelope(t, 0.003, hold_s, 0.10)
+
+
 def _lead(freq: float, hold_s: float, sr: int) -> np.ndarray:
     t = _time(hold_s + 0.1, sr)
     vibrato = 1.0 + 0.004 * np.sin(2 * np.pi * 5.5 * t) * (t > 0.2)
@@ -93,6 +100,8 @@ def _voice(note: Note, hold_s: float, sr: int) -> np.ndarray:
         return _bass(freq, hold_s, sr)
     if note.instrument == "keys":
         return _keys(freq, hold_s, sr)
+    if note.instrument == "guitar":
+        return _guitar(freq, hold_s, sr)
     return _lead(freq, hold_s, sr)
 
 

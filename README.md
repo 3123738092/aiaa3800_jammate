@@ -38,6 +38,8 @@ pnpm --dir web/optimized run build
 
 要启用大模型，在项目目录运行 `.\.venv\Scripts\python.exe -m pip install -e ".[llm]"`，配置自己的 `OPENAI_API_KEY`，或让 `JAMMATE_LLM_CONFIG` 指向仓库外的私有配置。重启服务后，在文字页选择「队友大模型 Agent」。[配置与验证说明](docs/integration/REFERENCE_WORKBENCH.md#大模型配置)
 
+「高级设置 → 音符编排」可单独启用 LLM，调整计划授权声部的实际音符。网页可查看编排摘要，模型请求、原始回复与采纳结果写入本地日志。[操作与日志说明](docs/LLM_ARRANGEMENT.md)
+
 ## 实现与来源
 
 哼唱由 Spotify Basic Pitch 提取音符，接上我们的单声部整理和变奏。拍手与文字调用队友 `a63a0f5` 版本的节拍编排和文字 Agent。三种入口都按小节生成乐器音符，拍手使用原版内置合成器，哼唱和文字可以用 Kevin 渲染器及 FluidSynth 发声。[实现与验收](docs/integration/REFERENCE_WORKBENCH.md) · [团队原版命令行和研发记录](https://github.com/3123738092/aiaa3800_jammate/blob/a63a0f5f579cbc36ed0dfa31874c8888e4873cbd/README.md)

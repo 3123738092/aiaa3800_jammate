@@ -8,8 +8,9 @@ import pretty_midi
 
 from jammate.music import Note
 
-# General MIDI programs (0-based): finger bass, electric piano, square lead, choir.
-_PROGRAMS = {"bass": 33, "keys": 4, "lead": 80, "user": 52}
+# General MIDI programs are 0-based.
+GUITAR_PROGRAM = 25  # Acoustic Guitar (steel)
+_PROGRAMS = {"bass": 33, "keys": 4, "lead": 80, "user": 52, "guitar": GUITAR_PROGRAM}
 
 
 def to_pretty_midi(notes: tuple[Note, ...], tempo_bpm: float) -> pretty_midi.PrettyMIDI:

@@ -19,6 +19,12 @@
       </select></label>
       <p id="provider-state" class="muted" role="status">正在检查大模型配置…</p>
       <details><summary>高级设置</summary>
+        <label>音符编排 <select id="text-arranger" aria-describedby="direct-bass-help">
+          <option value="rule">本地规则</option>
+          <option value="llm" disabled>LLM 辅助编排</option>
+          <option value="llm_direct_bass" disabled>LLM 直接编排贝斯</option>
+        </select></label>
+        <p id="direct-bass-help" class="muted" hidden>模型直接写 1–4 小节贝斯。可先输入「来一段」。用大模型 Agent 还可以指定音域或写法。计划未授权或校验失败时会显示规则回退。</p>
         <label>生成后端 <select id="text-renderer">
           <option value="default">精确编排（当前音源）</option>
           <option value="mrt2">MRT2 生成试听</option>
@@ -43,6 +49,10 @@
     <section id="text-output" class="panel" hidden>
       <h2>听这一轮</h2>
       <p id="text-decision"></p>
+      <details id="arrangement-details" hidden>
+        <summary>音符编排日志</summary>
+        <pre id="arrangement-trace"></pre>
+      </details>
       <audio id="text-audio" controls aria-label="文字创作结果"></audio>
       <p><a id="text-wav" download="text.wav">下载 WAV</a> · <a id="text-midi" download="text.mid">下载 MIDI</a></p>
     </section>

@@ -1,0 +1,491 @@
+{
+  "turns": 88,
+  "input_sha256": {
+    "demo_out/text_benchmark_20261118/mini_baseline/turns.jsonl": "5b856e58b474a77181460be4862058e74fd367b974b2c7463f0dd7ac2c78f8ed",
+    "demo_out/text_benchmark_20261118/prompt_methods/luna/turns.jsonl": "2c23c9b5e4714271a1bda8d095de4e98b9e6d7e3ab78c252f022c5dfcee4ead9",
+    "demo_out/jev_text_shadow_20261119/mainline_extended_1/turns.jsonl": "bc52c84de64f483b3c3be5878dfe00a7842b342a84b7e335e0ba6c94783fa125",
+    "demo_out/jev_text_shadow_20261119/mainline_extended_2/turns.jsonl": "0dbf974b68bedc7c1cf4d2631d0dbeed7ff29525f59b88c54fa11f3bdf11621b",
+    "demo_out/jev_text_shadow_20261119/mainline_extended_3/turns.jsonl": "e0af8b378e6414b231a8ef04e1a81d74657c3b6abc22d1ac10d588b4e85991ec",
+    "/mnt/d/桌面/学/a26-27 autumn/AIAA 3800/project/aiaa3800-jammate-mrt2/examples/text_benchmark/cases.json": "dd3605b1313a5cadb59d457c17e513adee97f8be356f475dca84ca0257d505f9",
+    "/mnt/d/桌面/学/a26-27 autumn/AIAA 3800/project/aiaa3800-jammate-mrt2/examples/text_benchmark/extended_cases.json": "f5c0ffba8ab66f3d9445043a2fe275955459dd92637c20cf9e64cbde73bd3cc9",
+    "/mnt/d/桌面/学/a26-27 autumn/AIAA 3800/project/aiaa3800-jammate-mrt2/examples/text_benchmark/prompt_methods.json": "9f15f2990c9bb61eb0ec00b28932ba3b248169649774cbcf0bfa55ba03c6feda"
+  },
+  "cases_by_dataset": {
+    "cases": 18,
+    "extended_cases": 62,
+    "prompt_methods": 8
+  },
+  "gold_routes": {
+    "fast": 44,
+    "agent": 35,
+    "unsupported": 5,
+    "clarify": 4
+  },
+  "baseline_passed": 81,
+  "modes": {
+    "text_only": {
+      "responses": 88,
+      "exact": 49,
+      "fields": {
+        "route": {
+          "correct": 59,
+          "total": 88
+        },
+        "tempo": {
+          "correct": 19,
+          "total": 20
+        },
+        "scope": {
+          "correct": 49,
+          "total": 59
+        },
+        "bars": {
+          "correct": 5,
+          "total": 5
+        },
+        "transport": {
+          "correct": 6,
+          "total": 6
+        },
+        "effect": {
+          "correct": 27,
+          "total": 28
+        }
+      },
+      "gates": {
+        "0.0": {
+          "fast_predictions": 19,
+          "wrong_route": 0,
+          "all_scored_fields_correct": 18
+        },
+        "0.8": {
+          "fast_predictions": 5,
+          "wrong_route": 0,
+          "all_scored_fields_correct": 5
+        },
+        "0.9": {
+          "fast_predictions": 4,
+          "wrong_route": 0,
+          "all_scored_fields_correct": 4
+        },
+        "0.95": {
+          "fast_predictions": 2,
+          "wrong_route": 0,
+          "all_scored_fields_correct": 2
+        }
+      },
+      "models": [
+        "jev-1.14.0"
+      ],
+      "p50_ms": 854.0,
+      "p95_ms": 918.8
+    },
+    "context": {
+      "responses": 88,
+      "exact": 59,
+      "fields": {
+        "route": {
+          "correct": 64,
+          "total": 88
+        },
+        "tempo": {
+          "correct": 20,
+          "total": 20
+        },
+        "scope": {
+          "correct": 54,
+          "total": 59
+        },
+        "bars": {
+          "correct": 5,
+          "total": 5
+        },
+        "transport": {
+          "correct": 6,
+          "total": 6
+        },
+        "effect": {
+          "correct": 28,
+          "total": 28
+        }
+      },
+      "gates": {
+        "0.0": {
+          "fast_predictions": 43,
+          "wrong_route": 11,
+          "all_scored_fields_correct": 30
+        },
+        "0.8": {
+          "fast_predictions": 15,
+          "wrong_route": 2,
+          "all_scored_fields_correct": 13
+        },
+        "0.9": {
+          "fast_predictions": 9,
+          "wrong_route": 1,
+          "all_scored_fields_correct": 8
+        },
+        "0.95": {
+          "fast_predictions": 6,
+          "wrong_route": 0,
+          "all_scored_fields_correct": 6
+        }
+      },
+      "models": [
+        "jev-1.14.0"
+      ],
+      "p50_ms": 857.4,
+      "p95_ms": 954.4
+    }
+  },
+  "by_dataset": {
+    "cases": {
+      "text_only": {
+        "responses": 18,
+        "exact": 9,
+        "fields": {
+          "route": {
+            "correct": 12,
+            "total": 18
+          },
+          "tempo": {
+            "correct": 3,
+            "total": 3
+          },
+          "scope": {
+            "correct": 8,
+            "total": 12
+          },
+          "bars": {
+            "correct": 0,
+            "total": 0
+          },
+          "transport": {
+            "correct": 3,
+            "total": 3
+          },
+          "effect": {
+            "correct": 7,
+            "total": 7
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 5,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 4
+          },
+          "0.8": {
+            "fast_predictions": 2,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 2
+          },
+          "0.9": {
+            "fast_predictions": 1,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 1
+          },
+          "0.95": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 872.2,
+        "p95_ms": 1004.7
+      },
+      "context": {
+        "responses": 18,
+        "exact": 10,
+        "fields": {
+          "route": {
+            "correct": 13,
+            "total": 18
+          },
+          "tempo": {
+            "correct": 3,
+            "total": 3
+          },
+          "scope": {
+            "correct": 9,
+            "total": 12
+          },
+          "bars": {
+            "correct": 0,
+            "total": 0
+          },
+          "transport": {
+            "correct": 3,
+            "total": 3
+          },
+          "effect": {
+            "correct": 7,
+            "total": 7
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 10,
+            "wrong_route": 3,
+            "all_scored_fields_correct": 5
+          },
+          "0.8": {
+            "fast_predictions": 3,
+            "wrong_route": 1,
+            "all_scored_fields_correct": 2
+          },
+          "0.9": {
+            "fast_predictions": 2,
+            "wrong_route": 1,
+            "all_scored_fields_correct": 1
+          },
+          "0.95": {
+            "fast_predictions": 1,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 1
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 869.1,
+        "p95_ms": 1001.6
+      }
+    },
+    "extended_cases": {
+      "text_only": {
+        "responses": 62,
+        "exact": 32,
+        "fields": {
+          "route": {
+            "correct": 39,
+            "total": 62
+          },
+          "tempo": {
+            "correct": 16,
+            "total": 17
+          },
+          "scope": {
+            "correct": 40,
+            "total": 46
+          },
+          "bars": {
+            "correct": 5,
+            "total": 5
+          },
+          "transport": {
+            "correct": 3,
+            "total": 3
+          },
+          "effect": {
+            "correct": 17,
+            "total": 18
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 14,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 14
+          },
+          "0.8": {
+            "fast_predictions": 3,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 3
+          },
+          "0.9": {
+            "fast_predictions": 3,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 3
+          },
+          "0.95": {
+            "fast_predictions": 2,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 2
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 853.3,
+        "p95_ms": 892.6
+      },
+      "context": {
+        "responses": 62,
+        "exact": 41,
+        "fields": {
+          "route": {
+            "correct": 43,
+            "total": 62
+          },
+          "tempo": {
+            "correct": 17,
+            "total": 17
+          },
+          "scope": {
+            "correct": 44,
+            "total": 46
+          },
+          "bars": {
+            "correct": 5,
+            "total": 5
+          },
+          "transport": {
+            "correct": 3,
+            "total": 3
+          },
+          "effect": {
+            "correct": 18,
+            "total": 18
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 33,
+            "wrong_route": 8,
+            "all_scored_fields_correct": 25
+          },
+          "0.8": {
+            "fast_predictions": 12,
+            "wrong_route": 1,
+            "all_scored_fields_correct": 11
+          },
+          "0.9": {
+            "fast_predictions": 7,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 7
+          },
+          "0.95": {
+            "fast_predictions": 5,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 5
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 856.7,
+        "p95_ms": 902.9
+      }
+    },
+    "prompt_methods": {
+      "text_only": {
+        "responses": 8,
+        "exact": 8,
+        "fields": {
+          "route": {
+            "correct": 8,
+            "total": 8
+          },
+          "tempo": {
+            "correct": 0,
+            "total": 0
+          },
+          "scope": {
+            "correct": 1,
+            "total": 1
+          },
+          "bars": {
+            "correct": 0,
+            "total": 0
+          },
+          "transport": {
+            "correct": 0,
+            "total": 0
+          },
+          "effect": {
+            "correct": 3,
+            "total": 3
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.8": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.9": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.95": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 850.0,
+        "p95_ms": 869.2
+      },
+      "context": {
+        "responses": 8,
+        "exact": 8,
+        "fields": {
+          "route": {
+            "correct": 8,
+            "total": 8
+          },
+          "tempo": {
+            "correct": 0,
+            "total": 0
+          },
+          "scope": {
+            "correct": 1,
+            "total": 1
+          },
+          "bars": {
+            "correct": 0,
+            "total": 0
+          },
+          "transport": {
+            "correct": 0,
+            "total": 0
+          },
+          "effect": {
+            "correct": 3,
+            "total": 3
+          }
+        },
+        "gates": {
+          "0.0": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.8": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.9": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          },
+          "0.95": {
+            "fast_predictions": 0,
+            "wrong_route": 0,
+            "all_scored_fields_correct": 0
+          }
+        },
+        "models": [
+          "jev-1.14.0"
+        ],
+        "p50_ms": 855.0,
+        "p95_ms": 911.4
+      }
+    }
+  }
+}

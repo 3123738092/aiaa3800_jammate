@@ -1,0 +1,53 @@
+{
+  "bpm": 96,
+  "scenarios": [
+    {
+      "id": "neutral",
+      "turns": [
+        {"id": "neutral", "text": "按现在的设置原样继续四小节，速度和各个声部都不要改。", "state": {"music": ["=", "before.music"]}, "notes": {"all": [">", 0]}}
+      ]
+    },
+    {
+      "id": "poetic",
+      "turns": [
+        {"id": "poetic", "text": "把这段做得更诗情画意一点吧，像月光落在水面上，水纹散开以后还有一点留白。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "jiangnan",
+      "turns": [
+        {"id": "jiangnan", "text": "来一点江南风情，像撑着小船穿过烟雨里的石桥，轻轻悠悠的。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "underworld",
+      "turns": [
+        {"id": "underworld", "text": "让这段有一点阴森的地狱风情，像走进漆黑的地底，深处有什么在缓慢靠近。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "southeast_asia",
+      "turns": [
+        {"id": "southeast_asia", "text": "来一点东南亚的感觉，像雨刚停的海岛集市，空气湿热，人群跟着棚下传来的音乐轻轻摇摆。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "nordic_winter",
+      "turns": [
+        {"id": "nordic_winter", "text": "想要一点北欧冬夜的冷冽，像走过一片空旷的雪原，只看见远处几盏灯慢慢亮起来。", "outcome": "observe"}
+      ]
+    },
+    {
+      "id": "jiangnan_anchored",
+      "turns": [
+        {"id": "jiangnan_anchored", "text": "还是烟雨江南的感觉。速度保持，鼓点稀疏一点，再请你弹一句短短的主旋律。", "state": {"tempo": 96, "layers.drums.density": ["<", "before.layers.drums.density"]}, "notes": {"lead": [">", 0]}}
+      ]
+    },
+    {
+      "id": "nordic_anchored",
+      "turns": [
+        {"id": "nordic_anchored", "text": "做成北欧冬夜那种空旷和冷。速度设为 72 BPM，鼓声更轻、鼓点更稀，其他声部保持。", "state": {"tempo": 72, "layers.drums.density": ["<", "before.layers.drums.density"], "layers.drums.level": ["<", "before.layers.drums.level"]}, "preserve_other_layers": ["drums"]}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "requested_model": "gpt-5.4-mini",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-5.4-mini-2026-03-17"
+  ],
+  "passed": 7,
+  "total": 8,
+  "model_responses": 10,
+  "attempts": 10,
+  "usage": {
+    "input_tokens": 33700,
+    "output_tokens": 4059,
+    "total_tokens": 37759
+  },
+  "latency_median_ms": 5265.0,
+  "failed_cases": [
+    {
+      "case": "underworld",
+      "checks": [
+        "style probe: validated plan available for review"
+      ],
+      "execution_error": {
+        "provider": "invalid_output"
+      }
+    }
+  ],
+  "renderer": "Kevin / FluidSynth"
+}

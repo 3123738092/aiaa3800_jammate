@@ -1,0 +1,48 @@
+{
+  "bpm": 80,
+  "scenarios": [
+    {
+      "id": "instrument_lifecycle",
+      "turns": [
+        {"id": "start", "text": "来四小节伴奏，鼓可以更有力一点，速度别动。", "state": {"tempo": 80, "layers.drums.level": [">", "before.layers.drums.level"]}, "notes": {"guitar": 0}, "preserve_other_layers": ["drums"]},
+        {"id": "add_guitar", "text": "稍微快一点，加一个其他乐器进来", "state": {"tempo": [">", "before.tempo"], "layers.guitar.active": true}, "notes": {"guitar": [">", 0]}, "actions": [["INTRODUCE_LAYER", "guitar"]], "preserve_other_layers": ["guitar"]},
+        {"id": "mute_reference", "text": "让刚加进来的那个乐器停下来，其他照旧。", "state": {"tempo": ["=", "before.tempo"], "playing": true, "layers.guitar.active": false}, "notes": {"guitar": 0, "drums": [">", 0], "bass": [">", 0], "keys": [">", 0]}, "preserve_other_layers": ["guitar"]},
+        {"id": "restore_reference", "text": "还是把刚才关掉的加回来吧，其他不动。", "state": {"tempo": ["=", "before.tempo"], "layers.guitar.active": true}, "notes": {"guitar": [">", 0]}, "actions": [["ADD_LAYER", "guitar"]], "preserve_other_layers": ["guitar"]},
+        {"id": "unsupported_instrument", "text": "保持现在的编制不要换，另外加一把小提琴。", "outcome": "unsupported", "feedback_contains": ["小提琴"], "state": {"music": ["=", "before.music"]}}
+      ]
+    },
+    {
+      "id": "tempo_level_density",
+      "turns": [
+        {"id": "exact_tempo", "text": "速度设到 110 BPM，其他全部保持。", "state": {"tempo": 110}, "preserve_other_layers": []},
+        {"id": "drum_level", "text": "鼓再有冲击力一点，但节奏型和速度都别改。", "state": {"tempo": 110, "layers.drums.level": [">", "before.layers.drums.level"], "layers.drums.density": ["=", "before.layers.drums.density"]}, "onsets": {"drums": ["=", "previous.drums"]}, "preserve_other_layers": ["drums"]},
+        {"id": "drum_density", "text": "鼓打得稀疏些，力度不要比刚才小，速度不变。", "state": {"tempo": 110, "layers.drums.level": ["=", "before.layers.drums.level"], "layers.drums.density": ["<", "before.layers.drums.density"]}, "onsets": {"drums": ["<", "previous.drums"]}, "preserve_other_layers": ["drums"]},
+        {"id": "restore_original_volume", "text": "鼓音量恢复到一开始，刚调好的稀疏节奏和速度都保留。", "state": {"tempo": 110, "layers.drums.level": 0.5, "layers.drums.density": ["=", "before.layers.drums.density"]}, "onsets": {"drums": ["=", "previous.drums"]}, "preserve_other_layers": ["drums"]},
+        {"id": "no_change", "text": "这段不错，就这样接着演一段，什么都不用改。", "state": {"music": ["=", "before.music"]}, "notes": {"drums": [">", 0], "bass": [">", 0], "keys": [">", 0]}}
+      ]
+    },
+    {
+      "id": "stop_and_resume",
+      "turns": [
+        {"id": "mute_drums_only", "text": "停的是鼓，不是整个乐队。贝斯和键盘继续。", "state": {"playing": true, "layers.drums.active": false}, "notes": {"drums": 0, "bass": [">", 0], "keys": [">", 0]}, "preserve_other_layers": ["drums"]},
+        {"id": "stop_band", "text": "现在全队停下来。", "state": {"playing": false}, "notes": {"all": 0}, "preserve_other_layers": []},
+        {"id": "do_not_restart", "text": "先别开始，保持停奏。", "outcome": "hold", "state": {"playing": false, "music": ["=", "before.music"]}, "notes": {"all": 0}},
+        {"id": "resume_except_drums", "text": "乐队继续，但鼓先继续休息。", "state": {"playing": true, "layers.drums.active": false}, "notes": {"drums": 0, "bass": [">", 0], "keys": [">", 0]}, "preserve_other_layers": []}
+      ]
+    },
+    {
+      "id": "motif_and_partial",
+      "turns": [
+        {"id": "introduce_motif", "text": "你先来一句短的主旋律，速度保持。", "state": {"tempo": 80, "motif": ["!=", "before.motif"]}, "notes": {"lead": [">", 0]}, "actions": [["INTRODUCE_MOTIF", "lead"]]},
+        {"id": "repeat_motif", "text": "原样再弹一遍你刚才那句主旋律，别变奏。", "state": {"tempo": 80, "motif": ["=", "before.motif"]}, "notes": {"lead": ["=", "previous.lead"]}, "actions": [["ECHO_MOTIF", "lead"]], "same_pitched_notes_as_previous": "lead"},
+        {"id": "partially_supported", "text": "把速度升到 96 BPM，再从现在的调换成 C 小调。其他都保持。", "outcome": "partial", "feedback_contains": ["调"], "state": {"tempo": 96, "key": ["=", "before.key"], "motif": ["=", "before.motif"]}, "preserve_other_layers": []}
+      ]
+    },
+    {
+      "id": "ambiguous_reference",
+      "turns": [
+        {"id": "unresolved_scope", "text": "把那个再调一点，别的不要动。", "outcome": "clarify", "state": {"music": ["=", "before.music"]}}
+      ]
+    }
+  ]
+}

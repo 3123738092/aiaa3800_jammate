@@ -1,0 +1,134 @@
+{
+  "jev": {
+    "n": 19,
+    "passed": 19,
+    "outcomes": {
+      "applied": 13,
+      "held": 2,
+      "abstain": 4,
+      "error": 0
+    },
+    "provider_rows": 18,
+    "provider_attempts": 18,
+    "provider_p50_ms": 817.15,
+    "request_gate_rows": 0,
+    "request_gate_p50_ms": null,
+    "models": [
+      "jev-1.14.0"
+    ],
+    "applied_total_p50_ms": 852.42
+  },
+  "llm": {
+    "n": 18,
+    "passed": 18,
+    "outcomes": {
+      "applied": 14,
+      "held": 4,
+      "abstain": 0,
+      "error": 0
+    },
+    "provider_rows": 16,
+    "provider_attempts": 17,
+    "provider_p50_ms": 3843.915,
+    "request_gate_rows": 2,
+    "request_gate_p50_ms": 13.24,
+    "models": [
+      "gpt-5.4-mini-2026-03-17"
+    ],
+    "applied_total_p50_ms": 4070.115
+  },
+  "fixture_sha256": "a083a575b2565f83d491e09a0b04b477afd59846099c678af8e274b7c62eb083",
+  "pairs": 18,
+  "archived_mixed_mute": {
+    "source": "demo_out/classifier_iteration_20261119/round2/cases.jsonl",
+    "text": "速度设到 96 BPM，同时让鼓停下来。",
+    "status": "error",
+    "passed": false,
+    "before": {
+      "bpm": 102,
+      "next_bar": 0,
+      "playing": true,
+      "state_version": 1,
+      "layers": {
+        "drums": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "bass": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "keys": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "lead": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        }
+      }
+    },
+    "after": {
+      "bpm": 102,
+      "next_bar": 0,
+      "playing": true,
+      "state_version": 1,
+      "layers": {
+        "drums": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "bass": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "keys": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        },
+        "lead": {
+          "active": true,
+          "level": 0.5,
+          "density": 1.0
+        }
+      }
+    },
+    "attempts": [
+      {
+        "attempt": 1,
+        "request_chars": 16255,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "usage": {
+          "input_tokens": 3242,
+          "output_tokens": 209,
+          "total_tokens": 3451
+        },
+        "status": "invalid_output",
+        "validation_error": "cannot preserve groove while removing/simplifying drums"
+      },
+      {
+        "attempt": 2,
+        "request_chars": 16895,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "usage": {
+          "input_tokens": 3391,
+          "output_tokens": 176,
+          "total_tokens": 3567
+        },
+        "status": "invalid_output",
+        "validation_error": "plan violates preserve tempo"
+      }
+    ]
+  },
+  "failures": {
+    "jev": [],
+    "llm": []
+  }
+}

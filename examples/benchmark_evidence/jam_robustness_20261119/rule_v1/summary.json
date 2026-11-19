@@ -1,0 +1,99 @@
+{
+  "agent": "rule",
+  "virtual_sample_rate": 1000,
+  "fixture_sha256": "465221872ffc8e8e9808cefcf61be66acc6968d7a716a7fd3ea48f46638090dd",
+  "melody_template_sha256": "cf10e196e17da72d45a70711983b31e8cbe515926c0b06ca07d0daba164722a0",
+  "scenarios": 24,
+  "passed": 22,
+  "turns": 37,
+  "statuses": {
+    "applied": 26,
+    "decision_late": 1,
+    "prepare_late": 1,
+    "stale": 1,
+    "cancelled": 2,
+    "ignored": 3,
+    "held": 3
+  },
+  "agent_wall_p50_ms": 0.24,
+  "failures": {
+    "indirect_chinese_thin_only_drums": [
+      "feedback.status",
+      "feedback.actions",
+      "bar1.drums.fewer_onsets"
+    ],
+    "indirect_english_thin_only_keys": [
+      "feedback.status",
+      "feedback.actions",
+      "bar1.keys.fewer_onsets"
+    ]
+  },
+  "by_split": {
+    "dev": {
+      "scenarios": 12,
+      "passed": 12
+    },
+    "holdout": {
+      "scenarios": 12,
+      "passed": 10
+    }
+  },
+  "by_family": {
+    "decision_deadline": {
+      "scenarios": 3,
+      "passed": 3
+    },
+    "prepare_deadline": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "quick_revision": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "duplicate": {
+      "scenarios": 2,
+      "passed": 2
+    },
+    "rhythm_quality": {
+      "scenarios": 3,
+      "passed": 3
+    },
+    "wording_zh": {
+      "scenarios": 1,
+      "passed": 0
+    },
+    "wording_en": {
+      "scenarios": 1,
+      "passed": 0
+    },
+    "two_turn_repair": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "transport_control": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "multimodal_window": {
+      "scenarios": 3,
+      "passed": 3
+    },
+    "activity_order": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "long_handoff": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "empty_phrase": {
+      "scenarios": 1,
+      "passed": 1
+    },
+    "tempo_timing": {
+      "scenarios": 2,
+      "passed": 2
+    }
+  }
+}

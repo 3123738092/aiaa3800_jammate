@@ -1,0 +1,33 @@
+{
+  "requested_model": "gpt-6-luna",
+  "reasoning_effort": "low",
+  "returned_models": [
+    "gpt-6-luna"
+  ],
+  "passed": 17,
+  "total": 18,
+  "model_responses": 18,
+  "attempts": 18,
+  "usage": {
+    "input_tokens": 87927,
+    "output_tokens": 3121,
+    "total_tokens": 91048
+  },
+  "latency_median_ms": 3648.5,
+  "failed_cases": [
+    {
+      "case": "no_change",
+      "checks": [
+        "result: rendered and committed",
+        "notes.drums",
+        "notes.bass",
+        "notes.keys"
+      ],
+      "execution_error": {
+        "type": "ValueError",
+        "message": "这条要求无法执行：按当前状态继续演奏四小节，不做任何调整。"
+      }
+    }
+  ],
+  "renderer": "Kevin / FluidSynth"
+}

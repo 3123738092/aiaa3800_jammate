@@ -1,0 +1,51 @@
+{
+  "sessions": [
+    {
+      "id": "orchard", "initial_bpm": 108, "turns": [
+        {"id":"set_scope_length","text":"生成三小节，同时把速度调到 101 BPM，让键盘静音。","status":"applied","bpm":101,"bars":3,"inactive":["keys"]},
+        {"id":"relative_after_commit","text":"从当前速度减 7 BPM，让贝斯停下来，渲染五小节。","status":"applied","bpm":94,"bars":5,"inactive":["keys","bass"]},
+        {"id":"reopen_one_scope","text":"恢复键盘，播放一小节。","status":"applied","bpm":94,"bars":1,"inactive":["bass"]}
+      ]
+    },
+    {
+      "id": "ceiling", "initial_bpm": 170, "turns": [
+        {"id":"tempo_conflict","text":"生成两小节，保持原速，速度改成 164 BPM。","status":"held","bpm":170,"reason_any":["冲突","确认"]},
+        {"id":"relative_exceeds_ceiling","text":"从当前速度加 15 BPM，生成三小节。","status":"held","bpm":170,"reason_any":["185","范围"]},
+        {"id":"resume_valid_command","text":"把速度改为 165 BPM，来六小节。","status":"applied","bpm":165,"bars":6,"inactive":[]}
+      ]
+    },
+    {
+      "id": "room_mix", "initial_bpm": 102, "turns": [
+        {"id":"interpretive_level","text":"Make the bass a little louder, keep the pace and leave the keys alone.","status":"applied","bpm":102,"inactive":[],"raise_level":["bass"]},
+        {"id":"interpretive_density","text":"把鼓的打点变得疏一些，鼓的音量别动。","status":"applied","bpm":102,"inactive":[],"lower_density":["drums"]},
+        {"id":"supported_partial","text":"速度调至 109 BPM，然后换成 D 小调；如果调性不支持，先完成调速。","status":"applied","bpm":109,"inactive":[],"unresolved_any":["D 小调","调性","换调"]}
+      ]
+    },
+    {
+      "id": "english", "initial_bpm": 106, "turns": [
+        {"id":"english_compound","text":"Render 7 bars, set the tempo to 113 BPM, disable the bass.","status":"applied","bpm":113,"bars":7,"inactive":["bass"]},
+        {"id":"english_enable","text":"Enable bass, play 3 bars, keep the tempo unchanged.","status":"applied","bpm":113,"bars":3,"inactive":[]},
+        {"id":"groove_conflict","text":"Disable drums, keep the drum pattern, generate 2 bars.","status":"held","bpm":113,"reason_any":["冲突","确认"]}
+      ]
+    },
+    {
+      "id": "lights", "initial_bpm": 100, "turns": [
+        {"id":"unsupported_organ","text":"请为这首加入一支管风琴；做不到就暂时不要继续。","status":"held","bpm":100,"reason_any":["管风琴","音色"]},
+        {"id":"recover_after_held","text":"把速度调整到 104 BPM，播放两小节。","status":"applied","bpm":104,"bars":2,"inactive":[]},
+        {"id":"image_then_action","text":"想让整体像摇曳的灯光；请仅略微加强鼓声，其余保持。","status":"applied","bpm":104,"inactive":[],"raise_level":["drums"]}
+      ]
+    },
+    {
+      "id": "muted", "initial_bpm": 121, "turns": [
+        {"id":"mute_two","text":"让贝斯和键盘静音，来三小节。","status":"applied","bpm":121,"bars":3,"inactive":["bass","keys"]},
+        {"id":"paraphrase_relative","text":"在当前速度的基础上减去 5 BPM，其他照旧。","status":"applied","bpm":116,"inactive":["bass","keys"]},
+        {"id":"invalid_length","text":"让鼓停止演奏，生成十七小节。","status":"held","bpm":116,"reason_any":["小节数","1–16"]}
+      ]
+    }
+  ],
+  "diagnostic": {
+    "id":"injected_omission", "initial_bpm": 110, "turns": [
+      {"id":"omit_jev_scope","text":"设到 98 BPM，同时让键盘停奏，生成五小节。","status":"applied","bpm":98,"bars":5,"inactive":["keys"],"inject_jev":{"tempo":["set","98"],"bars":5}}
+    ]
+  }
+}

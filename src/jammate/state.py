@@ -9,7 +9,7 @@ from enum import Enum
 
 from jammate.music import Key, Note
 from jammate.rhythm import RhythmContext, RhythmMode
-from jammate.interaction import Interaction, Layer, Motif, RhythmSource, TransportPosition, unit
+from jammate.interaction import CORE_LAYER_NAMES, Interaction, Layer, Motif, RhythmSource, TransportPosition, unit
 
 MIN_TEMPO_BPM = 60.0
 MAX_TEMPO_BPM = 180.0
@@ -75,8 +75,8 @@ class JamState:
             ids = [getattr(item, key) for item in entries]
             if len(ids) != len(set(ids)):
                 raise ValueError(f"duplicate {key}")
-        if {layer.name for layer in self.layers} != {"drums", "bass", "keys", "lead"}:
-            raise ValueError("baseline state requires drums, bass, keys and lead layers (active or muted)")
+        if not set(CORE_LAYER_NAMES).issubset(layer.name for layer in self.layers):
+            raise ValueError("state requires drums, bass, keys and lead layers (active or muted)")
         if self.current_motif_id is not None and self.current_motif_id not in {m.motif_id for m in self.motifs}:
             raise ValueError("current_motif_id must reference a registered motif")
 
