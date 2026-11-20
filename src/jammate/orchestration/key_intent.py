@@ -22,6 +22,11 @@ _TONICS = {name.lower(): pc for pc, name in enumerate(PITCH_CLASS_NAMES) if len(
 _ACCIDENTALS = {"": 0, "#": 1, "♯": 1, "b": -1, "♭": -1}
 
 
+def named_key(root, accidental, mode):
+    tonic = (_TONICS[root.lower()] + _ACCIDENTALS[accidental.lower()]) % 12
+    return Key(tonic, "major" if mode.lower() in {"大调", "major"} else "minor")
+
+
 def explicit_key_plan(events, state, plan_id):
     clauses = speech_clauses(events)
     if len(clauses) != 1:
@@ -32,11 +37,8 @@ def explicit_key_plan(events, state, plan_id):
     match = _TARGET.fullmatch(text)
     if match is None:
         return None
-    root, accidental, mode_text = match.groups()
-    tonic = (_TONICS[root] + _ACCIDENTALS[accidental]) % 12
-    mode = "major" if mode_text in {"大调", "major"} else "minor"
-    key = Key(tonic, mode)
-    label = f"{PITCH_CLASS_NAMES[tonic]} {'大调' if mode == 'major' else '小调'}"
+    key = named_key(*match.groups())
+    label = f"{PITCH_CLASS_NAMES[key.tonic]} {'大调' if key.mode == 'major' else '小调'}"
     if state.key == key:
         return request_hold(events, state, plan_id, f"当前已经是 {label}。")
     preserve = ["tempo", "playing"]
@@ -46,6 +48,6 @@ def explicit_key_plan(events, state, plan_id):
         preserve.append(f"motif:{state.current_motif_id}")
     return make_plan(
         state, events, plan_id, "FOLLOW",
-        [{"action": "SET_KEY", "scope": "band", "strength": 1.0, "parameters": {"tonic": tonic, "mode": mode}}],
+        [{"action": "SET_KEY", "scope": "band", "strength": 1.0, "parameters": {"tonic": key.tonic, "mode": key.mode}}],
         preserve, {}, 4, f"从生效小节起，将伴奏换到 {label}。", [],
     )

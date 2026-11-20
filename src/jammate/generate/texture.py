@@ -53,19 +53,20 @@ def apply_texture(state, chord, backing):
         "bass": lambda: _bass(texture.bass, chord),
         "keys": lambda: _keys(texture.keys, chord, anchors, bool(state.chord_cycle)),
     }
-    changed = {name for name in by_layer if getattr(texture, name) != "default"}
+    changed = {name for name in by_layer if getattr(texture, name) != "default"
+               and (name == "drums" or chord is not None)}
     notes = tuple(note for note in backing if note.instrument not in changed)
     for name, generate in by_layer.items():
         if name in changed:
             notes += generate()
-    if texture.scale == "default":
+    if texture.scale == "default" or state.key is None:
         return notes
     if texture.scale == "blues":
         steps = (0, 3, 5, 6, 7, 10)
     else:
         steps = (0, 2, 4, 7, 9) if state.key.mode == "major" else (0, 3, 5, 7, 10)
     palette = {(state.key.tonic + step) % 12 for step in steps}
-    if state.chord_cycle:
+    if chord is not None and state.chord_cycle:
         palette.update(chord.pcs)
     return tuple(dict.fromkeys(
         note if note.instrument == "drums" or note.pitch % 12 in palette else

@@ -74,6 +74,16 @@ def test_llm_is_primary_not_a_keyword_preparser(monkeypatch):
     assert m.state.layer("bass").level == .5 and m.state.tempo_bpm == 100
 
 
+def test_optional_model_reply_trace_redacts_credentials():
+    m, events, agent, _ = setup(f"bad reply {SECRET}", decision())
+    agent.capture_replies = True
+    agent.decide(events, m.state)
+    rejected, accepted = agent.last_trace["attempts"]
+    assert rejected["reply"] == "bad reply [redacted]"
+    assert rejected["status"] == "invalid_output"
+    assert json.loads(accepted["reply"])["reason"] == "只增强鼓"
+
+
 def test_schema_requires_every_branch_field_and_has_no_backend_notes():
     def check(schema):
         if schema.get("type") == "object":

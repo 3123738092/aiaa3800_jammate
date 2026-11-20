@@ -22,7 +22,9 @@
 .jam-position { font-size: 1rem; color: #dfebd0; }
 #jam-bar { font-weight: 650; font-variant-numeric: tabular-nums; font-size: 3rem; line-height: 1.1; }
 .jam-settings label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.jam-settings label[hidden] { display: none; }
 .jam-settings input { width: 6rem; }
+#jam-mrt2-auto { width: auto; }
 .jam-settings input, .jam-settings select { background: #f3f4e9; border: 1px solid #dce3d4; border-radius: 7px; }
 .jam-buttons, .jam-quick { display: flex; flex-wrap: wrap; gap: 8px; }
 .jam-buttons button { background: #e0edcc; color: #233e31; padding: 8px 14px; }
@@ -37,6 +39,14 @@
 .jam-voice { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; }
 .jam-voice button[aria-pressed=true] { background: #92442c; }
 #jam-voice-status { margin: 8px 0 14px; overflow-wrap: anywhere; }
+.jam-captions { margin-bottom: 14px; padding: 10px 12px; border: 1px solid #b7c1af; border-radius: 8px; }
+#jam-captions-status { margin: 0; font-size: .85rem; }
+#jam-captions-text { min-height: 1.5em; margin: 4px 0 8px; overflow-wrap: anywhere; }
+#jam-captions-use { font-size: .87rem; padding: 5px 10px; }
+.jam-nod:not([hidden]) { display: flex; align-items: start; gap: 12px; margin-bottom: 14px; padding: 10px 12px; border: 1px solid #b7c1af; border-radius: 8px; }
+.jam-nod video { width: min(132px, 25vw); border-radius: 6px; background: #233e31; transform: scaleX(-1); }
+.jam-nod p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.jam-nod button { padding: 5px 10px; font-size: .87rem; }
 .jam-transcript { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .jam-transcript span { overflow-wrap: anywhere; }
 .jam-transcript button { font-size: .87rem; padding: 5px 10px; }
@@ -59,6 +69,120 @@
 .jam-advanced input[type=checkbox] { width: auto; }
 #jam-backend-status, #jam-timbre-status, #jam-mrt2-hint { font-size: .85rem; color: #dce9d3; margin: 6px 0; }
 #jam-preview-audio { display: block; width: 100%; margin-bottom: 8px; }
+.jam-export { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#jam-export-status { font-size: .85rem; }
 
 .jam-workspace button:disabled { cursor: default; }
 #jam-start[aria-busy=true] { cursor: progress; }
+
+.jam-debug {
+  margin-top: 18px;
+  color: #203b31;
+  background: #f0f4ea;
+  border: 1px solid #bfccbb;
+  border-radius: 18px;
+}
+.jam-debug > summary {
+  cursor: pointer;
+  padding: 16px 22px;
+  font-weight: 650;
+}
+#jam-debug-summary {
+  margin-inline-start: 10px;
+  font-size: .85rem;
+  font-weight: 400;
+  color: #4e6256;
+}
+.jam-debug-content { padding: 2px 22px 22px; }
+.jam-debug-music {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr);
+  gap: 1px;
+  margin: 0 0 20px;
+  overflow: hidden;
+  border: 1px solid #cfdbca;
+  border-radius: 12px;
+  background: #cfdbca;
+}
+.jam-debug-music > div { padding: 10px 12px; background: #fbfcf7; }
+.jam-debug-music dt { font-size: .76rem; color: #50665a; }
+.jam-debug-music dd { margin: 2px 0 0; font-size: 1rem; font-weight: 650; overflow-wrap: anywhere; }
+.jam-debug-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 6px 18px; flex-wrap: wrap; }
+.jam-debug-toolbar h2 { margin: 0; font-size: 1.13rem; }
+.jam-debug-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.jam-debug-toolbar label { display: flex; align-items: center; gap: 5px; font-size: .85rem; }
+.jam-debug-toolbar select { max-width: min(14rem, 59vw); min-width: 0; }
+.jam-debug-toolbar button { font-size: .82rem; padding: 6px 10px; }
+.jam-debug-muted { font-size: .84rem; color: #4e6256; margin: 6px 0 10px; }
+.jam-debug-roll { overflow: hidden; border-radius: 9px; background: #11251f; }
+.jam-debug-roll canvas { width: 100%; height: 168px; display: block; }
+.jam-debug-table { overflow-x: auto; margin-top: 10px; }
+.jam-debug-table table { width: 100%; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+.jam-debug-table caption { text-align: left; font-size: .8rem; color: #4e6256; margin-bottom: 6px; }
+.jam-debug-table th, .jam-debug-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #d1dbcc; white-space: nowrap; }
+.jam-debug-table tr th:first-child { padding-left: 0; }
+.jam-debug-swatch { display: inline-block; width: .66em; height: .66em; margin-inline-end: .55em; border-radius: 2px; border: 1px solid #466457; }
+.jam-debug-history { margin-top: 20px; }
+#jam-debug-turn-status { margin: 6px 0 10px; font-size: .9rem; overflow-wrap: anywhere; }
+.jam-debug-data { display: grid; gap: 6px; }
+.jam-debug-data details { border: 1px solid #cfdbca; border-radius: 8px; background: #fbfcf7; min-width: 0; }
+.jam-debug-data summary { cursor: pointer; padding: 7px 10px; font-size: .87rem; }
+.jam-debug-data pre {
+  margin: 0 8px 8px;
+  padding: 10px;
+  max-height: 17rem;
+  overflow: auto;
+  border-radius: 5px;
+  background: #1b3028;
+  color: #e1eee2;
+  font: .76rem/1.5 ui-monospace, Consolas, monospace;
+  tab-size: 2;
+}
+@media (max-width: 550px) {
+  .jam-debug > summary, .jam-debug-content { padding-inline: 14px; }
+  .jam-debug-music { grid-template-columns: 1fr 1fr; }
+}
+
+.jam-opening.panel { margin: 0 0 20px; padding: 18px 22px; border: 1px solid #cad8c5; }
+.jam-opening h2 { margin: 0 0 12px; font-size: 1.2rem; }
+.jam-opening-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; }
+.jam-opening-mode select { font: inherit; max-width: 100%; }
+.jam-opening-mode p { width: 100%; margin: 0; font-size: .84rem; }
+.jam-cold-settings { margin: 0 0 12px; }
+.jam-cold-settings summary { cursor: pointer; }
+.jam-cold-settings p { margin: 6px 0 0; font-size: .84rem; }
+.jam-cold-fields { display: flex; gap: 8px 18px; flex-wrap: wrap; margin-top: 8px; }
+.jam-cold-fields label { display: flex; align-items: center; gap: 8px; }
+.jam-cold-fields input, .jam-cold-fields select { font: inherit; }
+.jam-cold-fields input { width: 6rem; }
+.jam-opening-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.jam-opening-card { padding: 14px; border: 1px solid #cbd8c9; border-radius: 12px; background: #f3f6ee; min-width: 0; }
+.jam-opening-card h3 { margin: 0; font-size: .99rem; }
+.jam-opening-card p, #jam-opening-status { font-size: .84rem; margin: 6px 0; overflow-wrap: anywhere; }
+.jam-opening-card audio { width: 100%; height: 40px; margin: 4px 0; }
+.jam-humming-trim { border: 1px solid #cad8c5; border-radius: 8px; margin: 8px 0; min-width: 0; }
+.jam-humming-trim label { display: grid; gap: 4px; }
+.jam-humming-trim output { display: block; margin-top: 4px; font-size: .85rem; }
+#jam-complete-humming { background: #315a42; border: 1px solid #315a42; color: #fff8e7; font-weight: 650; }
+#jam-complete-humming:disabled { background: #e2ebdc; border-color: #a4b69e; color: #355044; opacity: 1; }
+.jam-opening-actions { display: flex; align-items: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.jam-opening-actions button, .jam-opening-card [data-send] { font-size: .85rem; padding: 6px 10px; }
+.jam-file { position: relative; display: inline-flex; align-items: center; cursor: pointer; border: 1px solid #a2b7a5;
+  border-radius: 8px; padding: 5px 9px; color: #234532; font-size: .85rem; }
+.jam-file input { cursor: inherit; position: absolute; inset: 0; width: 100%; opacity: 0; }
+.jam-file:focus-within { outline: 2px solid #335e49; outline-offset: 2px; }
+.jam-file:has(input:disabled) { opacity: .55; cursor: default; }
+.jam-dropzone { display: flex; justify-content: center; min-height: 42px; border-style: dashed; background: #fbfcf7; }
+.jam-dropzone:not(:has(input:disabled)):hover, .jam-opening-card.is-dragging .jam-dropzone {
+  background: #dfedda;
+  border-color: #3a6a50;
+}
+#jam-opening-direction { margin: 12px 0 4px; font-size: .85rem; }
+#jam-opening-text { display: block; box-sizing: border-box; width: 100%; margin-top: 4px; padding: 7px 10px;
+  border: 1px solid #bdccb9; border-radius: 8px; resize: vertical; font: inherit; }
+#jam-opening-result { margin-top: 10px; padding: 9px 12px; border-radius: 8px; background: #e7efe0; overflow-wrap: anywhere; }
+#jam-opening-reason { margin: 4px 0 0; font-size: .85rem; }
+@media (max-width: 550px) {
+  .jam-opening.panel { padding: 14px; }
+  .jam-opening-inputs { grid-template-columns: 1fr; }
+}

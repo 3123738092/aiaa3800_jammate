@@ -148,7 +148,7 @@ class KevinRuntime:
         target = project(state, plan)
         if plan.to_dict()["effective_at"]["bar"] != state.position.next_bar:
             raise PlanError("renderer requires the next unrendered bar")
-        if target.playing and target.key is None:
+        if target.playing and target.auto_harmony and target.key is None:
             raise PlanError("a playing arrangement requires a key")
         return target
 

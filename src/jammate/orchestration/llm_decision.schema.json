@@ -584,6 +584,57 @@
               "action": {
                 "type": "string",
                 "enum": [
+                  "SET_KEY"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "band"
+                ]
+              },
+              "strength": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tonic",
+                  "mode"
+                ],
+                "properties": {
+                  "tonic": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 11
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "major",
+                      "minor"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "scope",
+              "strength",
+              "parameters"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
                   "SET_PROGRESSION"
                 ]
               },

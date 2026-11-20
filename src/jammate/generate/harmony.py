@@ -28,13 +28,17 @@ def progression(key: Key, variant: int = 0) -> tuple[Chord, ...]:
 
 
 def harmony_cycle(state) -> tuple[Chord, ...]:
+    if state.key is None:
+        return ()
     if state.chord_cycle:
         return tuple(step.in_key(state.key) for step in state.chord_cycle)
-    return progression(state.key, state.progression_variant)
+    return progression(state.key, state.progression_variant) if state.auto_harmony else ()
 
 
 def same_cycle(first, second):
     """Compare what would repeat, independent of starting chord or duplicate cycles."""
+    if not first or not second:
+        return not first and not second
     horizon = len(first) * len(second)
     return any(
         all(first[index % len(first)] == second[(index + phase) % len(second)] for index in range(horizon))

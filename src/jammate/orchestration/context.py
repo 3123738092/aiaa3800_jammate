@@ -9,6 +9,8 @@ def select_state(events, state, *, motif_limit=12, rhythm_limit=8):
     rhythms = {e.event_id for e in events if e.event_type == "rhythm_seed"}
     if state.current_motif_id:
         motifs.add(state.current_motif_id)
+    if state.accompaniment_motif is not None:
+        motifs.add(state.accompaniment_motif.motif_id)
     # Current input and explicit references take priority over recency. A large
     # current batch may exceed the target counts; the request budget then guards it.
     motifs.update(m.motif_id for m in state.motifs if mentioned(m.motif_id))

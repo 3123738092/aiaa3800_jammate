@@ -45,9 +45,11 @@ def state_schema():
         "rhythm": {"anyOf": [{"type": "null"}, rhythm]}, "rhythm_mode": {"enum": ["follow", "vary", "simplify"]},
         "rhythm_sources": {"type": "array", "items": obj({"event_id": text, "context": rhythm})},
     })
+    result["properties"]["motifs"]["properties"]["accompaniment"] = obj({"motif_id": text, "start_bar": integer})
     result["properties"]["arrangement"]["properties"]["texture"] = obj(
         {name: {"enum": list(values)} for name, values in TEXTURE_CHOICES.items()}
     )
+    result["properties"]["harmony"]["properties"]["auto_harmony"] = boolean
     result["properties"]["harmony"]["properties"]["progression"] = obj({
         "start_bar": integer,
         "chords": {"type": "array", "minItems": 2, "maxItems": 8, "items": obj({

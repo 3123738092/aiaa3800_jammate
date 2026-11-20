@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, replace
+from math import ceil
 
 from jammate.generate.harmony import triad
-from jammate.music import Key, Note
+from jammate.music import BEATS_PER_BAR, Key, Note
 
 LEAD_LOW, LEAD_HIGH = 60, 84
 TRANSFORMS = ("echo", "sequence", "inversion", "retrograde", "displace")
@@ -146,6 +147,18 @@ def answer_motif(
         if _pitch_classes(answer.notes) != heard:
             return answer
     return _build("echo", notes, key, rng)
+
+
+def continue_motif(motif: tuple[Note, ...], key: Key) -> tuple[Note, ...]:
+    """Develop a short ending from the last few notes of a recognized melody."""
+    phrase = sorted(motif, key=lambda note: (note.start, note.pitch))
+    start = ceil(max(note.end for note in phrase) * 2) / 2
+    tail = normalize(tuple(phrase[-4:]))
+    span = max(note.end for note in tail)
+    scale = min(1., BEATS_PER_BAR / span)
+    tail = tuple(replace(note, start=note.start * scale, duration=note.duration * scale) for note in tail)
+    answer = answer_motif(tail, key, random.Random(0), transform="sequence")
+    return tuple(note.shifted(start) for note in answer.notes)
 
 
 def initiate_motif(key: Key, rng: random.Random) -> tuple[Note, ...]:

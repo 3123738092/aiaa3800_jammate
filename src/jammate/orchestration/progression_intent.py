@@ -30,21 +30,26 @@ def asks_for_new_progression(events):
     return len(clauses) == 1 and _OPEN.fullmatch(clauses[0]) is not None
 
 
-def explicit_progression_plan(events, state, plan_id):
-    clauses = speech_clauses(events)
-    if len(clauses) != 1 or (match := _EXPLICIT.fullmatch(clauses[0])) is None:
+def named_chords(clause):
+    if (match := _EXPLICIT.fullmatch(clause)) is None:
         return None
     text = match[1] or match[2]
     tokens = re.split(r"\s*[-–—→、]\s*|\s+", text.strip())
     matches = [_CHORD.fullmatch(token) for token in tokens]
     if not 2 <= len(matches) <= 8 or not all(matches):
         return None
-    if state.key is None:
-        return request_hold(events, state, plan_id, "请先设置当前调性，再切换和弦进行。")
-    chords = tuple(
+    return tuple(
         Chord((_NATURALS[root] + _ACCIDENTALS[accidental]) % 12, _QUALITIES[quality])
         for root, accidental, quality in (chord.groups() for chord in matches)
     )
+
+
+def explicit_progression_plan(events, state, plan_id):
+    clauses = speech_clauses(events)
+    if len(clauses) != 1 or not (chords := named_chords(clauses[0])):
+        return None
+    if state.key is None:
+        return request_hold(events, state, plan_id, "请先设置当前调性，再切换和弦进行。")
     label = " → ".join(chord.name for chord in chords)
     if len(set(chords)) < 2:
         return request_hold(events, state, plan_id, "请给出至少两个不同的和弦来组成进行。")

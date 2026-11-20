@@ -89,6 +89,18 @@ class Motif:
 
 
 @dataclass(frozen=True)
+class AccompanimentMotif:
+    motif_id: str
+    start_bar: int
+
+    def __post_init__(self):
+        if not isinstance(self.motif_id, str) or not self.motif_id.strip():
+            raise ValueError("accompaniment motif needs an ID")
+        if type(self.start_bar) is not int or self.start_bar < 0:
+            raise ValueError("invalid accompaniment start bar")
+
+
+@dataclass(frozen=True)
 class RhythmSource:
     event_id: str
     context: RhythmContext

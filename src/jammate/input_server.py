@@ -60,7 +60,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("请求必须为 JSON 对象。")
                 if self.path.startswith("/api/jam/"):
                     operation = self.path.removeprefix("/api/jam/")
-                    if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop"}:
+                    if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop", "debug"}:
                         self.json_response(404, {"error": "unknown Jam endpoint"})
                         return
                     self.json_response(200, self.server.jam.dispatch(operation, body))

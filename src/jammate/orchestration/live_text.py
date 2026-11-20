@@ -4,7 +4,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict
-from urllib.error import URLError
+from time import monotonic
+from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import uuid4
 
@@ -75,6 +76,9 @@ class JevLiveTagger:
         self.key = key
 
     def __call__(self, text, state, catalogue):
+        return self.classify(text, state, catalogue)[0]
+
+    def classify(self, text, state, catalogue):
         targets = {layer.name: f"Existing layer {layer.name}." for layer in state.layers}
         normalized = text.casefold()
         named_programs = {added_program(SCOPES[name]) for name in re.findall(_ALIASES, normalized)}
@@ -108,18 +112,26 @@ class JevLiveTagger:
             }}, ensure_ascii=False).encode(),
             {"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
         )
+        started = monotonic()
+        trace = {"requested_model": "jev-latest"}
+        selected = {}
         try:
             with build_opener(_NoRedirect).open(request, timeout=JEV_TIMEOUT) as response:
                 result = json.load(response)
             answers = result["answers"]
-            selected = {}
             for name, question in questions.items():
                 choice, score = answers[name]["choice"], float(answers[name]["confidence"])
                 if choice in question["criteria"] and 0 <= score <= 1:
                     selected[name] = choice, score
-            return selected
-        except (URLError, OSError, ValueError, TypeError, KeyError):
-            return {}
+            trace.update(model=result.get("model"), status="classified" if selected else "empty")
+        except (URLError, OSError, ValueError, TypeError, KeyError) as exc:
+            selected = {}
+            reason = getattr(exc, "reason", exc)
+            trace.update(status="failed", error="timeout" if isinstance(reason, TimeoutError) else type(exc).__name__)
+            if isinstance(exc, HTTPError):
+                trace["http_status"] = exc.code
+        trace["elapsed_ms"] = round((monotonic() - started) * 1000, 2)
+        return selected, trace
 
 
 def _exact_plan(events, state, plan_id):
@@ -216,6 +228,7 @@ class LiveTextAgent:
         events = tuple(events)
         plan_id = plan_id or f"plan_{uuid4().hex}"
         tags = {}
+        jev_trace = {}
         plan = _exact_plan(events, state, plan_id) if state.playing and not state.interaction.user_active else None
         if plan is not None:
             validate_plan(plan, events, state)
@@ -225,18 +238,22 @@ class LiveTextAgent:
             return plan
         if self.tagger and len(events) == 1 and events[0].event_type == "speech":
             catalogue = available_instruments(state, self.primary.soundfont_programs)
-            tags = self.tagger(events[0].payload["text"], state, catalogue)
+            if isinstance(self.tagger, JevLiveTagger):
+                tags, report = self.tagger.classify(events[0].payload["text"], state, catalogue)
+                jev_trace = {"jev": report}
+            else:
+                tags = self.tagger(events[0].payload["text"], state, catalogue)
             if state.playing and not state.interaction.user_active:
                 try:
                     plan = _tagged_plan(events, state, plan_id, tags, catalogue)
                     if plan is not None:
                         validate_plan(plan, events, state)
                         self.primary.execution_validator(state, plan)
-                        self.last_trace = {"source": "jev_direct", "tags": tags}
+                        self.last_trace = {"source": "jev_direct", "tags": tags, **jev_trace}
                         return plan
                 except PlanError:
                     pass
         try:
             return self.primary.decide(events, state, plan_id=plan_id, history=history, intent_hints=tags)
         finally:
-            self.last_trace = {**self.primary.last_trace, "tags": tags}
+            self.last_trace = {**self.primary.last_trace, "tags": tags, **jev_trace}

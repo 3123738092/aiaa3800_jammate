@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import replace
 
 from jammate.generate.harmony import harmony_cycle
+from jammate.generate.motif_backing import follow_motif
 from jammate.generate.patterns import added_instrument_bar, bass_bar, comp_bar, drum_bar
-from jammate.generate.rhythm import rhythm_parts
+from jammate.generate.rhythm import rhythm_parts, rhythmic_hits
 from jammate.generate.texture import apply_texture
 from jammate.instruments import added_program
 from jammate.music import BEATS_PER_BAR, Chord, Note
@@ -16,9 +18,22 @@ from jammate.texture import ArrangementTexture
 PHRASE_BARS = 4
 
 
-def chord_for_bar(state: JamState, bar_index: int) -> Chord:
+def chord_for_bar(state: JamState, bar_index: int) -> Chord | None:
     loop = harmony_cycle(state)
-    return loop[(bar_index - state.progression_start_bar) % len(loop)]
+    return loop[(bar_index - state.progression_start_bar) % len(loop)] if loop else None
+
+
+def follow_added_rhythm(part, hits):
+    groups = defaultdict(list)
+    for note in part:
+        groups[note.start].append(note)
+    phrases = tuple(groups.values())
+    return tuple(
+        replace(note, start=beat, duration=min(note.duration, end - beat),
+                velocity=max(1, round(note.velocity * (.55 + .45 * accent))))
+        for i, ((beat, accent), end) in enumerate(zip(hits, [x[0] for x in hits[1:]] + [BEATS_PER_BAR]))
+        for note in phrases[i % len(phrases)]
+    ) if phrases else ()
 
 
 def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) -> tuple[Note, ...]:
@@ -30,14 +45,20 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
     if state.rhythm is not None:
         backing = rhythm_parts(chord, state.rhythm, state.rhythm_mode, state.energy, bar_index)
     else:
-        backing = (drum_bar(state.energy, phrase_pos)
-                   + bass_bar(chord, state.energy)
-                   + comp_bar(chord, state.energy))
+        backing = drum_bar(state.energy, phrase_pos)
+        if chord is not None:
+            backing += bass_bar(chord, state.energy) + comp_bar(chord, state.energy)
     for layer in state.layers:
-        if layer.active and added_program(layer.name) is not None:
-            backing += added_instrument_bar(layer.name, chord, phrase_pos)
+        if chord is not None and layer.active and added_program(layer.name) is not None:
+            part = added_instrument_bar(layer.name, chord, phrase_pos)
+            if state.rhythm is not None:
+                part = follow_added_rhythm(part, rhythmic_hits(state.rhythm, state.rhythm_mode, bar_index, state.energy))
+            backing += part
     if state.texture != ArrangementTexture():
         backing = apply_texture(state, chord, backing)
+    theme = state.accompaniment_motif
+    if chord is not None and theme is not None and bar_index >= theme.start_bar:
+        backing = follow_motif(backing, chord, state.motif(theme.motif_id).notes, bar_index - theme.start_bar)
     bar_notes = backing + tuple(lead)
     offset = bar_index * BEATS_PER_BAR
     return tuple(n.shifted(offset) for n in bar_notes)

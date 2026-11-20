@@ -207,8 +207,10 @@ def validate_plan(plan, events, state):
     can_request_start = any(e.event_type == "speech" or (e.event_type == "session_control" and e.payload["command"] == "start") for e in events)
     if not state.playing and target.playing and not can_request_start:
         raise PlanError("audio/idle alone cannot restart a stopped session")
-    if motifs and (not target.playing or target.key is None or not target.layer("lead").active or target.layer("lead").level == 0):
-        raise PlanError("motif response needs playing, configured key, and audible lead")
+    if motifs and (not target.playing or not target.layer("lead").active or target.layer("lead").level == 0):
+        raise PlanError("motif response needs playing and audible lead")
+    if target.key is None and any(motif["action"] != "ECHO_MOTIF" for motif in motifs):
+        raise PlanError("motif variation or generation needs a configured key")
     if motifs and "layer:lead" in data["preserve"]:
         raise PlanError("a new lead utterance cannot preserve the lead track")
     for action in motifs:
@@ -240,7 +242,7 @@ def validate_plan(plan, events, state):
 class LLMAgent:
     def __init__(self, config: LLMConfig, *, provider=None, max_attempts=2, fallback="hold",
                  max_context_chars=100000, execution_validator=None, arrangement_enabled=False,
-                 direct_bass_enabled=False, soundfont_programs=None):
+                 direct_bass_enabled=False, soundfont_programs=None, capture_replies=False):
         if max_attempts not in (1, 2) or fallback not in {"hold", "rule", "error"}:
             raise ValueError("use one or two attempts and fallback hold/rule/error")
         self.config, self.provider = config, provider or OpenAIProvider(config)
@@ -252,6 +254,7 @@ class LLMAgent:
         self.arrangement_enabled = arrangement_enabled
         self.direct_bass_enabled = direct_bass_enabled
         self.soundfont_programs = dict(soundfont_programs or {})
+        self.capture_replies = capture_replies
         self.last_trace = {}
 
     def _compile(self, content, events, state, plan_id, *, schema=None):
@@ -378,6 +381,11 @@ class LLMAgent:
             try:
                 reply = self.provider.complete(messages, schema, remaining)
                 record.update(model=reply.model, usage=reply.usage)
+                if self.capture_replies and isinstance(reply.text, str):
+                    raw = reply.text
+                    if self.config.api_key:
+                        raw = raw.replace(self.config.api_key, "[redacted]")
+                    record.update(reply=raw[:8000], reply_truncated=len(raw) > 8000)
                 if time.monotonic() - started > self.config.timeout_s:
                     raise ProviderFailure("timeout")
                 plan = self._compile(reply.text, events, state, plan_id, schema=schema)

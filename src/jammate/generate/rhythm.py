@@ -41,16 +41,17 @@ def rhythmic_hits(context: RhythmContext, mode: RhythmMode,
     return tuple(sorted(hits))
 
 
-def rhythm_parts(chord: Chord, context: RhythmContext, mode: RhythmMode,
+def rhythm_parts(chord: Chord | None, context: RhythmContext, mode: RhythmMode,
                  energy: int, bar_index: int) -> tuple[Note, ...]:
     """Generate a coordinated bar. Energy zero remains the existing pad break."""
     if energy <= 0:
-        return tuple(Note(p, 0, BEATS_PER_BAR, 45, "keys") for p in chord.voicing(COMP_LOW))
+        return () if chord is None else tuple(Note(p, 0, BEATS_PER_BAR, 45, "keys") for p in chord.voicing(COMP_LOW))
     hits = rhythmic_hits(context, mode, bar_index, energy)
     if not hits:
         return ()
-    root, _, fifth = chord.voicing(BASS_LOW)[:3]
-    voicing = chord.voicing(COMP_LOW)
+    if chord is not None:
+        root, _, fifth = chord.voicing(BASS_LOW)[:3]
+        voicing = chord.voicing(COMP_LOW)
     # A full grid leaves no room to insert notes. Change the color of the
     # phrase ending while keeping every existing attack in place.
     color_ending = mode == RhythmMode.VARY and len(hits) == len(context.onset_beats) and bar_index % 4 == 3
@@ -63,6 +64,7 @@ def rhythm_parts(chord: Chord, context: RhythmContext, mode: RhythmMode,
         notes.append(Note(drum, beat, min(0.125, duration), velocity, "drums"))
         hat = OPEN_HAT if color_ending and i == len(hits) - 1 else CLOSED_HAT
         notes.append(Note(hat, beat, min(0.125, duration), max(1, velocity - 25), "drums"))
-        notes.append(Note(root if i % 2 == 0 else fifth, beat, duration, velocity, "bass"))
-        notes.extend(Note(p, beat, min(duration, 0.5), max(1, velocity - 25), "keys") for p in voicing)
+        if chord is not None:
+            notes.append(Note(root if i % 2 == 0 else fifth, beat, duration, velocity, "bass"))
+            notes.extend(Note(p, beat, min(duration, 0.5), max(1, velocity - 25), "keys") for p in voicing)
     return tuple(sorted(notes, key=lambda n: (n.start, n.instrument, n.pitch)))

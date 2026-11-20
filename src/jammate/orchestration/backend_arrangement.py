@@ -93,11 +93,12 @@ class MRTArrangement:
 class LLMBackendArranger:
     """Independent MIDI arrangement or direct MRT2 conditioning."""
 
-    def __init__(self, config, backend, *, provider=None, log=None):
+    def __init__(self, config, backend, *, provider=None, log=None, capture_replies=False):
         if backend not in {"synth", "fluidsynth", "mrt2"}:
             raise ValueError("unknown backend for LLM arrangement")
         self.config, self.backend, self.log = config, backend, log
         self.provider = provider or OpenAIProvider(config, schema_name=f"jammate_{backend}_arrangement_v1")
+        self.capture_replies = capture_replies
         self.last_trace = {}
 
     def _record(self, name, **fields):
@@ -125,6 +126,8 @@ class LLMBackendArranger:
             reply = self.provider.complete(messages, schema, self.config.timeout_s)
             self.last_trace.update(model=reply.model, usage=reply.usage)
             raw = self._redact(reply.text)
+            if self.capture_replies:
+                self.last_trace.update(reply=raw[:8000], reply_truncated=len(raw) > 8000)
             self._record("backend_arrangement_output", raw=raw[:96_000], truncated=len(raw) > 96_000)
             if len(raw) > 96_000:
                 raise PlanError("backend arrangement response is too large")

@@ -106,13 +106,14 @@ class RealtimeSession:
     """Virtual sample-driven host for the live scheduling contract."""
 
     def __init__(self, manager: StateManager, *, sample_rate: int = 22050,
-                 timing: TimingPolicy = TimingPolicy()):
+                 timing: TimingPolicy = TimingPolicy(), opening_plan: BandPlan | None = None,
+                 opening_answer: tuple[Note, ...] = ()):
         if type(sample_rate) is not int or sample_rate <= 0:
             raise ValueError("sample_rate must be a positive integer")
         initial = manager.state
         if initial.position != TransportPosition():
             raise ValueError("a new realtime session must start at bar zero")
-        if initial.playing and initial.key is None:
+        if initial.playing and initial.auto_harmony and initial.key is None:
             raise ValueError("a playing realtime session needs a key")
         self.manager = manager
         self.sample_rate = sample_rate
@@ -123,6 +124,13 @@ class RealtimeSession:
         self._request: DecisionRequest | None = None
         self._queued: PreparedChange | None = None
         self._active: PlannedPerformance | None = None
+        if opening_plan is not None:
+            request = DecisionRequest(manager.current_batch(), initial, (), 0, 0)
+            decision = BoundDecision(request, ScheduleSlot(0, 0, 0, 0), opening_plan, initial)
+            performance = prepare_plan(initial, opening_plan, opening_answer=opening_answer)
+            if not manager.stage(opening_plan):
+                raise PlanError("opening plan has already been staged")
+            self._queued = PreparedChange(decision, performance)
 
     @property
     def sample(self) -> int:

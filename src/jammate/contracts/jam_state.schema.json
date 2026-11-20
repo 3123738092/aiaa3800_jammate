@@ -102,6 +102,9 @@
           "type": "integer",
           "minimum": 0
         },
+        "auto_harmony": {
+          "type": "boolean"
+        },
         "progression": {
           "type": "object",
           "additionalProperties": false,
@@ -366,6 +369,24 @@
                   }
                 }
               }
+            }
+          }
+        },
+        "accompaniment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "motif_id",
+            "start_bar"
+          ],
+          "properties": {
+            "motif_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start_bar": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         }

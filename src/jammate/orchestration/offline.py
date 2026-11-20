@@ -13,10 +13,10 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from jammate.contracts.band_plan import BandPlan, PlanError
-from jammate.generate.arranger import arrange_bar, place_lead
-from jammate.generate.response import answer_motif, initiate_motif
+from jammate.generate.arranger import arrange_bar, chord_for_bar, place_lead
+from jammate.generate.response import LEAD_HIGH, LEAD_LOW, answer_motif, continue_motif, initiate_motif
 from jammate.interaction import Motif
-from jammate.music import Note
+from jammate.music import BEATS_PER_BAR, Note
 from jammate.render.synth import render, TAIL_S
 from jammate.state import JamState
 from .manager import StateManager
@@ -66,6 +66,29 @@ def prepare_bar(state: JamState, bar: int, lead: tuple[Note, ...] = ()) -> tuple
     return apply_layer_settings(arrange_bar(state, bar, lead), state, bar=bar)
 
 
+def prepare_humming_answer(state: JamState, motif: Motif) -> tuple[Note, ...]:
+    key = state.key
+    if key is None:
+        raise PlanError("哼唱补全需要一个可用的调性。")
+    answer = continue_motif(motif.notes, key)
+    start = int(answer[0].start // BEATS_PER_BAR)
+    end = math.ceil(max(note.end for note in answer) / BEATS_PER_BAR)
+    backing = tuple(note for bar in range(start, end) for note in prepare_bar(state, bar)
+                    if note.instrument not in {"drums", "lead"})
+    scale = tuple(pitch for pitch in range(LEAD_LOW, LEAD_HIGH + 1) if key.contains(pitch))
+    result = []
+    for index, note in enumerate(answer):
+        sounding = {other.pitch for other in (*backing, *result)
+                    if min(note.end, other.end) - max(note.start, other.start) >= .05}
+        chord = chord_for_bar(state, int(note.start // BEATS_PER_BAR))
+        chord_tones = tuple(pitch for pitch in scale if chord and pitch % 12 in chord.pcs)
+        safe = tuple(pitch for pitch in scale if all(abs(pitch - other) > 1 for other in sounding))
+        anchors = tuple(pitch for pitch in chord_tones if pitch in safe)
+        options = (anchors or safe or chord_tones or scale) if index in (0, len(answer) - 1) else (safe or scale)
+        result.append(replace(note, pitch=min(options, key=lambda pitch: (abs(note.pitch - pitch), pitch))))
+    return tuple(result)
+
+
 def performance_state_for_bar(state, target, actions, offset, bars):
     layers = []
     for layer in target.layers:
@@ -79,18 +102,20 @@ def performance_state_for_bar(state, target, actions, offset, bars):
     return target.with_updates(layers=tuple(layers))
 
 
-def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerformance:
+def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800, opening_answer: tuple[Note, ...] = ()) -> PlannedPerformance:
     """Compile/validate actual notes without synthesizing audio or changing state."""
     target, data = project(state, plan), plan.to_dict()
     start, bars = data["effective_at"]["bar"], data["valid_for_bars"]
     if start != state.position.next_bar:
         raise PlanError("offline executor requires the next unrendered bar; cannot skip intervening bars")
     lead, generated = (), None
-    if target.playing and target.key is None:
+    if target.playing and target.auto_harmony and target.key is None:
         raise PlanError("baseline accompaniment needs an explicitly configured session key")
     rng = random.Random(int.from_bytes(hashlib.sha256(f"{seed}:{plan.plan_id}".encode()).digest()[:8], "big"))
     for action in data["actions"]:
         name, params = action["action"], action["parameters"]
+        if target.key is None and name in {"VARY_MOTIF", "INTRODUCE_MOTIF"}:
+            raise PlanError("需要先指定调性才能生成或变奏旋律。")
         if name == "ECHO_MOTIF":
             lead = tuple(replace(n, instrument="lead") for n in target.motif(params["motif_id"]).notes)
         elif name == "VARY_MOTIF":
@@ -102,10 +127,16 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
         raise PlanError("motif response requires an audible lead layer")
     if any(n.end > bars * 4 for n in lead):
         raise PlanError("generated motif extends past plan lifetime")
-    lead_bars = place_lead(lead, start)
+    performance_bars = bars
+    if opening_answer:
+        if (start != 0 or len(data["actions"]) != 1 or data["actions"][0]["action"] != "ECHO_MOTIF"
+                or not lead or opening_answer[0].start < max(note.end for note in lead)):
+            raise PlanError("opening continuation must follow the replayed melody")
+        performance_bars = max(bars, math.ceil(max(note.end for note in opening_answer) / BEATS_PER_BAR))
+    lead_bars = place_lead(lead + opening_answer, start)
     all_notes = []
     violations = set()
-    for offset in range(bars):
+    for offset in range(performance_bars):
         bar = start + offset
         bar_state = performance_state_for_bar(state, target, data["actions"], offset, bars)
         notes = prepare_bar(bar_state, bar, lead_bars.get(bar, ()))
@@ -113,7 +144,7 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
         # Explicit start/stop governs audibility globally. Compare preserved
         # arrangements under that same transport control, including a restart.
         reference = state.with_updates(playing=target.playing)
-        baseline = prepare_bar(reference, bar) if reference.playing and reference.key is not None else ()
+        baseline = prepare_bar(reference, bar) if reference.playing and (reference.key is not None or not reference.auto_harmony) else ()
         for preserved in data["preserve"]:
             if preserved.startswith("layer:"):
                 instrument = preserved[6:]
@@ -127,7 +158,7 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800) -> PlannedPerfor
     if violations:
         raise PlanError("render would change preserved " + ", ".join(sorted(violations)))
     notes = tuple(all_notes)
-    return PlannedPerformance(notes, lead, generated, target.tempo_bpm, start, bars)
+    return PlannedPerformance(notes, lead, generated, target.tempo_bpm, start, performance_bars)
 
 
 def render_plan(state: JamState, plan: BandPlan, *, seed=3800, sample_rate=22050) -> RenderedPlan:

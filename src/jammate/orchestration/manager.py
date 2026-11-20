@@ -12,7 +12,8 @@ from dataclasses import replace
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import to_legacy_phrase
 from jammate.contracts.band_plan import BandPlan, PlanError
-from jammate.interaction import Interaction, Motif, RhythmSource, Strategy, TransportPosition
+from jammate.generate.motif_backing import has_melodic_contour
+from jammate.interaction import AccompanimentMotif, Interaction, Motif, RhythmSource, Strategy, TransportPosition
 from jammate.music import Note
 from jammate.rhythm import RhythmContext
 from jammate.session_log import SessionLog
@@ -21,8 +22,9 @@ from .transitions import project
 
 
 class StateManager:
-    def __init__(self, initial: JamState, log: SessionLog | None = None):
+    def __init__(self, initial: JamState, log: SessionLog | None = None, *, follow_humming: bool = False):
         self._state = JamState.from_dict(initial.to_dict())
+        self._follow_humming = follow_humming
         self._lock = threading.RLock()
         self._log = log or SessionLog(None)
         self._log_write_failures = 0
@@ -123,7 +125,11 @@ class StateManager:
                     phrase = to_legacy_phrase(event, tempo_bpm=state.tempo_bpm)
                     if phrase.notes:
                         motif = Motif(f"motif_{event.event_id}", "user", (event.event_id,), phrase.notes)
-                        state = state.with_updates(motifs=state.motifs + (motif,), last_user_motif=phrase.notes)
+                        accompaniment = state.accompaniment_motif
+                        if self._follow_humming and event.source == "humming" and has_melodic_contour(phrase.notes):
+                            accompaniment = AccompanimentMotif(motif.motif_id, state.position.next_bar)
+                        state = state.with_updates(motifs=state.motifs + (motif,), last_user_motif=phrase.notes,
+                                                   accompaniment_motif=accompaniment)
                 elif event.event_type == "rhythm_seed":
                     seed = RhythmSource(event.event_id, RhythmContext(**event.payload["rhythm"]))
                     state = state.with_updates(rhythm_sources=state.rhythm_sources + (seed,))

@@ -10,7 +10,9 @@ from enum import Enum
 from jammate.music import ChordStep, Key, Note
 from jammate.texture import ArrangementTexture
 from jammate.rhythm import RhythmContext, RhythmMode
-from jammate.interaction import CORE_LAYER_NAMES, Interaction, Layer, Motif, RhythmSource, TransportPosition, unit
+from jammate.interaction import (
+    CORE_LAYER_NAMES, AccompanimentMotif, Interaction, Layer, Motif, RhythmSource, TransportPosition, unit,
+)
 from jammate.instruments import MAX_JAM_LAYERS
 
 MIN_TEMPO_BPM = 60.0
@@ -57,6 +59,8 @@ class JamState:
     texture: ArrangementTexture = ArrangementTexture()
     chord_cycle: tuple[ChordStep, ...] = ()
     progression_start_bar: int = 0
+    auto_harmony: bool = True
+    accompaniment_motif: AccompanimentMotif | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
@@ -89,8 +93,13 @@ class JamState:
             raise ValueError("custom progression requires 2–8 chord steps")
         if type(self.progression_start_bar) is not int or self.progression_start_bar < 0:
             raise ValueError("progression_start_bar must be a nonnegative integer")
+        if type(self.auto_harmony) is not bool:
+            raise ValueError("auto_harmony must be a boolean")
         if self.current_motif_id is not None and self.current_motif_id not in {m.motif_id for m in self.motifs}:
             raise ValueError("current_motif_id must reference a registered motif")
+        if self.accompaniment_motif is not None and self.accompaniment_motif.motif_id not in {
+                motif.motif_id for motif in self.motifs if motif.owner == "user"}:
+            raise ValueError("accompaniment must reference a registered user motif")
 
     def with_tempo(self, bpm: float) -> JamState:
         return replace(self, tempo_bpm=min(MAX_TEMPO_BPM, max(MIN_TEMPO_BPM, bpm)))
@@ -123,11 +132,15 @@ class JamState:
             "rhythm": self.rhythm.to_dict() if self.rhythm else None, "rhythm_mode": self.rhythm_mode.value,
             "rhythm_sources": [{"event_id": r.event_id, "context": r.context.to_dict()} for r in self.rhythm_sources],
         }
+        if self.accompaniment_motif is not None:
+            data["motifs"]["accompaniment"] = asdict(self.accompaniment_motif)
         if self.texture != ArrangementTexture():
             data["arrangement"]["texture"] = asdict(self.texture)
         if self.chord_cycle:
             data["harmony"]["progression"] = {"start_bar": self.progression_start_bar,
                                              "chords": [asdict(step) for step in self.chord_cycle]}
+        if not self.auto_harmony:
+            data["harmony"]["auto_harmony"] = False
         return json.loads(json.dumps(data, allow_nan=False))
 
     @classmethod
@@ -150,4 +163,6 @@ class JamState:
             texture=ArrangementTexture(**data["arrangement"].get("texture", {})),
             chord_cycle=tuple(ChordStep(**step) for step in progression.get("chords", ())),
             progression_start_bar=progression.get("start_bar", 0),
+            auto_harmony=harmony.get("auto_harmony", True),
+            accompaniment_motif=AccompanimentMotif(**motifs["accompaniment"]) if "accompaniment" in motifs else None,
         )

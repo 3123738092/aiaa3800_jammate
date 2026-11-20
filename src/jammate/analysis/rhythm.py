@@ -49,23 +49,26 @@ ignored. Multiple detections in one grid cell keep their strongest accent.
                          beat_origin_s, confidence=confidence * fit)
 
 
-def _onsets_and_accents(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
+def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
+                        relative_peak_floor: float = .12,
+                        absolute_peak_floor: float = .01) -> tuple[np.ndarray, np.ndarray]:
     audio = np.asarray(y, dtype=np.float32)
     if audio.ndim != 1 or not np.isfinite(audio).all() or sr <= 0:
         raise ValueError("rhythm audio must be finite mono audio with a positive sample rate")
-    if not audio.size or np.max(np.abs(audio)) < 0.01:
+    max_peak = float(np.max(np.abs(audio), initial=0.0))
+    if max_peak < absolute_peak_floor:
         return np.array([]), np.array([])
     # Padding allows a clap at sample zero to be detected as an onset.
     pad = int(round(0.1 * sr))
     padded = np.pad(audio, (pad, pad))
     onsets = librosa.onset.onset_detect(y=padded, sr=sr, hop_length=ONSET_HOP,
-                                       units="time", backtrack=True) - pad / sr
+                                       units="time", backtrack=backtrack) - pad / sr
     # Backtracking may land up to one analysis frame before the attack.
     onsets = np.maximum(0, onsets)
     onsets = onsets[onsets < audio.size / sr]
     peaks = np.array([np.max(np.abs(audio[int(t * sr):min(audio.size, int(t * sr) + max(1, int(.06 * sr)))]))
                       for t in onsets])
-    keep = peaks >= max(0.01, float(np.max(np.abs(audio))) * 0.12)
+    keep = peaks >= max(absolute_peak_floor, max_peak * relative_peak_floor)
     peaks = peaks[keep]
     return onsets[keep], peaks / peaks.max() if peaks.size else peaks
 
@@ -82,9 +85,20 @@ An incomplete bar is rejected rather than inventing its missing contents.
         raise ValueError("count_in must be 0 or at least 3")
     onsets, accents = _onsets_and_accents(y, sr)
     if count_in:
+        tempo = tempo_from_onsets(onsets[:count_in]) if len(onsets) >= count_in else None
+        if tempo is None:
+            # On softer syllables, backtracking can place the candidate before
+            # its audible attack. Retry at the detected position with a lower
+            # relative peak floor, still requiring a steady count-in.
+            soft_onsets, soft_accents = _onsets_and_accents(
+                y, sr, backtrack=False, relative_peak_floor=.075, absolute_peak_floor=.008,
+            )
+            if len(soft_onsets) >= count_in:
+                tempo = tempo_from_onsets(soft_onsets[:count_in])
+                if tempo is not None:
+                    onsets, accents = soft_onsets, soft_accents
         if len(onsets) < count_in:
             raise ValueError("not enough count-in claps; use --count-in 0 with --tempo")
-        tempo = tempo_from_onsets(onsets[:count_in])
         if tempo is None:
             raise ValueError("count-in is not steady; use --count-in 0 with --tempo")
         origin = float(onsets[count_in - 1] + 60.0 / tempo)
