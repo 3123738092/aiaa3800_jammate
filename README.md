@@ -30,6 +30,19 @@ pnpm --dir web/optimized run build
 
 启动后在本机打开 [创作工作台](http://127.0.0.1:4188/)。以后可直接双击 `start-input-lab.cmd`。如果要在页面现生成风格样段，或使用 FluidSynth 音色，请先配置 FluidSynth。[音源配置与运行说明](docs/integration/RUN.md#音源与验收)
 
+## 一起 Jam 的总麦克风
+
+总麦克风用 Gemini 3.5 Flash-Lite 听开场录音。完成上面的环境安装和前端构建后，在仓库根目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[llm]"
+Copy-Item audio-router.example.json audio-router.secrets.json
+```
+
+首次配置时，在 `audio-router.secrets.json` 填写自己的 `api_key` 和 `base_url`。该地址需要支持以 OpenAI Chat Completions 格式提交 WAV 音频，并返回 JSON Schema 结果。也可将 `JAMMATE_AUDIO_ROUTER_CONFIG` 指向仓库外的私有配置文件。
+
+运行 `.\start-jam-mic.cmd`，打开 [一起 Jam](http://127.0.0.1:4221/jam.html)。点「总麦克风」，说「我来哼一段」或「我来拍几个拍子」，再点「结束录音」。对应卡片会高亮并自动开始录，点「停止录制」收尾。直接说「鼓轻一点」会把原话放进文字框，可以修改后点「确认文字」。音频识别和下方的编排 Agent 分别配置。
+
 ## 文字入口的大模型选项
 
 本分支新增 FluidSynth / MRT2 执行适配与规则/LLM 共用入口。MRT2 生成试听会明确报告无法保证的保留约束，不提交未经验证的音乐状态；独立输入文件、运行命令和官方接口说明见 [MRT2 后端](docs/MRT2_BACKEND.md)。服务默认加载当前工作目录代码，使用 `--implementation pinned` 可复现历史版本。

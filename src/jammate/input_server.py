@@ -14,6 +14,7 @@ from contextlib import closing
 import numpy as np
 import soundfile as sf
 from jammate.browser_jam import BrowserJamService
+from jammate.opening_mic import OpeningMic
 from jammate.input_event import perceive_rhythm, validate_event
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_rhythm
@@ -60,6 +61,9 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError("请求必须为 JSON 对象。")
                 if self.path.startswith("/api/jam/"):
                     operation = self.path.removeprefix("/api/jam/")
+                    if operation == "opening-mic":
+                        self.json_response(200, self.server.opening_mic.recognize(body))
+                        return
                     if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop", "debug"}:
                         self.json_response(404, {"error": "unknown Jam endpoint"})
                         return
@@ -121,11 +125,16 @@ def main():
         parser.error("FluidSynth and SoundFont must be existing files")
     if args.soundfont and not args.fluidsynth:
         parser.error("a SoundFont requires FluidSynth")
-    with closing(BrowserJamService(fluidsynth=args.fluidsynth, soundfont=args.soundfont)) as jam, ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
-                         soundfont=args.soundfont, implementation=args.implementation) as reference, ThreadingHTTPServer(
-                             ("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server:
+    with (
+        closing(OpeningMic()) as opening_mic,
+        closing(BrowserJamService(fluidsynth=args.fluidsynth, soundfont=args.soundfont)) as jam,
+        ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
+                        soundfont=args.soundfont, implementation=args.implementation) as reference,
+        ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server,
+    ):
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
         server.reference = reference
+        server.opening_mic = opening_mic
         server.jam = jam
         print(f"JamMate Input Lab: http://127.0.0.1:{args.port}", flush=True)
         server.serve_forever()

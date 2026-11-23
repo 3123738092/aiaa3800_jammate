@@ -1,5 +1,5 @@
 import {initJamDebug} from './jam-debug.js?v=2';
-import {initJamInputs} from './jam-inputs.js?v=7';
+import {initJamInputs} from './jam-inputs.js?v=opening-mic';
 import {addressedCommand, initNodConfirmation} from './jam-nod.js?v=2';
 
 const byId = id => document.getElementById(id);
@@ -1027,6 +1027,7 @@ post('status', {}).then(view => {
   openingReady = Boolean(view.llm_ready);
   hummingCompletionReady = Boolean(view.opening_modes?.includes('humming'));
   coldAvailable = Boolean(view.opening_modes?.includes('cold'));
+  if (!openingReady && coldAvailable && !run) openingMode.value = 'cold';
   coldSettingsAvailable = view.cold_opening_settings === true;
   coldMrtReady = view.cold_mrt2_preview === true;
   mrtLiveState = view.mrt2_live_state === true;

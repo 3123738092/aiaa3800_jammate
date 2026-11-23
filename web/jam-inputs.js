@@ -1,3 +1,5 @@
+import {initOpeningMic} from './jam-opening-mic.js';
+
 const rate = 16000;
 const titles = {rhythm: '拍手', humming: '哼唱'};
 
@@ -18,6 +20,20 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
   let take = null;
   let pending = false;
   let hummingSeconds = 0;
+  const mic = initOpeningMic({text, post, encodeWave, onChange,
+    async receiveMusic(mode, blob) {
+      const card = cards.find(item => item.mode === mode);
+      card.node.classList.add('mic-target');
+      card.node.scrollIntoView({block: 'nearest'});
+      if (blob) {
+        await decode(card, blob, '总麦克风录音');
+      } else {
+        card.status.textContent = '正在打开麦克风…';
+        await toggleRecord(card);
+        if (take?.card === card && take.recorder?.state === 'recording') card.record.focus();
+      }
+    },
+  });
 
   function durationLimit(card, live) {
     return (card.mode === 'humming' && hummingSeconds) || (live ? 9 : 12);
@@ -54,19 +70,22 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
     pending = starting;
     hummingSeconds = limit;
     const live = liveSession();
+    mic.update({live: Boolean(live), blocked: starting || Boolean(take) ||
+      cards.some(card => card.busy || card.selection), supported: supportsRecording});
+    const locked = pending || mic.busy();
     document.getElementById('jam-opening-direction').hidden = Boolean(live);
     text.disabled = pending;
     for (const card of cards) {
       card.record.textContent = take?.card === card && take.recorder ? '停止录制' : '录' + titles[card.mode];
-      card.record.disabled = !supportsRecording || pending || card.busy ||
+      card.record.disabled = !supportsRecording || locked || card.busy ||
         Boolean(take && (take.card !== card || !take.recorder));
-      card.file.disabled = pending || card.busy || Boolean(take);
+      card.file.disabled = locked || card.busy || Boolean(take);
       if (card.file.disabled) resetDrop(card);
       card.remove.hidden = !card.clip || Boolean(card.selection);
-      card.remove.disabled = pending || card.busy || Boolean(take);
+      card.remove.disabled = locked || card.busy || Boolean(take);
       card.send.hidden = !live;
       card.send.disabled = !card.clip || card.busy || Boolean(take || card.selection);
-      if (card.trim) card.trim.disabled = pending || card.busy || Boolean(take);
+      if (card.trim) card.trim.disabled = locked || card.busy || Boolean(take);
       card.guide.textContent = live && card.mode === 'rhythm' ?
         '跟着当前速度拍一小节，拍完留到小节结束。' : card.openingGuide;
     }
@@ -193,7 +212,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       const limit = durationLimit(card, liveSession());
       recorder.start();
       capture.timer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, limit * 1000 - 300);
-      card.status.textContent = '正在录制，结束后点「停止录制」。';
+      card.status.textContent = '正在录' + titles[card.mode] + '，可以开始了。结束后点「停止录制」。';
       onChange();
     } catch {
       capture.stream?.getTracks().forEach(track => track.stop());
@@ -306,7 +325,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
   return {
     update,
     hasHumming: () => cards.some(card => card.mode === 'humming' && card.clip),
-    ready: (hasSettings = false) => !take && cards.every(card => !card.busy && !card.selection) &&
+    ready: (hasSettings = false) => !mic.busy() && !take && cards.every(card => !card.busy && !card.selection) &&
       (hasSettings || Boolean(text.value.trim()) || cards.some(card => card.clip)),
     request: () => ({...Object.fromEntries(cards.filter(card => card.clip).map(card => [card.mode, payload(card)])), text: text.value.trim()}),
     opened(opening, bpm) {
@@ -331,6 +350,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       result.hidden = false;
     },
     stop(clearClips = false) {
+      mic.reset();
       result.hidden = true;
       if (clearClips) cards.forEach(clear);
       if (take) {

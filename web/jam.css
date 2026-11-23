@@ -186,3 +186,8 @@
   .jam-opening.panel { padding: 14px; }
   .jam-opening-inputs { grid-template-columns: 1fr; }
 }
+.opening-mic-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-block: 8px 14px; }
+.opening-mic-row[hidden] { display: none; }
+.opening-mic-row span { color: #425747; font-size: .9rem; }
+#opening-mic[aria-pressed=true] { background: #91442c; color: white; }
+.jam-opening .mic-target { outline: 3px solid #4b805a; outline-offset: 2px; }

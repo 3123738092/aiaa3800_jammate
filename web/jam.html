@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JamMate · 一起 Jam</title>
   <link rel="stylesheet" href="lab.css">
-  <link rel="stylesheet" href="jam.css?v=humming-action">
+  <link rel="stylesheet" href="jam.css?v=opening-mic">
 </head>
 <body>
 <main class="jam-workspace">
@@ -13,6 +13,10 @@
   <h1>一起 Jam</h1>
   <section class="panel jam-opening" id="jam-opening" aria-label="Jam 素材">
     <h2>用文字或音频开始</h2>
+    <div id="opening-mic-row" class="opening-mic-row">
+      <button id="opening-mic" type="button" aria-pressed="false">🎙 总麦克风</button>
+      <span id="opening-mic-status" role="status">说说你想哼唱、拍手，还是给乐队提要求。</span>
+    </div>
     <div class="jam-opening-mode">
       <label for="jam-opening-mode">开场方式</label>
       <select id="jam-opening-mode" aria-describedby="jam-opening-mode-note">
@@ -66,6 +70,10 @@
     <label id="jam-opening-direction">开场文字
       <textarea id="jam-opening-text" rows="2" maxlength="500" placeholder="例如：92 BPM，D 大调，4/4，每小节在第 1、2.5、4 拍起音"></textarea>
     </label>
+    <div id="opening-mic-review" class="opening-mic-row" hidden>
+      <button id="opening-mic-confirm" type="button">确认文字</button>
+      <button id="opening-mic-discard" type="button">撤销本次转写</button>
+    </div>
     <div class="jam-opening-inputs">
       <div class="jam-opening-card" data-jam-input="rhythm">
         <h3>拍手节奏（可选）</h3>
@@ -271,6 +279,6 @@
   </details>
   <p class="muted">已确认播放的小节和指令状态会实时更新。刷新页面会结束本次会话。</p>
 </main>
-<script type="module" src="jam.js?v=humming-action"></script>
+<script type="module" src="jam.js?v=opening-mic"></script>
 </body>
 </html>

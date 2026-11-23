@@ -1,0 +1,6 @@
+{
+  "api_key": "",
+  "base_url": "https://your-gemini-gateway.example/v1",
+  "model": "gemini-3.5-flash-lite",
+  "api": "chat_completions"
+}

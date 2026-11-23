@@ -29,6 +29,14 @@ def _activity(audio, rate):
     return tuple(regions), hop
 
 
+def isolated_attack_times(audio, rate):
+    """Return onset times when the recording consists of several isolated short sounds."""
+    regions, hop = _activity(audio, rate)
+    if len(regions) < 3 or any((end - start) * hop / rate > .10 for start, end, _ in regions):
+        return []
+    return [round(int(start) * hop / rate, 2) for start, _, _ in regions]
+
+
 def _likely_hum(audio, rate, regions):
     """Look for a series of sustained, clearly periodic pitches before pYIN."""
     if not regions or sum(end - start for start, end, _ in regions) < 44:
