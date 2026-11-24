@@ -32,7 +32,7 @@ pnpm --dir web/optimized run build
 
 ## 一起 Jam 的总麦克风
 
-总麦克风用 Gemini 3.5 Flash-Lite 听开场录音。完成上面的环境安装和前端构建后，在仓库根目录运行：
+总麦克风用 Gemini 3.5 Flash-Lite 听开场录音。演奏中的语音每次停顿后也用同一配置转写这一段。完成上面的环境安装和前端构建后，在仓库根目录运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[llm]"

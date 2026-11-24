@@ -70,9 +70,10 @@ def _resolve(pitch: int, key: Key, low: int = LEAD_LOW, high: int = LEAD_HIGH) -
     return min(candidates, key=lambda p: (abs(p - pitch), p))
 
 
-def _finish(rhythm: list[tuple[float, float]], pitches: list[int], key: Key) -> tuple[Note, ...]:
-    in_key = fit_register([key.snap(p) for p in pitches])
-    in_key[-1] = _resolve(in_key[-1], key)
+def _finish(rhythm: list[tuple[float, float]], pitches: list[int], key: Key,
+            low: int = LEAD_LOW, high: int = LEAD_HIGH) -> tuple[Note, ...]:
+    in_key = fit_register([key.snap(p) for p in pitches], low, high)
+    in_key[-1] = _resolve(in_key[-1], key, low, high)
     notes: list[Note] = []
     last_by_pitch: dict[int, int] = {}
     for pitch, (start, duration) in zip(in_key, rhythm):
@@ -111,13 +112,14 @@ def _transform_pitches(name: str, pitches: list[int], key: Key, rng: random.Rand
     raise ValueError(f"unknown transform {name!r}; expected one of {TRANSFORMS}")
 
 
-def _build(name: str, notes: tuple[Note, ...], key: Key, rng: random.Random) -> Answer:
+def _build(name: str, notes: tuple[Note, ...], key: Key, rng: random.Random,
+           low: int = LEAD_LOW, high: int = LEAD_HIGH) -> Answer:
     pitches = _transform_pitches(name, [n.pitch for n in notes], key, rng)
     rhythm = [(n.start, n.duration) for n in notes]
     if name == "displace":
         rhythm = _displace(rhythm)
         pitches = pitches[: len(rhythm)]
-    return Answer(_finish(rhythm, pitches, key), name)
+    return Answer(_finish(rhythm, pitches, key, low, high), name)
 
 
 def _pitch_classes(notes: tuple[Note, ...]) -> list[int]:
@@ -149,7 +151,8 @@ def answer_motif(
     return _build("echo", notes, key, rng)
 
 
-def continue_motif(motif: tuple[Note, ...], key: Key) -> tuple[Note, ...]:
+def continue_motif(motif: tuple[Note, ...], key: Key, *,
+                   low: int = LEAD_LOW, high: int = LEAD_HIGH) -> tuple[Note, ...]:
     """Develop a short ending from the last few notes of a recognized melody."""
     phrase = sorted(motif, key=lambda note: (note.start, note.pitch))
     start = ceil(max(note.end for note in phrase) * 2) / 2
@@ -157,7 +160,7 @@ def continue_motif(motif: tuple[Note, ...], key: Key) -> tuple[Note, ...]:
     span = max(note.end for note in tail)
     scale = min(1., BEATS_PER_BAR / span)
     tail = tuple(replace(note, start=note.start * scale, duration=note.duration * scale) for note in tail)
-    answer = answer_motif(tail, key, random.Random(0), transform="sequence")
+    answer = _build("sequence", tail, key, random.Random(0), low, high)
     return tuple(note.shifted(start) for note in answer.notes)
 
 

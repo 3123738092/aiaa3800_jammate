@@ -354,6 +354,42 @@ def test_transcribed_commands_keep_their_speech_source():
         assert jam.snapshot()["feedback"]["status"] == "scheduled"
 
 
+def test_live_gemini_transcript_uses_the_existing_command_gate(monkeypatch):
+    from contextlib import closing
+    from unittest.mock import Mock
+
+    import numpy as np
+
+    router = Mock(ready=True)
+    router.dictate.side_effect = [
+        {"route": "SEND_TEXT", "instruction": "乐队，鼓少一点。"},
+        {"route": "SEND_TEXT", "instruction": "今天的天气不错。"},
+        {"route": "KEEP_LISTENING"},
+    ]
+    audio = np.full(1600, .1, dtype=np.float32)
+    heard = Mock(return_value=(None, True))
+    monkeypatch.setattr("jammate.browser_jam.analyze_capture", heard)
+    with closing(BrowserJamService(audio_router=router)) as service:
+        status = service.dispatch("status", {})
+        assert status["speech_mode"] == "gemini" and status["speech_ready"]
+        start = service.dispatch("start", {"opening_mode": "cold", "opening": {"text": "96 BPM"}})
+        session = service.sessions[start["session"]]
+        monkeypatch.setattr(service, "decode_recording", lambda body, seconds: (audio, 16000))
+        assert service.capture(session, {"mode": "auto"}) == {"recognition": "browser_speech"}
+        router.dictate.assert_not_called()
+        result = service.capture(session, {"mode": "speech"})
+        assert result["command"] == "鼓少一点。"
+        assert service.capture(session, {"mode": "auto", "transcribe": True})["command"] is None
+        assert service.capture(session, {"mode": "speech"}) == {"recognition": "no_speech"}
+        assert session.debug()["turns"] == []
+        assert session.debug()["captures"][0]["engine"] == "gemini"
+        rhythm_event = Mock()
+        rhythm_event.to_dict.return_value = {"source": "rhythm"}
+        heard.return_value = (rhythm_event, False)
+        assert service.capture(session, {"mode": "auto", "transcribe": True}) == {"event": {"source": "rhythm"}}
+        assert router.dictate.call_count == 3
+
+
 def test_continuous_listening_only_routes_directed_or_explicit_music_commands():
     state = JamState(session_id="voice_test", tempo_bpm=96)
     assert voice_command("鼓少一点。", state) == "鼓少一点。"

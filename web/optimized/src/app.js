@@ -1,11 +1,10 @@
-import { decodeHumming, frameRms } from './continuity.js';
 import { hummingEvent } from './input-event.js';
 import { attachBandPanel } from '../../band-panel.js';
+import { createHummingClient } from './humming-client.js';
+import { decodeHummingAudio, measureAudio, monoResample, prepareSamples } from './audio-pipeline.js';
+import { TIMBRES, buildExports } from './melody.js';
 const selectBandInput = attachBandPanel(document.querySelector('#band-panel'));
-import * as tf from '@tensorflow/tfjs';
-import { BasicPitch, outputToNotesPoly, noteFramesToTime } from '@spotify/basic-pitch';
-import { SAMPLE_RATE, measureAudio, prepareSamples } from './audio-pipeline.js';
-import { DECODING, TIMBRES, standardizeNotes, cleanNotes, createMelodyDocument, buildExports } from './melody.js';
+const humming = createHummingClient(new URL('./humming-worker.js', import.meta.url));
 
 const $ = id => document.getElementById(id);
 const ui = Object.fromEntries(['record','record-rings','mic-icon','stop-icon','record-timer','record-prompt','input-level','example','import','file','original-track','original','source-name','source-duration','convert','status','progress','model-badge','model-label','retry-model','empty','result-content','note-count','result-time','piano-roll','play-midi','timbre','download-midi','conversion-time','download-original','download-json','quality-panel','quality-summary','quality-metrics','processing-summary','normalize','trim','variant','cleanup-summary','result-state','overlap-hint'].map(id => [id,$(id)]));
@@ -13,7 +12,7 @@ let eventURL = null;
 const MAX_RECORD_SECONDS = 20;
 const MAX_AUDIO_SECONDS = 30;
 let captureEpoch = 0, operation = 0, inferenceRunning = false;
-let model = null, modelReady = false, busy = false, requestingMic = false;
+let modelReady = false, busy = false, requestingMic = false;
 let recorder = null, recording = false, stream = null;
 let audioCtx = null, analyser = null, micSource = null, meterFrame = 0, recordClock = 0, recordingStart = 0;
 let audioBuffer = null, audioURL = null, midiURL = null, midiBytes = null;
@@ -58,12 +57,7 @@ async function loadModel() {
   ui['model-badge'].className = 'model-badge';
   ui['model-label'].textContent = '加载 Basic Pitch…';
   try {
-    // Repeatable reference backend: Windows WebGL runs differed on the same
-    // synthetic input. Keep the baseline untouched for an honest comparison.
-    await tf.setBackend('cpu');
-    await tf.ready();
-    model = new BasicPitch('./model/model.json');
-    await model.model;
+    await humming.load();
     modelReady = true;
     ui['model-badge'].classList.add('ready');
     ui['model-label'].textContent = 'Basic Pitch 已就绪';
@@ -124,8 +118,7 @@ function refreshPreparation() {
 async function setAudio(blob, name, sourceType = 'recording', token = operation) {
   if (token !== operation) return;
   clearAudio();
-  const ctx = await getContext();
-  const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+  const decoded = await decodeHummingAudio(await blob.arrayBuffer());
   if (decoded.duration < .5) throw new Error('录音太短了，试着哼 3–8 秒再转换。');
   if (decoded.duration > MAX_AUDIO_SECONDS + .2) throw new Error('请导入 30 秒以内的录音；短一点更方便比较效果。');
   if (token !== operation) return;
@@ -237,14 +230,6 @@ function stopRecording() {
   syncUI();
 }
 
-async function monoResample(buffer) {
-  const offline = new OfflineAudioContext(1, Math.ceil(buffer.duration*SAMPLE_RATE), SAMPLE_RATE);
-  const source = offline.createBufferSource(); source.buffer = buffer;
-  source.connect(offline.destination); source.start();
-  const rendered = await offline.startRendering();
-  return rendered.getChannelData(0);
-}
-
 async function convert() {
   if (!prepared || prepared.metadata.quality.status === 'rejected' || !modelReady || busy || recording || inferenceRunning) return;
   const token = operation, preparation = prepared, sourceSnapshot = structuredClone(sourceInfo), duration = audioBuffer.duration;
@@ -253,42 +238,24 @@ async function convert() {
   ui.progress.hidden = false; ui.progress.value = 0;
   status('正在听这段旋律…');
   const started = performance.now();
-  let scoped = false;
   try {
-    const samples = preparation.samples;
-    const frames = [], onsets = [];
-    await new Promise(resolve => setTimeout(resolve,30));
-    tf.engine().startScope(); scoped = true;
-    await model.evaluateModel(samples,
-      (nextFrames,nextOnsets) => { frames.push(...nextFrames); onsets.push(...nextOnsets); },
-      percent => { if (token !== operation) return; ui.progress.value = percent; ui.convert.firstElementChild.textContent = `正在转换 ${Math.round(percent*100)}%`; });
-    tf.engine().endScope(); scoped = false;
-    if (token !== operation) return;
-    if (!frames.length) throw new Error('这段录音没有产生可用结果，请再录一段。');
-    const times = noteFramesToTime(Array.from({length:frames.length+1},(_,startFrame)=>({startFrame,durationFrames:1,pitchMidi:60,amplitude:1}))).map(n=>n.startTimeSeconds);
-    const continuous = decodeHumming(frames,onsets,times,{durationSec:duration,offsetSec:preparation.metadata.processing.trimStartSec,rms:frameRms(samples,SAMPLE_RATE,times)});
-    const config = DECODING;
-    const noteFrames = outputToNotesPoly(frames,onsets,config.onsetThreshold,config.frameThreshold,config.minimumNoteFrames,config.inferOnsets,config.maximumFrequencyHz,config.minimumFrequencyHz,config.melodiaTrick,config.energyToleranceFrames);
-    const decoded = noteFramesToTime(noteFrames).map((note,index) => {
-      const evidence = [-1,0,1].map(delta=>onsets[noteFrames[index].startFrame+delta]?.[note.pitchMidi-21]).filter(Number.isFinite);
-      return {...note,onsetActivation:evidence.length?Math.max(...evidence):null};
+    const result = await humming.transcribe({source:sourceSnapshot, ...preparation}, percent => {
+      if (token !== operation) return;
+      ui.progress.value = percent;
+      ui.convert.firstElementChild.textContent = `正在转换 ${Math.round(percent*100)}%`;
     });
-    const offset = preparation.metadata.processing.trimStartSec;
-    const raw = standardizeNotes(decoded,Math.min(duration,offset+samples.length/SAMPLE_RATE),offset);
-    melodyDocument = createMelodyDocument(sourceSnapshot,preparation.metadata,raw,continuous,performance.now()-started);
-    melodyDocument.model.executionBackend = tf.getBackend();
-    for (const n of continuous.notes) n.sourceNoteIds=raw.filter(r=>r.startSec<n.startSec+n.durationSec&&r.startSec+r.durationSec>n.startSec).map(r=>r.id);
+    if (token !== operation) return;
+    melodyDocument = result;
     trackDuration = duration;
     updateOutputs();
     ui['result-time'].textContent = `${trackDuration.toFixed(1)} 秒`;
     ui['conversion-time'].textContent = `转换用时 ${((performance.now()-started)/1000).toFixed(1)} 秒`;
-    status(continuous.notes.length ? '转换完成。切换“原始识别 / 连贯哼唱”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!continuous.notes.length);
+    status(result.notes.length ? '转换完成。切换“原始识别 / 连贯哼唱”比较；试听与下载对应当前选择。' : '没有识别到稳定音符，仍可下载 JSON 诊断记录。试试清楚地唱“da-da”。',!result.notes.length);
   } catch (error) {
     if (token !== operation) return;
     console.error('Transcription failed',error);
     status(error.message?.includes('录音') ? error.message : '转换没有完成。可以试一段更短、更清晰的录音，再点“转成 MIDI”。',true);
   } finally {
-    if (scoped) tf.engine().endScope();
     inferenceRunning = false;
     if (token === operation) { busy = false; ui.progress.hidden = true; }
     syncUI();

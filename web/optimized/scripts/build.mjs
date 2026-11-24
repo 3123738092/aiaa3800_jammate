@@ -7,7 +7,9 @@ const root = path.resolve(import.meta.dirname, '..');
 const dist = path.join(root, 'dist');
 await mkdir(dist, { recursive: true });
 await Promise.all(['index.html', 'style.css'].map(name => copyFile(path.join(root, 'src', name), path.join(dist, name))));
-await build({ entryPoints: [path.join(root, 'src/app.js')], bundle: true, minify: true, sourcemap: false, outfile: path.join(dist, 'app.js'), format: 'esm', platform: 'browser', target: ['es2020'], logLevel: 'info' });
+await build({ entryPoints: ['app.js', 'humming-worker.js'].map(name => path.join(root, 'src', name)),
+  bundle: true, splitting: true, minify: true, sourcemap: false, outdir: dist,
+  format: 'esm', platform: 'browser', target: ['es2020'], logLevel: 'info' });
 const basicPitchRoot = path.dirname(path.dirname(require.resolve('@spotify/basic-pitch')));
 await cp(path.join(basicPitchRoot, 'model'), path.join(dist, 'model'), { recursive: true });
 await copyFile(path.join(basicPitchRoot, 'LICENSE'), path.join(dist, 'BASIC-PITCH-LICENSE.txt'));

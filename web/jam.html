@@ -110,6 +110,8 @@
           <audio controls hidden data-trim-audio aria-label="试听所选哼唱片段"></audio>
         </fieldset>
         <audio controls hidden data-input-audio aria-label="试听哼唱"></audio>
+        <p><label><input type="checkbox" id="jam-correct-humming" aria-describedby="jam-correct-humming-note" disabled> 哼唱矫正</label></p>
+        <p class="muted" id="jam-correct-humming-note">正在检查矫正模型…</p>
         <button type="button" data-send hidden>发送哼唱到 Jam</button>
       </div>
     </div>
@@ -181,7 +183,7 @@
       <div class="jam-voice">
         <button id="jam-microphone" type="button" aria-pressed="false" disabled>开启麦克风</button>
         <button id="jam-captions-toggle" type="button" aria-controls="jam-captions" aria-pressed="false"
-                title="开始演奏并打开麦克风后，由浏览器转录指令" disabled>开启语音转录</button>
+                title="开始演奏并打开麦克风后，由 Gemini 转写指令" disabled>开启语音转录</button>
         <button id="jam-nod-toggle" type="button" aria-controls="jam-nod" aria-pressed="false" disabled>开启点头确认</button>
         <span class="muted">试着说「乐队，鼓少一点」。点头确认开启后，以「乐队」开头的语音会先等待确认。</span>
       </div>
@@ -269,6 +271,7 @@
       <div class="jam-debug-data">
         <details><summary>开场素材、编制与模型</summary><pre id="jam-debug-opening">—</pre></details>
         <details><summary>InputEvent</summary><pre id="jam-debug-event">—</pre></details>
+        <details><summary>哼唱矫正前后</summary><pre id="jam-debug-humming">—</pre></details>
         <details><summary>JamState</summary><pre id="jam-debug-state">—</pre></details>
         <details><summary>BandPlan 与播放回执</summary><pre id="jam-debug-plan">—</pre></details>
         <details><summary>模型、回复与错误</summary><pre id="jam-debug-models">—</pre></details>
@@ -279,6 +282,6 @@
   </details>
   <p class="muted">已确认播放的小节和指令状态会实时更新。刷新页面会结束本次会话。</p>
 </main>
-<script type="module" src="jam.js?v=opening-mic"></script>
+<script type="module" src="jam.js?v=humming-correction"></script>
 </body>
 </html>

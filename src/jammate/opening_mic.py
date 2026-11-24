@@ -10,6 +10,7 @@ from threading import Condition
 import wave
 
 import numpy as np
+from scipy.signal import resample_poly
 
 from jammate.analysis.jam_capture import isolated_attack_times
 from jammate.orchestration.llm import OpenAIProvider, ProviderFailure
@@ -103,7 +104,7 @@ class OpeningMic:
             raise LLMConfigurationError("音频入口需要 chat_completions。")
         return OpenAIProvider(config, schema_name="jammate_opening_mic")
 
-    def _complete(self, messages, schema):
+    def _complete(self, messages, schema, *, schema_name=None, timeout_s=None):
         with self._requests:
             if self._closed:
                 raise RuntimeError("总麦克风服务已关闭。")
@@ -112,12 +113,36 @@ class OpeningMic:
             provider = self._provider
             self._active += 1
         try:
-            return provider.complete(messages, schema, provider.config.timeout_s)
+            if schema_name is not None:
+                provider = OpenAIProvider(provider.config, client=provider.client, schema_name=schema_name)
+            timeout = provider.config.timeout_s
+            return provider.complete(messages, schema, min(timeout, timeout_s) if timeout_s is not None else timeout)
         finally:
             with self._requests:
                 self._active -= 1
                 if not self._active:
                     self._requests.notify_all()
+
+    @property
+    def ready(self):
+        with self._requests:
+            return self._provider is not None and not self._closed
+
+    def complete_humming(self, messages, schema, timeout_s):
+        return self._complete(messages, schema, schema_name="jammate_humming_correction", timeout_s=timeout_s)
+
+    def dictate(self, audio, rate):
+        """Convert a live mono segment to the same 16 kHz payload as the opening mic."""
+        if rate != SAMPLE_RATE:
+            divisor = np.gcd(rate, SAMPLE_RATE)
+            audio = resample_poly(audio, SAMPLE_RATE // divisor, rate // divisor)
+        pcm = np.rint(np.clip(audio, -1., 1.) * 32767).astype("<i2")
+        with io.BytesIO() as buffer:
+            with wave.open(buffer, "wb") as wav:
+                wav.setparams((1, 2, SAMPLE_RATE, 0, "NONE", "not compressed"))
+                wav.writeframes(pcm.tobytes())
+            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return self.recognize({"mode": "dictation", "audio": encoded})
 
     def close(self):
         with self._requests:

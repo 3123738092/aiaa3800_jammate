@@ -127,7 +127,7 @@ def main():
         parser.error("a SoundFont requires FluidSynth")
     with (
         closing(OpeningMic()) as opening_mic,
-        closing(BrowserJamService(fluidsynth=args.fluidsynth, soundfont=args.soundfont)) as jam,
+        closing(BrowserJamService(fluidsynth=args.fluidsynth, soundfont=args.soundfont, audio_router=opening_mic)) as jam,
         ReferenceBridge(ROOT.parent, scratch=ROOT.parent / "tmp", fluidsynth=args.fluidsynth,
                         soundfont=args.soundfont, implementation=args.implementation) as reference,
         ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server,

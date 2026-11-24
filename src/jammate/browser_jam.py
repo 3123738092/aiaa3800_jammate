@@ -19,10 +19,11 @@ from uuid import uuid4
 import numpy as np
 import soundfile as sf
 
-from jammate.analysis.jam_capture import analyze_capture
+from jammate.analysis.humming_correction import correct_humming
+from jammate.analysis.jam_capture import analyze_capture, route_capture
 from jammate.analysis.rhythm import analyze_rhythm_audio
 from jammate.contracts import BandPlan, InputEvent, PlanError
-from jammate.contracts.adapters import from_rhythm, from_text
+from jammate.contracts.adapters import from_humming, from_rhythm, from_text
 from jammate.generate.arranger import chord_for_bar
 from jammate.generate.harmony import harmony_cycle
 from jammate.instruments import gm_program
@@ -38,7 +39,7 @@ from jammate.orchestration.jam_opening import cold_audio_plan, prepare_opening
 from jammate.orchestration.key_intent import explicit_key_plan
 from jammate.orchestration.progression_intent import asks_for_new_progression, explicit_progression_plan
 from jammate.orchestration.tempo_intent import explicit_tempo
-from jammate.orchestration.llm import LLMAgent, ProviderFailure, validate_plan
+from jammate.orchestration.llm import LLMAgent, OpenAIProvider, ProviderFailure, validate_plan
 from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
 from jammate.orchestration.live_text import JEV_TIMEOUT, JevLiveTagger, LiveTextAgent
 from jammate.orchestration.live_timing import LiveTurnTiming, can_wait, target_position
@@ -669,13 +670,14 @@ class BrowserJam:
 
 
 class BrowserJamService:
-    def __init__(self, *, fluidsynth=None, soundfont=None):
+    def __init__(self, *, fluidsynth=None, soundfont=None, audio_router=None):
         self.lock = threading.Lock()
         self.sessions = {}
         self.preview_lock = threading.Lock()
         self.workers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="jam-agent")
         self.preview_workers = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jam-mrt2")
         self.soundfont = SoundFontRenderer(fluidsynth, soundfont) if fluidsynth and soundfont else None
+        self.audio_router = audio_router
         key = os.environ.get("JAMMATE_JEV_API_KEY") or os.environ.get("OHMYGPT_API_KEY")
         self.jev = JevLiveTagger(key) if key else None
 
@@ -716,6 +718,29 @@ class BrowserJamService:
             raise ValueError("录音数据无效。")
         return audio, rate
 
+    def humming_provider(self):
+        complete = getattr(self.audio_router, "complete_humming", None)
+        return complete if complete and self.audio_router.ready else None
+
+    def complete_humming(self, messages, schema, timeout_s):
+        if complete := self.humming_provider():
+            return complete(messages, schema, timeout_s)
+        config = self.config()
+        provider = OpenAIProvider(config, schema_name="jammate_humming_correction")
+        return provider.complete(messages, schema, min(timeout_s, config.timeout_s))
+
+    def browser_melody(self, document, session_id, max_seconds, *, correction=False):
+        event = from_humming(document, session_id=session_id)
+        melody = event.payload["melody"]
+        if not .5 <= melody["source"]["durationSec"] <= max_seconds:
+            raise ValueError(f"请提供 0.5–{max_seconds} 秒的哼唱。")
+        if melody["selectedResult"] != "cleaned" or not melody["notes"]:
+            raise ValueError("未识别到稳定的哼唱音符，请重新录制。")
+        if correction:
+            corrected = correct_humming(melody, self.complete_humming)
+            return from_humming(corrected, session_id=session_id, event_id=event.event_id)
+        return event
+
     def opening_events(self, body):
         if not isinstance(body, dict):
             raise ValueError("请提供至少一种开场素材：文字、拍手或哼唱。")
@@ -735,8 +760,13 @@ class BrowserJamService:
             events.append(from_rhythm(rhythm, session_id=session_id, audio_duration_s=len(clap) / clap_rate,
                                       tempo_source="detected", confidence_kind="grid_alignment_heuristic"))
         if body.get("humming") is not None:
-            humming, humming_rate = self.decode_recording(body["humming"], MAX_HUMMING_SECONDS)
-            melody, _ = analyze_capture(humming, humming_rate, mode="humming", session_id=session_id, bpm=None)
+            source = body["humming"]
+            if isinstance(source, dict) and "melody" in source:
+                melody = self.browser_melody(source["melody"], session_id, MAX_HUMMING_SECONDS,
+                                             correction=source.get("correct_humming") is True)
+            else:
+                humming, humming_rate = self.decode_recording(source, MAX_HUMMING_SECONDS)
+                melody, _ = analyze_capture(humming, humming_rate, mode="humming", session_id=session_id, bpm=None)
             if melody is None:
                 raise ValueError("哼唱中没有识别到音符，请靠近麦克风重新录一小句。")
             events.append(melody)
@@ -751,28 +781,61 @@ class BrowserJamService:
         text, mode = body.get("transcript"), body.get("mode", "auto")
         if not isinstance(text, str) or not 0 < len(text.strip()) <= 500 or mode not in ("auto", "speech"):
             raise ValueError("请提交浏览器转录的 1–500 字语音。")
+        return BrowserJamService.speech_result(session, text, mode, engine="browser")
+
+    @staticmethod
+    def speech_result(session, text, mode, *, engine):
         text = text.strip()
         with session.lock:
             session.check_open()
-            command = voice_command(text, session.manager.state, accept_short=mode == "speech")
+            command = voice_command(text, session.manager.state, accept_short=mode == "speech") if len(text) <= 500 else None
         output = {"command": command, "transcript": text, "recognition": "transcribed"}
-        session.record_capture({"stage": "transcribe", "engine": "browser", "mode": mode, **output})
+        session.record_capture({"stage": "transcribe", "engine": engine, "mode": mode, **output})
         return output
 
     def capture(self, session, body):
         mode = body.get("mode")
-        if mode not in ("auto", "rhythm", "humming"):
-            raise ValueError("请选择自动识别、拍手或哼唱，再提交录音。")
-        audio, rate = self.decode_recording(body, MAX_HUMMING_SECONDS if mode == "humming" else 9)
+        if mode not in ("auto", "rhythm", "humming", "speech"):
+            raise ValueError("请选择自动识别、语音、拍手或哼唱，再提交录音。")
+        max_seconds = MAX_HUMMING_SECONDS if mode == "humming" else 9
         with session.lock:
             session.check_open()
             bpm = session.manager.state.tempo_bpm
-        event, speech = analyze_capture(audio, rate, mode=mode, session_id=session.id, bpm=bpm)
+        if "melody" in body:
+            if mode not in {"humming", "auto"}:
+                raise ValueError("请用哼唱或自动识别模式提交旋律。")
+            event = self.browser_melody(body["melody"], session.id, max_seconds,
+                                        correction=body.get("correct_humming") is True)
+            data = event.to_dict()
+            session.record_capture({"stage": "capture", "mode": mode, "engine": "basic-pitch", "event": data})
+            return {"event": data}
+        audio, rate = self.decode_recording(body, max_seconds)
+        if mode == "auto" and body.get("humming_backend") == "basic-pitch":
+            event, route = route_capture(audio, rate, mode=mode, session_id=session.id, bpm=bpm)
+            if route == "humming":
+                return {"recognition": "analyze_humming"}
+            speech = route == "speech"
+        else:
+            event, speech = analyze_capture(audio, rate, mode=mode, session_id=session.id, bpm=bpm)
         if event is not None:
             data = event.to_dict()
             session.record_capture({"stage": "capture", "mode": mode, "engine": "local", "event": data})
             return {"event": data}
-        outcomes = {"rhythm": "no_rhythm", "humming": "no_melody", "auto": "unclassified"}
+        if speech and (mode == "speech" or (mode == "auto" and body.get("transcribe") is True)):
+            if self.audio_router is None:
+                raise ValueError("Gemini 语音转写未配置。")
+            try:
+                result = self.audio_router.dictate(audio, rate)
+            except ValueError as error:
+                session.record_capture({"stage": "transcribe", "engine": "gemini", "mode": mode,
+                                        "recognition": "error", "error": str(error)})
+                raise
+            if result["route"] == "SEND_TEXT":
+                return self.speech_result(session, result["instruction"], mode, engine="gemini")
+            session.record_capture({"stage": "transcribe", "engine": "gemini", "mode": mode,
+                                    "recognition": "no_speech"})
+            return {"recognition": "no_speech"}
+        outcomes = {"rhythm": "no_rhythm", "humming": "no_melody", "auto": "unclassified", "speech": "no_speech"}
         recognition = "browser_speech" if speech else outcomes[mode]
         session.record_capture({"stage": "capture", "mode": mode, "engine": "local", "recognition": recognition})
         return {"recognition": recognition}
@@ -796,7 +859,9 @@ class BrowserJamService:
                     "presets": {name: self.soundfont.profile_timbres(name)
                                 for name in ("electric", "acoustic", "synth")},
                 }
-            return {"llm_ready": llm_ready, "speech_ready": True, "speech_mode": "browser",
+            return {"llm_ready": llm_ready, "speech_ready": bool(self.audio_router and self.audio_router.ready),
+                    "speech_mode": "gemini",
+                    "humming_correction_ready": bool(self.humming_provider()) or llm_ready,
                     "music_capture": True, "humming_clip_seconds": MAX_HUMMING_SECONDS,
                     "fluidsynth": self.soundfont is not None,
                     "timbre_catalog": catalog, "mrt2": self.mrt2_available(), "opening_modes": ["warm", "cold", "humming"],

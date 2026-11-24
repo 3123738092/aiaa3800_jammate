@@ -84,6 +84,23 @@ def test_overlapping_recordings_keep_the_client_open_until_both_finish(monkeypat
     provider.client.close.assert_called_once_with()
 
 
+def test_live_dictation_resamples_browser_audio_for_the_shared_provider(monkeypatch):
+    provider = Mock()
+    provider.config.timeout_s = 10
+    provider.complete.return_value = SimpleNamespace(text='{"route":"SEND_TEXT","instruction":"鼓少一点"}')
+    monkeypatch.setattr(opening_mic.OpeningMic, "_create_provider", Mock(return_value=provider))
+    with closing(opening_mic.OpeningMic()) as mic:
+        audio = .3 * np.sin(2 * np.pi * 330 * np.arange(24000) / 48000)
+        assert mic.ready
+        assert mic.dictate(audio, 48000) == {"route": "SEND_TEXT", "instruction": "鼓少一点"}
+        messages, schema, _ = provider.complete.call_args.args
+        assert messages[0]["content"] == opening_mic.DICTATE
+        part, = messages[1]["content"]
+        with wave.open(io.BytesIO(base64.b64decode(part["input_audio"]["data"]))) as clip:
+            assert (clip.getframerate(), clip.getnchannels(), clip.getsampwidth(), clip.getnframes()) == (16000, 1, 2, 8000)
+        assert schema["properties"]["route"]["enum"] == ["SEND_TEXT", "KEEP_LISTENING"]
+
+
 @pytest.mark.parametrize("mode,route,words", [
     ("intent", "WAIT_HUMMING", ""), ("intent", "WAIT_RHYTHM", ""),
     ("intent", "WAIT_TEXT", ""), ("intent", "SEND_TEXT", "慢一点，先别加鼓。"),

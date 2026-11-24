@@ -38,7 +38,7 @@ def isolated_attack_times(audio, rate):
 
 
 def _likely_hum(audio, rate, regions):
-    """Look for a series of sustained, clearly periodic pitches before pYIN."""
+    """Look for a series of sustained, clearly periodic pitches before transcription."""
     if not regions or sum(end - start for start, end, _ in regions) < 44:
         return False
     probe_rate = 8000
@@ -69,11 +69,11 @@ def _likely_hum(audio, rate, regions):
     return len(stable) >= 2 and max(stable) - min(stable) >= 1.0
 
 
-def analyze_capture(audio, rate, *, mode, session_id, bpm):
-    """Return a local music event and whether a speech attempt is appropriate."""
+def route_capture(audio, rate, *, mode, session_id, bpm):
+    """Recognize local rhythm or route a recording to melody or speech analysis."""
     regions, hop = _activity(audio, rate)
     if not regions:
-        return None, False
+        return None, None
     duration = len(audio) / rate
     # A short, separated word can have three voiced bursts while none of them
     # reaches the sustained-region threshold on its own.
@@ -89,29 +89,40 @@ def analyze_capture(audio, rate, *, mode, session_id, bpm):
                 context = rhythm_from_onsets(attacks, bpm, attacks[0], accents)
                 if len(context.onset_beats) >= 2 and context.confidence >= .65:
                     return from_rhythm(context, session_id=session_id, audio_duration_s=duration,
-                                       tempo_source="session", confidence_kind="grid_alignment_heuristic"), False
-            return None, mode == "auto" and speech_like
+                                       tempo_source="session", confidence_kind="grid_alignment_heuristic"), None
+            return None, "speech" if mode == "auto" and speech_like else None
 
     if mode == "humming" or (mode == "auto" and _likely_hum(audio, rate, regions)):
-        probe_rate = 22050
-        divisor = np.gcd(rate, probe_rate)
-        pitch_audio = resample_poly(audio, probe_rate // divisor, rate // divisor)
-        notes = []
-        for timed in segment_notes(*track_pitch(pitch_audio, probe_rate), min_duration=.14):
-            end = min(duration, timed.end_s)
-            if end <= timed.start_s:
-                continue
-            identity = f"n{len(notes) + 1}"
-            notes.append({"id": identity, "pitchMidi": timed.pitch, "startSec": timed.start_s,
-                          "durationSec": end - timed.start_s, "velocity01": .7, "sourceNoteIds": [identity]})
-        if notes and (mode == "humming" or len({note["pitchMidi"] for note in notes}) >= 2):
-            source = uuid4().hex
-            document = {"schemaVersion": "1.0.0", "id": source, "status": "ready",
-                        "source": {"id": source, "durationSec": duration, "kind": "recording"},
-                        "timebase": {"unit": "seconds", "origin": "original_audio_start"},
-                        "tempo": {"bpm": None, "source": "unknown", "mode": "free", "quantized": False},
-                        "key": None, "timeSignature": None, "selectedResult": "cleaned", "notes": notes,
-                        "model": {"name": "librosa.pyin"},
-                        "results": {"raw": {"notes": notes}, "cleaned": {"notes": notes}}}
-            return from_humming(document, session_id=session_id), False
-    return None, mode in {"speech", "auto"} and speech_like
+        return None, "humming"
+    return None, "speech" if mode in {"speech", "auto"} and speech_like else None
+
+
+def analyze_capture(audio, rate, *, mode, session_id, bpm):
+    """Analyze audio-only requests, including those from older Jam clients."""
+    event, route = route_capture(audio, rate, mode=mode, session_id=session_id, bpm=bpm)
+    if event is not None or route != "humming":
+        return event, route == "speech"
+    duration = len(audio) / rate
+
+    probe_rate = 22050
+    divisor = np.gcd(rate, probe_rate)
+    pitch_audio = resample_poly(audio, probe_rate // divisor, rate // divisor)
+    notes = []
+    for timed in segment_notes(*track_pitch(pitch_audio, probe_rate), min_duration=.14):
+        end = min(duration, timed.end_s)
+        if end <= timed.start_s:
+            continue
+        identity = f"n{len(notes) + 1}"
+        notes.append({"id": identity, "pitchMidi": timed.pitch, "startSec": timed.start_s,
+                      "durationSec": end - timed.start_s, "velocity01": .7, "sourceNoteIds": [identity]})
+    if notes and (mode == "humming" or len({note["pitchMidi"] for note in notes}) >= 2):
+        source = uuid4().hex
+        document = {"schemaVersion": "1.0.0", "id": source, "status": "ready",
+                    "source": {"id": source, "durationSec": duration, "kind": "recording"},
+                    "timebase": {"unit": "seconds", "origin": "original_audio_start"},
+                    "tempo": {"bpm": None, "source": "unknown", "mode": "free", "quantized": False},
+                    "key": None, "timeSignature": None, "selectedResult": "cleaned", "notes": notes,
+                    "model": {"name": "librosa.pyin"},
+                    "results": {"raw": {"notes": notes}, "cleaned": {"notes": notes}}}
+        return from_humming(document, session_id=session_id), False
+    return None, mode == "auto"

@@ -1,5 +1,22 @@
 // Audio preparation has no musical timing or pitch correction.
 export const SAMPLE_RATE = 22050;
+
+export function decodeHummingAudio(data) {
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  return new Offline(1, 1, 48000).decodeAudioData(data);
+}
+
+export async function monoResample(buffer, start = 0, end = buffer.length) {
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const duration = (end - start) / buffer.sampleRate;
+  const offline = new Offline(1, Math.ceil(duration * SAMPLE_RATE), SAMPLE_RATE);
+  const source = offline.createBufferSource();
+  source.buffer = buffer;
+  source.connect(offline.destination);
+  source.start(0, start / buffer.sampleRate, duration);
+  return (await offline.startRendering()).getChannelData(0);
+}
+
 export const AUDIO_POLICY = Object.freeze({
   version: '1.0.0', silencePeak: .003, silenceRms: .0006,
   quietRms: .01, quietPeak: .05, targetPeak: .35, maxGain: 4,

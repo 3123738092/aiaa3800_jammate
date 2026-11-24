@@ -184,6 +184,11 @@ export function initJamDebug(post, label) {
       '尚未收到指令。');
     json('opening', frame?.opening);
     json('event', selectedTurn?.input_event ?? frame?.opening?.input_events);
+    const humming = selectedTurn?.input_event.payload?.melody ??
+      frame?.captures?.find(item => item.event?.source === 'humming')?.event.payload.melody ??
+      frame?.opening?.input_events?.find(item => item.source === 'humming')?.payload.melody;
+    json('humming', humming ? {basic_pitch_notes: humming.results.raw.notes,
+      ...humming.llmCorrection, final_notes: humming.notes} : null);
     json('state', state ? {current: state, at_decision: selectedTurn?.decision_state,
       after_playback: selectedTurn?.state_after_playback} : null);
     json('plan', selectedTurn ? {proposed: selectedTurn.proposed_plan, bound: selectedTurn.bound_plan,

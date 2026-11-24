@@ -1,9 +1,11 @@
 import {initOpeningMic} from './jam-opening-mic.js';
+import {analyzeJamHumming} from './jam-humming.js';
+import {decodeHummingAudio} from './optimized/src/audio-pipeline.js';
 
 const rate = 16000;
 const titles = {rhythm: '拍手', humming: '哼唱'};
 
-export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange, onRecord, sendEvent}) {
+export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange, onRecord, sendEvent, correctHumming}) {
   const root = document.getElementById('jam-opening');
   const text = document.getElementById('jam-opening-text');
   const status = document.getElementById('jam-opening-status');
@@ -106,12 +108,13 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
     return samples;
   }
 
-  async function saveClip(card, live, samples, sampleRate, name, blob) {
-    const audio = await encodeWave(samples, sampleRate);
+  async function saveClip(card, live, buffer, name, blob, start = 0, end = buffer.length) {
+    const melody = card.mode === 'humming' ? {buffer, start, end, name} : null;
+    const audio = melody ? null : await encodeWave(mono(buffer, start, end), buffer.sampleRate);
     if (liveSession() !== live) return;
     clear(card);
-    const duration = samples.length / sampleRate;
-    card.clip = {audio, url: URL.createObjectURL(blob), label: name + ' · ' + duration.toFixed(1) + ' 秒'};
+    const duration = (end - start) / buffer.sampleRate;
+    card.clip = {audio, melody, url: URL.createObjectURL(blob), label: name + ' · ' + duration.toFixed(1) + ' 秒'};
     card.audio.src = card.clip.url;
     card.audio.hidden = false;
     card.status.textContent = card.clip.label;
@@ -140,10 +143,11 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       if (blob.size > 25 * 1024 * 1024) throw new Error('文件太大，请截取 ' + limit + ' 秒以内的片段。');
       const OfflineAudio = window.OfflineAudioContext || window.webkitOfflineAudioContext;
       if (!OfflineAudio) throw new Error('浏览器无法解码音频。');
-      const clock = new OfflineAudio(1, 1, rate);
       let buffer;
       try {
-        buffer = await clock.decodeAudioData(await blob.arrayBuffer());
+        const data = await blob.arrayBuffer();
+        buffer = card.mode === 'humming' ? await decodeHummingAudio(data) :
+          await new OfflineAudio(1, 1, rate).decodeAudioData(data);
       } catch {
         throw new Error('无法读取此音频，请尝试 WAV 或浏览器支持的音频格式。');
       }
@@ -162,7 +166,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       if (buffer.duration > limit) {
         throw new Error('请使用 ' + limit + ' 秒以内的' + titles[card.mode] + '录音。');
       }
-      await saveClip(card, live, mono(buffer), buffer.sampleRate, name, blob);
+      await saveClip(card, live, buffer, name, blob);
     } catch (error) {
       card.status.textContent = error.message + (card.clip ? ' 已保留上一段可用素材。' : '');
     } finally {
@@ -223,7 +227,15 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
     }
   }
 
-  const payload = card => ({mime_type: 'audio/wav', audio: card.clip.audio});
+  async function payload(card) {
+    const clip = card.clip;
+    if (!clip.melody) return {mime_type: 'audio/wav', audio: clip.audio};
+    const correction = correctHumming();
+    const melody = clip.analysis ?? await analyzeJamHumming(clip.melody.buffer, clip.melody);
+    if (!melody.notes.length) throw new Error('未识别到稳定的哼唱音符，请重新录制。');
+    clip.analysis = melody;
+    return {melody, correct_humming: correction};
+  }
   function resetDrop(card) {
     card.dragDepth = 0;
     card.node.classList.remove('is-dragging');
@@ -250,8 +262,8 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
         onChange();
         try {
           const samples = mono(buffer, start, end);
-          await saveClip(card, live, samples, buffer.sampleRate, name + '（' + label + '）',
-            waveBlob(samples, buffer.sampleRate));
+          await saveClip(card, live, buffer, name + '（' + label + '）',
+            waveBlob(samples, buffer.sampleRate), start, end);
         } catch (error) {
           card.status.textContent = error.message;
         } finally {
@@ -307,11 +319,19 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       card.status.textContent = '正在识别' + titles[card.mode] + '…';
       onChange();
       try {
-        const {event} = await post('capture', {session: live.id, mode: card.mode, ...payload(card)}, 28000);
+        const input = await payload(card);
+        if (liveSession() !== live) return;
+        if (input.correct_humming) card.status.textContent = '正在矫正哼唱…';
+        const {event} = await post('capture', {session: live.id, mode: card.mode, ...input}, 28000);
         if (liveSession() !== live) return;
         if (!event) throw new Error(card.mode === 'rhythm' ?
           '未识别到节奏，请跟拍一整小节。' : '未识别到音符，请重新录制。');
-        if (await sendEvent(live, event)) card.status.textContent = '已发送' + titles[card.mode] + '到当前 Jam。';
+        if (await sendEvent(live, event)) {
+          const correction = event.payload?.melody?.llmCorrection;
+          card.status.textContent = '已发送' + titles[card.mode] + '到当前 Jam。' +
+            (correction?.status === 'applied' ? '矫正 ' + correction.edits.length + ' 处。' :
+              correction?.status === 'fallback' ? '已采用基础清理。' : '');
+        }
         else card.status.textContent = '发送失败，可以重试。';
       } catch (error) {
         card.status.textContent = error.name === 'AbortError' ? '识别超时，请重试。' : error.message;
@@ -327,7 +347,12 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
     hasHumming: () => cards.some(card => card.mode === 'humming' && card.clip),
     ready: (hasSettings = false) => !mic.busy() && !take && cards.every(card => !card.busy && !card.selection) &&
       (hasSettings || Boolean(text.value.trim()) || cards.some(card => card.clip)),
-    request: () => ({...Object.fromEntries(cards.filter(card => card.clip).map(card => [card.mode, payload(card)])), text: text.value.trim()}),
+    async request() {
+      const entries = cards.filter(card => card.clip);
+      const instruction = text.value.trim();
+      const inputs = await Promise.all(entries.map(async card => [card.mode, await payload(card)]));
+      return {...Object.fromEntries(inputs), text: instruction};
+    },
     opened(opening, bpm) {
       for (const card of cards) clear(card);
       const voices = opening.instruments.map(item => item.label).join('、') || '等待素材';

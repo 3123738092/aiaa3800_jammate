@@ -1,5 +1,6 @@
-import {initJamDebug} from './jam-debug.js?v=2';
-import {initJamInputs} from './jam-inputs.js?v=opening-mic';
+import {initJamDebug} from './jam-debug.js?v=humming-correction';
+import {initJamInputs} from './jam-inputs.js?v=humming-correction';
+import {analyzeJamHumming} from './jam-humming.js';
 import {addressedCommand, initNodConfirmation} from './jam-nod.js?v=2';
 
 const byId = id => document.getElementById(id);
@@ -9,6 +10,8 @@ const hummingCompletionNote = byId('jam-humming-completion-note');
 const exportButton = byId('jam-export'), exportStatus = byId('jam-export-status');
 const agent = byId('jam-agent'), bpmInput = byId('jam-bpm');
 const openingMode = byId('jam-opening-mode'), openingModeNote = byId('jam-opening-mode-note');
+const correctHumming = byId('jam-correct-humming'), correctionNote = byId('jam-correct-humming-note');
+let hummingCorrectionReady = false;
 const coldSettings = byId('jam-cold-settings'), coldBpm = byId('jam-cold-bpm'), coldKey = byId('jam-cold-key');
 const warmBpmRow = byId('jam-warm-bpm');
 let coldSettingsAvailable = false, coldMrtReady = false, mrtLiveState = false;
@@ -31,7 +34,6 @@ const examples = [...form.querySelectorAll('[data-example]')];
 const layerNames = {drums: '鼓', bass: '贝斯', keys: '键盘', lead: '主奏', guitar: '木吉他',
   flute: '长笛', strings: '弦乐', harp: '竖琴'};
 const micSupported = Boolean(navigator.mediaDevices?.getUserMedia && window.AudioWorkletNode);
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let speechStatus = 'checking';
 let openingReady = false;
 let hummingCompletionReady = false;
@@ -71,6 +73,7 @@ const nod = initNodConfirmation({reportError: debug.error});
 let pausedVoice = null;
 const manual = initJamInputs({
   post, encodeWave, waveBlob, liveSession: () => run?.started ? run : null, onChange: controls,
+  correctHumming: () => hummingCorrectionReady && correctHumming.checked,
   sendEvent: (live, event) => sendToJam(live, null, event.source, null, event),
   onRecord(recording) {
     if (recording) {
@@ -104,6 +107,9 @@ function controls() {
   for (const control of [bpmInput, agent, arranger, renderer]) control.disabled = Boolean(run);
   const mrt = renderer.value === 'mrt2';
   const starting = Boolean(run) && !run.started;
+  correctHumming.disabled = starting || !hummingCorrectionReady;
+  correctionNote.textContent = hummingCorrectionReady ? '把识别出的音符交给模型，尝试修正跑音或剔除误识别的音。' :
+    openingChecked ? '矫正模型不可用，仍可使用基础清理。' : '正在检查矫正模型…';
   play.disabled = Boolean(run) || !canOpen || !manual.ready(useColdSettings && Boolean(coldBpm.value || coldKey.value));
   play.textContent = starting ? '正在识别与编制…' : '分析素材并开始';
   play.setAttribute('aria-busy', String(starting));
@@ -143,14 +149,13 @@ function controls() {
   const captions = run?.voice?.captions;
   nod.setAvailable(Boolean(captions));
   captionsToggle.disabled = speechStatus !== 'ready' || !run?.voice?.processor || !usesSpeech();
-  if (!SpeechRecognition) captionsToggle.title = '此浏览器不支持实时语音字幕';
-  else if (speechStatus !== 'ready') captionsToggle.title = '当前服务未启用浏览器转录';
+  if (speechStatus !== 'ready') captionsToggle.title = '当前服务未配置 Gemini 语音转写';
   else if (!usesSpeech()) captionsToggle.title = '在高级设置中选择语音或自动识别后可开启转录';
   else if (!run?.voice?.processor) captionsToggle.title = '开始演奏并打开麦克风后可开启字幕';
-  else captionsToggle.title = '由浏览器识别语音，可能使用浏览器的在线服务';
+  else captionsToggle.title = '停顿后由 Gemini 转写这一句';
   captionsToggle.textContent = captions ? '暂停语音转录' : '开启语音转录';
   captionsToggle.setAttribute('aria-pressed', String(Boolean(captions)));
-  useCaption.disabled = !canSend || !captions?.final || Boolean(captions.interim);
+  useCaption.disabled = !canSend || !captions?.final;
   manual.update({starting, ready: canOpen, checked: openingChecked, cold, hummingSeconds,
     hummingCompletion: hummingCompletionReady});
 }
@@ -476,11 +481,6 @@ async function startJam(mode) {
   const hasSettings = useColdSettings && Boolean(tempoInput.value || key);
   if (run || !canOpen || !manual.ready(hasSettings) || !tempoInput.reportValidity()) return;
   if (mode === 'humming' && !manual.hasHumming()) return;
-  const opening = manual.request();
-  if (key) opening.key = key;
-  if (hasSettings && !opening.text && !opening.rhythm && !opening.humming) {
-    opening.text = [tempoInput.value && tempoInput.value + ' BPM', key].filter(Boolean).join('，');
-  }
   const settings = {bpm: tempoInput.value ? Number(tempoInput.value) : null,
     timbres: renderer.value === 'fluidsynth' && timbreOverride.checked ? selectedTimbres() : null};
   const Audio = window.AudioContext || window.webkitAudioContext;
@@ -509,6 +509,12 @@ async function startJam(mode) {
   try {
     await resumePlayback(live.clock);
     if (run !== live) return;
+    const opening = await manual.request();
+    if (run !== live) return;
+    if (key) opening.key = key;
+    if (hasSettings && !opening.text && !opening.rhythm && !opening.humming) {
+      opening.text = [settings.bpm && settings.bpm + ' BPM', key].filter(Boolean).join('，');
+    }
     const view = await post('start', {opening, opening_mode: mode, ...settings, agent: agent.value, renderer: renderer.value,
       arranger: arranger.value, allow_preview: renderer.value === 'mrt2'}, 85000);
     if (run !== live) {
@@ -585,7 +591,7 @@ function voiceAvailability() {
     return run?.id ? '麦克风已关闭。' : '开始后会按高级设置中的模式识别麦克风。';
   }
   if (speechStatus === 'checking') return '正在检查语音识别服务…';
-  if (speechStatus === 'unsupported') return '当前工作台版本不支持语音识别，请打开新版工作台。';
+  if (speechStatus === 'unsupported') return '当前服务未配置 Gemini 语音转写，可以使用文字。';
   if (speechStatus === 'unreachable') return '暂时无法连接语音识别服务，可刷新页面重试或使用文字。';
   return run?.id ? '麦克风已关闭。' : '开始演奏后自动开启麦克风，首次使用需要授权。';
 }
@@ -616,133 +622,48 @@ function releaseVoice(live) {
   setListening(live, false);
 }
 
-function stopCaptions(voice, message = '') {
-  const captions = voice.captions;
+function stopCaptions(voice) {
   voice.captions = null;
   nod.setAvailable(false);
-  if (captions) {
-    clearTimeout(captions.retry);
-    captions.recognition.abort();
-  }
   captionsText.textContent = '';
-  captionsStatus.textContent = message;
-  captionsPanel.hidden = !message;
+  captionsStatus.textContent = '';
+  captionsPanel.hidden = true;
 }
 
 function startCaptions(live, voice) {
-  const mode = captureMode.value;
-  if (!usesSpeech() || speechStatus !== 'ready' || voice.captions) return;
-  let recognition;
-  try {
-    recognition = new SpeechRecognition();
-  } catch {
-    stopCaptions(voice, '浏览器无法初始化语音字幕。');
-    return;
-  }
-  const captions = {recognition, final: '', interim: '', pending: Promise.resolve()};
-  voice.captions = captions;
+  if (run !== live || !usesSpeech() || speechStatus !== 'ready' || voice.captions) return;
+  voice.captions = {final: '', reviewRevision: 0};
   captionsPanel.hidden = false;
   captionsText.textContent = '';
-  captionsStatus.textContent = '正在启动浏览器字幕…';
+  captionsStatus.textContent = 'Gemini · 等待说话';
   controls();
+}
 
-  recognition.lang = document.documentElement.lang || 'zh-CN';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  const current = () => run === live && live.voice === voice && voice.captions === captions;
-  const fail = message => {
-    stopCaptions(voice, message);
-    controls();
-  };
-  const start = () => {
-    if (!current()) return;
-    try {
-      recognition.start(voice.stream.getAudioTracks()[0]);
-    } catch {
-      fail('无法启动浏览器字幕，可以重新开启。');
+async function handleTranscript(live, voice, segment, result) {
+  const {captions, reviewRevision} = segment;
+  if (!captions || voice.captions !== captions) return;
+  const transcript = result.transcript;
+  captions.final = transcript;
+  captionsText.textContent = transcript;
+  captionsStatus.textContent = 'Gemini · 最近一句';
+
+  const review = nod.enabled();
+  if (review && captions.reviewRevision !== reviewRevision) return;
+  const command = transcript.length <= input.maxLength &&
+    ((review && addressedCommand(transcript)) || result.command);
+  live.transcript = command ? null : transcript;
+  showTranscript(live.transcript);
+  if (command && review) {
+    if (!nod.offer({transcript, send: () => run === live && live.voice === voice &&
+        voice.captions === captions && captions.reviewRevision === reviewRevision &&
+        sendToJam(live, command, 'speech', voice)})) {
+      live.transcript = transcript;
+      showTranscript(transcript);
     }
-  };
-  recognition.onstart = () => {
-    if (current()) captionsStatus.textContent = '浏览器字幕 · 正在听';
-  };
-  recognition.onspeechstart = () => {
-    if (current() && nod.enabled()) {
-      captions.reviewRevision = (captions.reviewRevision ?? 0) + 1;
-      nod.clear();
-    }
-  };
-  recognition.onresult = event => {
-    if (!current()) return;
-    const interim = [], finals = [];
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const result = event.results[index];
-      const text = result[0].transcript.trim();
-      if (result.isFinal) {
-        if (text) finals.push(text);
-      } else {
-        interim.push(text);
-      }
-    }
-    if (finals.length) {
-      const transcript = finals.join(' ');
-      captions.final = transcript;
-      const review = nod.enabled();
-      const revision = captions.reviewRevision = (captions.reviewRevision ?? 0) + 1;
-      if (review) nod.clear();
-      captions.pending = captions.pending.then(async () => {
-        if (!current()) return;
-        try {
-          const addressed = (review || nod.enabled()) && addressedCommand(transcript);
-          const command = addressed || (await post('transcribe', {session: live.id, transcript, mode})).command;
-          if (!current()) return;
-          if ((review || nod.enabled()) && revision !== captions.reviewRevision) return;
-          live.transcript = command ? null : transcript;
-          showTranscript(live.transcript);
-          if (!command) return;
-          if (review || nod.enabled()) {
-            if (!nod.offer({
-              transcript, send: () => current() && sendToJam(live, command, 'speech', voice),
-            })) {
-              live.transcript = transcript;
-              showTranscript(transcript);
-            }
-          } else {
-            await sendToJam(live, command, 'speech', voice);
-          }
-        } catch (error) {
-          if (!current()) return;
-          debug.error('浏览器转录指令', error);
-          live.transcript = transcript;
-          showTranscript(transcript);
-        }
-      });
-    }
-    captions.interim = interim.join(' ').trim();
-    captionsText.textContent = captions.interim || captions.final;
-    captionsStatus.textContent = captions.interim ? '浏览器字幕 · 正在转写' :
-      captions.final ? '浏览器字幕 · 最近一句' : '浏览器字幕 · 正在听';
-    useCaption.disabled = !captions.final || Boolean(captions.interim) || live.sending;
-  };
-  recognition.onerror = ({error}) => {
-    if (!current() || error === 'no-speech') return;
-    const messages = {
-      'not-allowed': '浏览器未授权语音字幕，请检查权限后重新开启。',
-      'service-not-allowed': '浏览器的语音识别服务不可用。',
-      'language-not-supported': '浏览器的语音识别服务暂不支持当前语言。',
-      network: '浏览器语音识别连接失败，可以重新开启。',
-    };
-    debug.error('浏览器语音识别', new Error(error));
-    fail(messages[error] || '实时字幕已中断，可以重新开启。');
-  };
-  recognition.onend = () => {
-    if (!current()) return;
-    captions.interim = '';
-    captionsText.textContent = captions.final;
-    captionsStatus.textContent = '正在恢复浏览器字幕…';
-    controls();
-    captions.retry = setTimeout(start, 300);
-  };
-  start();
+  } else if (command) {
+    await sendToJam(live, command, 'speech', voice);
+  }
+  controls();
 }
 
 captionsToggle.addEventListener('click', () => {
@@ -901,9 +822,13 @@ async function enableVoice(live) {
       voice.listening = data.type === 'start';
       setListening(live, voice.listening);
       if (voice.listening) {
+        if (voice.captions && nod.enabled()) {
+          voice.captions.reviewRevision += 1;
+          nod.clear();
+        }
         voiceStatus.textContent = '正在听 · 伴奏已压低。';
-      } else if (data.samples && captureMode.value !== 'speech' && musicCaptureAvailable) {
-        if (!voice.musicJob) recognizeMusic(live, voice, data);
+      } else if (data.samples && (captureMode.value === 'speech' ? Boolean(voice.captions) : musicCaptureAvailable)) {
+        queueVoiceInput(live, voice, data);
       } else {
         voiceStatus.textContent = data.tooLong ? '正在监听 · 上一段太长，请把指令分开说。' : '正在监听。';
       }
@@ -932,31 +857,79 @@ async function enableVoice(live) {
   }
 }
 
-async function recognizeMusic(live, voice, segment) {
-  const mode = captureMode.value, revision = voice.captureRevision;
+function queueVoiceInput(live, voice, data) {
+  const captions = voice.captions;
+  const segment = {...data, mode: captureMode.value, revision: voice.captureRevision,
+    correctHumming: hummingCorrectionReady && correctHumming.checked, captions, reviewRevision: captions?.reviewRevision};
+  if (!voice.captureJob) {
+    recognizeVoiceInput(live, voice, segment);
+  } else if (!voice.pendingSegment) {
+    voice.pendingSegment = segment;
+  } else {
+    voiceStatus.textContent = '还有一段录音在等待识别，请稍等后再说。';
+  }
+}
+
+async function recognizeVoiceInput(live, voice, segment) {
+  const {mode, revision, captions} = segment;
   const current = () => run === live && live.voice === voice && revision === voice.captureRevision;
-  voice.musicJob = true;
-  voiceStatus.textContent = '正在识别拍手或哼唱…';
+  const transcribe = Boolean(captions && voice.captions === captions);
+  if (!current() || (mode === 'speech' && !transcribe)) return;
+  voice.captureJob = true;
+  voiceStatus.textContent = mode === 'speech' ? 'Gemini 正在转写…' : '正在识别这段输入…';
+  if (transcribe) captionsStatus.textContent = 'Gemini · 正在识别';
   try {
-    const audio = await encodeWave(segment.samples, segment.sampleRate);
-    if (!current()) return;
-    const result = await post('capture', {session: live.id, mime_type: 'audio/wav', audio, mode}, 28000);
+    let result;
+    if (mode !== 'humming') {
+      const audio = await encodeWave(segment.samples, segment.sampleRate);
+      if (!current()) return;
+      result = await post('capture', {session: live.id, mime_type: 'audio/wav', audio, mode, transcribe,
+        humming_backend: 'basic-pitch'}, transcribe ? 65000 : 28000);
+      if (!current()) return;
+    }
+    if (mode === 'humming' || result?.recognition === 'analyze_humming') {
+      voiceStatus.textContent = 'Basic Pitch 正在识别哼唱…';
+      const buffer = live.clock.createBuffer(1, segment.samples.length, segment.sampleRate);
+      buffer.copyToChannel(segment.samples, 0);
+      const melody = await analyzeJamHumming(buffer);
+      if (!current()) return;
+      if (melody.notes.length && segment.correctHumming) voiceStatus.textContent = '正在矫正哼唱…';
+      result = melody.notes.length ? await post('capture', {session: live.id, mode, melody,
+        correct_humming: segment.correctHumming}, 28000) :
+        {recognition: 'no_melody'};
+    }
     if (!current()) return;
     if (result.event) {
       await sendToJam(live, null, result.event.source, voice, result.event);
-      if (current()) voiceStatus.textContent = result.event.source === 'rhythm' ? '已识别拍手节奏。' : '已识别哼唱旋律。';
-    } else if (result.recognition !== 'browser_speech' || !voice.captions) {
+      if (current()) {
+        const correction = result.event.payload?.melody?.llmCorrection;
+        voiceStatus.textContent = result.event.source === 'rhythm' ? '已识别拍手节奏。' :
+          correction?.status === 'applied' ? '已识别哼唱，矫正 ' + correction.edits.length + ' 处。' :
+          correction?.status === 'fallback' ? '哼唱矫正未完成，已采用基础清理。' : '已识别哼唱旋律。';
+      }
+    } else if (result.transcript) {
+      await handleTranscript(live, voice, segment, result);
+      if (current()) voiceStatus.textContent = '正在监听。';
+    } else {
       voiceStatus.textContent = {no_rhythm: '未识别到拍手，请跟着伴奏拍一小节。',
         no_melody: '未识别到旋律，请再哼一句。', browser_speech: '语音转录尚未开启。',
+        no_speech: '没听清这一句，正在监听。',
         unclassified: '未识别到拍手或旋律。'}[result.recognition] ?? '正在监听。';
     }
   } catch (error) {
     if (current()) {
       voiceStatus.textContent = error.name === 'AbortError' ? '识别超时，请重试。' : error.message;
+      if (transcribe && voice.captions === captions) captionsStatus.textContent = 'Gemini · 本段转写失败';
       debug.error('麦克风识别', error);
     }
   } finally {
-    voice.musicJob = false;
+    voice.captureJob = false;
+    if (transcribe && current() && voice.captions === captions && captionsStatus.textContent === 'Gemini · 正在识别') {
+      captionsStatus.textContent = captions.final ? 'Gemini · 最近一句' : 'Gemini · 等待说话';
+    }
+    const pending = voice.pendingSegment;
+    voice.pendingSegment = null;
+    if (pending) recognizeVoiceInput(live, voice, pending);
   }
 }
 
@@ -989,6 +962,7 @@ captureMode.addEventListener('change', () => {
   const voice = run?.voice;
   if (voice) {
     voice.captureRevision = (voice.captureRevision ?? 0) + 1;
+    voice.pendingSegment = null;
     stopCaptions(voice);
     if (voice.processor) startCaptions(run, voice);
   } else {
@@ -1021,10 +995,11 @@ post('status', {}).then(view => {
   renderer.querySelector('option[value="fluidsynth"]').disabled = !view.fluidsynth;
   renderer.querySelector('option[value="mrt2"]').disabled = !view.mrt2;
   fillTimbres(view.timbre_catalog);
-  speechStatus = view.speech_mode === 'browser' && SpeechRecognition && view.speech_ready ? 'ready' : 'unsupported';
+  speechStatus = view.speech_mode === 'gemini' && view.speech_ready ? 'ready' : 'unsupported';
   musicCaptureAvailable = Boolean(view.music_capture);
   hummingSeconds = view.humming_clip_seconds ?? 0;
   openingReady = Boolean(view.llm_ready);
+  hummingCorrectionReady = Boolean(view.humming_correction_ready);
   hummingCompletionReady = Boolean(view.opening_modes?.includes('humming'));
   coldAvailable = Boolean(view.opening_modes?.includes('cold'));
   if (!openingReady && coldAvailable && !run) openingMode.value = 'cold';

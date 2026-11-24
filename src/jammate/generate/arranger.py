@@ -58,7 +58,9 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         backing = apply_texture(state, chord, backing)
     theme = state.accompaniment_motif
     if chord is not None and theme is not None and bar_index >= theme.start_bar:
-        backing = follow_motif(backing, chord, state.motif(theme.motif_id).notes, bar_index - theme.start_bar)
+        pads = {layer.name for layer in state.layers if layer.active and layer.role == "pad"}
+        backing = follow_motif(backing, chord, state.motif(theme.motif_id).notes,
+                              bar_index - theme.start_bar, pads=pads)
     bar_notes = backing + tuple(lead)
     offset = bar_index * BEATS_PER_BAR
     return tuple(n.shifted(offset) for n in bar_notes)

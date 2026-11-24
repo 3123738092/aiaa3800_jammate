@@ -126,3 +126,21 @@ def test_humming_completion_requires_a_melodic_phrase():
         prepare_opening((text,), None, {}, mode="humming")
     with pytest.raises(ValueError, match="至少有三个起音和两个不同音高"):
         prepare_opening((flat,), None, {}, mode="humming")
+
+
+def test_low_humming_stays_in_register_and_enriches_the_post_replay_backing():
+    event = humming("motif-jam", "low-voice", (42, 49, 48, 39), onsets=(0., .43, 1.14, 2.1))
+    text = from_text("F# 大调，96 BPM，和弦进行设为 D#m-B-F#-C#", session_id="motif-jam")
+    events = event, text
+    state, selection = prepare_opening(events, None, {}, mode="humming")
+    with ThreadPoolExecutor(1) as workers:
+        jam = BrowserJam(96, RuleAgent, workers, opening=(state, events, selection))
+        bars = jam.runtime.advance_to(22050 * 18)
+        assert abs(jam.opening_answer[0].pitch - 39) <= 7
+        assert all(note.pitch <= 51 and state.key.contains(note.pitch) for note in jam.opening_answer)
+        after = bars[-1].notes
+        assert not for_layer(after, "lead")
+        assert all(note.duration >= 3 for note in for_layer(after, "strings"))
+        assert len(for_layer(after, "strings")) == 2
+        assert len({note.start for note in for_layer(after, "keys")}) >= 4
+        assert len(for_layer(after, "bass")) == 3

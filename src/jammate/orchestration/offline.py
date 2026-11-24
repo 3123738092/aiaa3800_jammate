@@ -14,7 +14,7 @@ import numpy as np
 
 from jammate.contracts.band_plan import BandPlan, PlanError
 from jammate.generate.arranger import arrange_bar, chord_for_bar, place_lead
-from jammate.generate.response import LEAD_HIGH, LEAD_LOW, answer_motif, continue_motif, initiate_motif
+from jammate.generate.response import answer_motif, continue_motif, initiate_motif
 from jammate.interaction import Motif
 from jammate.music import BEATS_PER_BAR, Note
 from jammate.render.synth import render, TAIL_S
@@ -70,12 +70,15 @@ def prepare_humming_answer(state: JamState, motif: Motif) -> tuple[Note, ...]:
     key = state.key
     if key is None:
         raise PlanError("哼唱补全需要一个可用的调性。")
-    answer = continue_motif(motif.notes, key)
+    anchor = max(motif.notes, key=lambda note: note.end).pitch
+    lowest = min(note.pitch for note in motif.notes)
+    low, high = min(115, max(0, anchor - 7, lowest - 2)), min(127, anchor + 12)
+    answer = continue_motif(motif.notes, key, low=low, high=high)
     start = int(answer[0].start // BEATS_PER_BAR)
     end = math.ceil(max(note.end for note in answer) / BEATS_PER_BAR)
     backing = tuple(note for bar in range(start, end) for note in prepare_bar(state, bar)
                     if note.instrument not in {"drums", "lead"})
-    scale = tuple(pitch for pitch in range(LEAD_LOW, LEAD_HIGH + 1) if key.contains(pitch))
+    scale = tuple(pitch for pitch in range(low, high + 1) if key.contains(pitch))
     result = []
     for index, note in enumerate(answer):
         sounding = {other.pitch for other in (*backing, *result)
@@ -85,7 +88,8 @@ def prepare_humming_answer(state: JamState, motif: Motif) -> tuple[Note, ...]:
         safe = tuple(pitch for pitch in scale if all(abs(pitch - other) > 1 for other in sounding))
         anchors = tuple(pitch for pitch in chord_tones if pitch in safe)
         options = (anchors or safe or chord_tones or scale) if index in (0, len(answer) - 1) else (safe or scale)
-        result.append(replace(note, pitch=min(options, key=lambda pitch: (abs(note.pitch - pitch), pitch))))
+        aim = anchor if index == 0 else note.pitch
+        result.append(replace(note, pitch=min(options, key=lambda pitch: (abs(aim - pitch), pitch))))
     return tuple(result)
 
 

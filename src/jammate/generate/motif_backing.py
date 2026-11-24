@@ -31,7 +31,8 @@ def _separate_pitch(note: Note, melody: tuple[Note, ...], original: tuple[Note, 
     return replace(note, velocity=max(1, round(note.velocity * .55)))
 
 
-def follow_motif(backing: tuple[Note, ...], chord: Chord, phrase: tuple[Note, ...], bar: int) -> tuple[Note, ...]:
+def follow_motif(backing: tuple[Note, ...], chord: Chord, phrase: tuple[Note, ...], bar: int, *,
+                 pads=frozenset()) -> tuple[Note, ...]:
     """Use phrase contour, accent and space while keeping each existing attack."""
     first_pitch = min(phrase, key=lambda note: note.start).pitch
     length = ceil(max(note.end for note in phrase) / BEATS_PER_BAR)
@@ -52,7 +53,10 @@ def follow_motif(backing: tuple[Note, ...], chord: Chord, phrase: tuple[Note, ..
             voiced.append(note)
             continue
         reference = references[note.start]
-        if reference is None:
+        if note.instrument in pads:
+            gain = .62 if reference is not None else .72
+            duration = note.duration
+        elif reference is None:
             gain = .72 if cycle % 2 == 0 else .53
             duration = min(note.duration, .25 if note.instrument == "bass" else .18)
         else:

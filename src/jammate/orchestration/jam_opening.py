@@ -20,6 +20,7 @@ from jammate.interaction import Layer
 from jammate.music import BEATS_PER_BAR, CHORD_INTERVALS, ChordStep, Key
 from jammate.rhythm import RhythmContext
 from jammate.state import JamState, MAX_TEMPO_BPM, MIN_TEMPO_BPM
+from jammate.texture import ArrangementTexture
 from .llm import OpenAIProvider, ProviderFailure
 from .key_intent import named_key
 from .plans import make_plan
@@ -157,20 +158,23 @@ def _humming_opening(events, event, text, tempo, tempo_source, key, key_source, 
         chords = max(choices, key=fit)
     rhythm = RhythmContext(tempo, beats, (1.,) * len(beats)) if beats else (
         replace(claps, tempo_bpm=tempo) if claps else None)
-    labels = {"lead": "主奏 · 哼唱与接续", "keys": "键盘", "bass": "贝斯"}
+    labels = {"lead": "主奏 · 哼唱与接续", "keys": "键盘", "bass": "贝斯", "strings": "弦乐"}
     if rhythm is not None:
         labels["drums"] = "鼓组"
     base = JamState(tempo_bpm=tempo, session_id=events[0].session_id)
+    layers = tuple(replace(layer, active=layer.name in labels) for layer in base.layers)
+    layers += (Layer("strings", level=.32, role="pad"),)
+    texture = ArrangementTexture(keys="arpeggio", bass="syncopated") if rhythm is None else ArrangementTexture()
     state = base.with_updates(key=key, rhythm=rhythm,
         chord_cycle=tuple(ChordStep((chord.root - key.tonic) % 12, chord.quality) for chord in chords),
-        layers=tuple(replace(layer, active=layer.name in labels) for layer in base.layers))
+        layers=layers, texture=texture)
     return state, {
         "mode": "humming", "model": None,
         "instruments": [{"name": name, "label": label} for name, label in labels.items()],
         "settings": {"tempo_bpm": tempo, "tempo_source": tempo_source, "key": key.name, "key_source": key_source,
                      "rhythm_source": "text" if beats else "claps" if claps else None,
                      "rhythm_beats_zero_based": list(rhythm.onset_beats) if rhythm else []},
-        "reason": "原句结束后接续句尾，键盘和贝斯继续参考哼唱。",
+        "reason": "主奏在相近音区接续句尾，键盘、贝斯和轻弦乐继续参考哼唱。",
     }
 
 
