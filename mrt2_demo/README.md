@@ -4,7 +4,9 @@
 
 ## 本地运行
 
-在 JamMate 仓库根目录执行。`MAGENTA_HOME` 指向已有 `magenta-rt-v2` 缓存的父目录。未设置时，Magenta 使用自己的默认缓存路径。
+在 `aiaa3800_jammate` 仓库根目录执行。`python -m mrt2_demo` 运行 JamMate 计划，生成整段试听 WAV 和执行回执。独立流式播放用下方的 `python -m mrt2_demo.run`。
+
+`MAGENTA_HOME` 指向已有 `magenta-rt-v2` 缓存的父目录。未设置时，Magenta 使用自己的默认缓存路径。
 
 ```bash
 conda activate JamMate
@@ -43,7 +45,9 @@ python -m mrt2_demo.experiment
 python -m mrt2_demo.experiment_style_control
 ```
 
-交互播放支持 `text YOUR PROMPT`、`audio PATH`、`quit`。常规 MIDI demo 使用现行 JamMate 编排器。同一新版编排用于 `python -m mrt2_demo.baseline`，可用于新的对照实验。`--fixture` 的显式音符实验继续使用原有输入，历史报告保留在迁移前的目录。
+`--play` 将 48 kHz 双声道 PCM 按 40 ms 一帧送到声卡。开启 `--interactive` 后，播放期间可输入 `text YOUR PROMPT`、`audio PATH` 或 `quit`。风格编码在后台完成，在下一次生成时应用。`audio PATH` 使用整份 WAV 提取风格，`--mode midi` 使用预置编排按帧生成条件。这个入口的实时输入是终端命令。
+
+常规 MIDI demo 使用现行 JamMate 编排器。同一新版编排用于 `python -m mrt2_demo.baseline`，可用于新的对照实验。`--fixture` 的显式音符实验继续使用原有输入，历史报告保留在迁移前的目录。
 
 生成音频、报告和缓存保存在本机。通过 `--out` 可把运行结果写到其他位置。
 
