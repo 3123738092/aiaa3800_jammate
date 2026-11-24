@@ -55,3 +55,21 @@ MRT2_INTEGRATION=1 python -m pytest mrt2_demo/test_bandplan_robustness.py
 ```
 
 第一条跑本地单元测试和宿主 Runtime 回归测试。第二条需要装有模型和 Metal 的 Apple Silicon 环境。真实推理、声卡播放和听感分别验收。
+
+## JamMate 端到端 benchmark
+
+在 JamMate 仓库根目录运行。每次使用新的输出目录，`--trials` 默认是 3。
+
+```bash
+JAMMATE_MRT2_ENGINE=mlx python -m mrt2_demo.benchmark_e2e \
+  --out mrt2_demo/results/e2e-local
+```
+
+加 `--trials 1` 可让每个场景只跑一遍。已有 JAX checkpoint 时，可用 `JAMMATE_MRT2_ENGINE=jax JAX_PLATFORMS=cpu` 运行同一套场景。CPU 与 Metal 的耗时需要各自记录。
+
+- 文字、转写文本、合成拍手 WAV 与标准哼唱 Melody v1 数据进入 JamMate 的输入适配器，再由 `StateManager`、Agent 和 `MRT2Runtime` 驱动真实模型。拍手 WAV 会经过 JamMate 的节奏分析。
+- 覆盖规则 Agent 与 LLM Agent、标准 MIDI 与直接条件帧、变速、16 小节持续生成、严格拒绝、生成中被新输入取消、失败后重规划以及宿主静音停止。
+- 默认 LLM 场景使用固定响应，经 JamMate 的真实验证和编排执行。装好 `llm` extra 和私有配置后，可加 `--live-llm --llm-config /path/to/config.json`，加入一次真实 LLM 决策与直接编排。每次启用该选项都会调用配置的 API。
+- `summary.json` 记录逐项通过率、各阶段耗时、生成实时率和音频统计。各试次保留输入、WAV、MIDI 或条件帧、计划和回执。某项失败会继续跑剩余场景，最后返回非零退出码。
+
+这套基准从 JamMate 的输入数据接口开始，转写和哼唱使用现成的识别结果。浏览器、实际录音、声卡播放及盲听分别验收。原来的 `mrt2_demo.benchmark` 仍用于本地流式播放测量。
