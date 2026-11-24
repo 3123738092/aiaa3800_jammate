@@ -31,7 +31,19 @@ runtime = create_runtime(output, backend="mrt2", generator=generate, allow_previ
 result = runtime.execute(manager, plan)
 ```
 
-JamMate 网页的两条渲染路径目前使用其内置生成器。这个子项目通过上面的 Python Runtime 和 CLI 入口使用本地 `.mlxfn`。
+子项目 CLI 和「一起 Jam」的流式播放选项都可使用本地 `.mlxfn`。网页的整段 MRT2 试听沿用 JamMate 内置生成器。
+
+## 在「一起 Jam」边生成边播放
+
+从 JamMate 仓库根目录启动已有工作台服务。在 Apple Silicon 上选择「高级设置 → 生成后端 → MRT2 本地流式播放」。该选项用本机 MLX 加载 `.mlxfn`。启动前按上文设置 `MAGENTA_HOME`；可通过 `JAMMATE_MRT2_MODEL` 和 `JAMMATE_MRT2_PROMPT` 设置模型与初始风格。
+
+```bash
+python -m jammate.input_server --implementation workspace --port 4185
+```
+
+浏览器打开 `http://127.0.0.1:4185/jam.html`。使用本地规则和冷启动时，可以用「96 BPM，C 大调，反拍」作为开场，再发送「快一点」验证小节更新。已有 LLM 配置时，也可以选大模型 Agent。语音、拍手和哼唱沿用本页面的输入流程。
+
+JamMate 提供按小节编排的条件，同一个 MRT2 会话连续生成并按 40 ms 块发送 48 kHz 双声道 PCM。浏览器维护短播放缓冲，在收到首批音频后开始播放。会话中可继续给出指令，新计划按 JamMate 的小节时钟更新条件，播放导出可保存双声道 WAV。页面的声部和计划状态描述输入条件，MRT2 生成的听感由试听确认。「MRT2 生成试听」选项仍可导出完整 WAV。
 
 ## 流式播放与实验
 

@@ -12,6 +12,7 @@ from dataclasses import asdict
 from importlib.util import find_spec
 from math import ceil, isfinite
 from pathlib import Path
+from platform import machine, system
 from tempfile import TemporaryDirectory
 from time import monotonic
 from uuid import uuid4
@@ -55,6 +56,7 @@ from jammate.state import JamState, MAX_TEMPO_BPM, MIN_TEMPO_BPM
 
 
 BUFFER_SECONDS = .62
+MRT2_BUFFER_SECONDS = .28
 VOICE_LIMIT = 2 * 1024 * 1024
 DEBUG_HISTORY = 12
 MAX_OPENING_SECONDS = 12
@@ -135,12 +137,20 @@ class BrowserJam:
                         "notes": [asdict(note) for note in self.opening_answer],
                     }
         self.renderer, self.profile, self.arrangement_config = renderer, profile, arrangement_config
+        self.mrt2_stream = None
+        if renderer == "mrt2_stream":
+            from mrt2_demo.browser_stream import BrowserMRT2Stream
+            self.mrt2_stream = BrowserMRT2Stream(
+                os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band"),
+                os.environ.get("JAMMATE_MRT2_MODEL", "mrt2_small"),
+            )
         budget = arrangement_config.timeout_s if arrangement_config and renderer != "mrt2" else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
         lookahead = max(3, ceil((decision_timeout + budget) * 180 / 240) + 3)
         self.runtime = RealtimeSession(self.manager, sample_rate=SR, opening_plan=opening_plan,
                                        opening_answer=self.opening_answer, timing=TimingPolicy(
-            enqueue_guard_ms=750, preparation_budget_ms=max(350, round(budget * 1000)),
+            enqueue_guard_ms=350 if self.mrt2_stream is not None else 750,
+            preparation_budget_ms=max(350, round(budget * 1000)),
             lookahead_bars=lookahead))
         self.preview_lock = preview_lock or threading.Lock()
         self.preview = self.opening_preview = self.opening_preview_future = None
@@ -219,22 +229,32 @@ class BrowserJam:
     def reserve(self):
         bar = self.runtime.preview_next_bar()
         timing = bar.timing
-        local_notes = tuple(note.shifted(-timing.bar_index * BEATS_PER_BAR) for note in bar.notes)
-        duration = (timing.end_sample - timing.start_sample) / SR
-        wave = io.BytesIO()
         timbres = self.timbres_for_bar(timing.bar_index)
-        if self.renderer == "fluidsynth":
-            audio = self.soundfont.render_all(local_notes, timing.tempo_bpm, SR, total_s=duration + TAIL_S,
-                                              timbres=timbres)
+        packet = {"bar": timing.bar_index, "start": timing.start_sample, "end": timing.end_sample,
+                  "bpm": timing.tempo_bpm}
+        if self.mrt2_stream is not None:
+            packet["pcm_frames"] = self.mrt2_stream.samples_for_bar(timing, SR)
         else:
-            synthesize = self.soundfont.render if self.soundfont else render
-            audio = synthesize(local_notes, timing.tempo_bpm, SR, total_s=duration + TAIL_S)
-        sf.write(wave, audio, SR, format="WAV", subtype="PCM_16")
-        self.reserved, self.reserved_timbres = bar, timbres
-        self.packet = {
-            "bar": timing.bar_index, "start": timing.start_sample, "end": timing.end_sample,
-            "bpm": timing.tempo_bpm, "wav": base64.b64encode(wave.getvalue()).decode("ascii"),
-        }
+            local_notes = tuple(note.shifted(-timing.bar_index * BEATS_PER_BAR) for note in bar.notes)
+            duration = (timing.end_sample - timing.start_sample) / SR
+            wave = io.BytesIO()
+            if self.renderer == "fluidsynth":
+                audio = self.soundfont.render_all(local_notes, timing.tempo_bpm, SR, total_s=duration + TAIL_S,
+                                                  timbres=timbres)
+            else:
+                synthesize = self.soundfont.render if self.soundfont else render
+                audio = synthesize(local_notes, timing.tempo_bpm, SR, total_s=duration + TAIL_S)
+            sf.write(wave, audio, SR, format="WAV", subtype="PCM_16")
+            packet["wav"] = base64.b64encode(wave.getvalue()).decode("ascii")
+        self.reserved, self.reserved_timbres, self.packet = bar, timbres, packet
+
+    def open_mrt2_bar(self, index):
+        with self.lock:
+            self.check_open()
+            bar = self.reserved
+            if self.mrt2_stream is None or bar is None or bar.timing.bar_index != index:
+                raise ValueError("这个 MRT2 小节尚未预约或已失效。")
+            return self.mrt2_stream.open_bar(bar, SR)
 
     def timbres_for_bar(self, bar):
         if self.next_timbres and self.next_timbres["bar"] <= bar:
@@ -324,8 +344,9 @@ class BrowserJam:
                 end = self.playing.timing.end_sample
                 self.runtime.advance_to(max(self.runtime.sample, min(sample, end - 1)))
                 self.refresh_wait()
+                buffer_s = MRT2_BUFFER_SECONDS if self.mrt2_stream is not None else BUFFER_SECONDS
                 if self.reserved is None and (self.renderer == "mrt2"
-                                              or end - self.runtime.sample <= round(SR * BUFFER_SECONDS)):
+                                              or end - self.runtime.sample <= round(SR * buffer_s)):
                     self.reserve()
             return self.snapshot(buffered)
 
@@ -424,7 +445,7 @@ class BrowserJam:
                                  after_bar=sent_bar, through_bar=through)
 
     def prepare_arrangement(self, state, plan, events, arranger):
-        if self.renderer == "synth":
+        if self.renderer in {"synth", "mrt2_stream"}:
             performance, _ = prepare_scoped_score(state, plan, events, arranger)
             return performance
         runtime = create_runtime(".", backend="fluidsynth", fluidsynth=self.soundfont.executable,
@@ -606,7 +627,8 @@ class BrowserJam:
                 if use_score and self.feedback["status"] != "waiting_ready":
                     self.update_feedback(status="arranging")
             if use_score:
-                arranger = LLMBackendArranger(self.arrangement_config, self.renderer, capture_replies=True)
+                backend = "synth" if self.mrt2_stream is not None else self.renderer
+                arranger = LLMBackendArranger(self.arrangement_config, backend, capture_replies=True)
             arrange = (lambda state, plan, events: self.prepare_arrangement(state, plan, events, arranger)) if use_score else None
             for attempt in range(2):
                 change = bound.prepare(arrange)
@@ -660,6 +682,8 @@ class BrowserJam:
     def close(self):
         with self.lock:
             self.closed = True
+            if self.mrt2_stream is not None:
+                self.mrt2_stream.close()
             if self.future is not None:
                 self.future.cancel()
             if self.opening_preview_future is not None:
@@ -781,6 +805,18 @@ class BrowserJamService:
     def mrt2_available():
         return find_spec("magenta_rt") is not None
 
+    @staticmethod
+    def mrt2_stream_available():
+        return (system() == "Darwin" and machine() == "arm64"
+                and all(find_spec(name) is not None for name in ("mrt2_demo", "magenta_rt", "mlx")))
+
+    def open_mrt2_bar(self, session_id, bar):
+        with self.lock:
+            session = self.sessions.get(session_id)
+        if session is None:
+            raise ValueError("会话已结束，请重新开始 Jam。")
+        return session.open_mrt2_bar(bar)
+
     def dispatch(self, operation, body):
         if operation == "status":
             try:
@@ -800,7 +836,8 @@ class BrowserJamService:
                     "music_capture": True, "humming_clip_seconds": MAX_HUMMING_SECONDS,
                     "fluidsynth": self.soundfont is not None,
                     "timbre_catalog": catalog, "mrt2": self.mrt2_available(), "opening_modes": ["warm", "cold", "humming"],
-                    "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True}
+                    "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True,
+                    "mrt2_stream": self.mrt2_stream_available()}
         if operation == "start":
             agent = body.get("agent", "rule")
             mode = body.get("opening_mode", "warm")
@@ -815,12 +852,14 @@ class BrowserJamService:
                 raise ValueError("未知的指令处理或编排方式。")
             if mode not in ("warm", "cold", "humming"):
                 raise ValueError("请选择冷启动、暖启动或自动补全哼唱。")
-            if renderer not in ("synth", "fluidsynth", "mrt2") or profile not in ("electric", "acoustic", "synth"):
+            if renderer not in ("synth", "fluidsynth", "mrt2", "mrt2_stream") or profile not in ("electric", "acoustic", "synth"):
                 raise ValueError("未知的音频后端或音色。")
             if renderer == "fluidsynth" and self.soundfont is None:
                 raise ValueError("当前服务未配置 FluidSynth。")
             if renderer == "mrt2" and (not self.mrt2_available() or body.get("allow_preview") is not True):
                 raise ValueError("MRT2 需要可用的模型环境和试听授权。")
+            if renderer == "mrt2_stream" and not self.mrt2_stream_available():
+                raise ValueError("本地 MRT2 流式播放需要 Apple Silicon、MLX 和 MRT2 模型环境。")
             opening = body.get("opening")
             events = self.opening_events(opening)
             config = self.config() if mode == "warm" or agent == "llm" or arrangement == "llm_all" else None

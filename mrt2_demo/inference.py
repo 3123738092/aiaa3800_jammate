@@ -10,6 +10,12 @@ PITCH_KEY = 'pianoroll_with_onsets_tokens'
 DRUM_KEY = 'drum_pianoroll_tokens'
 
 
+def create_mlxfn_model(size):
+    from magenta_rt import MagentaRT2StdMlxfn
+
+    return MagentaRT2StdMlxfn(size=size)
+
+
 def encode_style(model, value):
     embedding = model.embed_style(value, use_mapper=isinstance(value, str))
     return [int(token) for token in model.tokenize_style(embedding)]

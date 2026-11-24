@@ -1,3 +1,4 @@
+import {MRT2_RATE, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
 import {initJamDebug} from './jam-debug.js?v=2';
 import {initJamInputs} from './jam-inputs.js?v=opening-mic';
 import {addressedCommand, initNodConfirmation} from './jam-nod.js?v=2';
@@ -39,7 +40,7 @@ let coldAvailable = false;
 let openingChecked = false;
 let musicCaptureAvailable = false;
 let hummingSeconds = 0;
-let mrtReady = false;
+let mrtReady = false, mrt2StreamReady = false;
 let timbreCatalog = null;
 let run = null;
 let lastPerformance = null;
@@ -100,9 +101,12 @@ function controls() {
     : '模型会补全乐器、调性与和弦进行。识别到哼唱旋律时，乐队会用它安排后续伴奏。';
   const mrtOption = renderer.querySelector('option[value="mrt2"]');
   mrtOption.disabled = !mrtReady || (cold && !coldMrtReady);
-  if (mrtOption.disabled && renderer.value === 'mrt2') renderer.value = 'synth';
+  const streamOption = renderer.querySelector('option[value="mrt2_stream"]');
+  streamOption.disabled = !mrt2StreamReady;
+  if ((mrtOption.disabled && renderer.value === 'mrt2')
+      || (streamOption.disabled && renderer.value === 'mrt2_stream')) renderer.value = 'synth';
   for (const control of [bpmInput, agent, arranger, renderer]) control.disabled = Boolean(run);
-  const mrt = renderer.value === 'mrt2';
+  const mrt = renderer.value === 'mrt2', stream = renderer.value === 'mrt2_stream';
   const starting = Boolean(run) && !run.started;
   play.disabled = Boolean(run) || !canOpen || !manual.ready(useColdSettings && Boolean(coldBpm.value || coldKey.value));
   play.textContent = starting ? '正在识别与编制…' : '分析素材并开始';
@@ -121,12 +125,12 @@ function controls() {
     control.disabled = !timbreCatalog || starting || (!run?.started && !timbreOverride.checked);
   }
   const mrtHint = byId('jam-mrt2-hint');
-  mrtHint.hidden = !mrt;
+  mrtHint.hidden = !mrt && !stream;
   autoPreviewRow.hidden = !mrt || !mrtLiveState;
   if (!run?.started) {
-    mrtHint.textContent = cold
-      ? '开始后按现有素材生成一段独立试听。'
-      : '发送指令后，MRT2 会在下方生成独立试听。';
+    mrtHint.textContent = stream
+      ? '从本机 MRT2 模型边生成边播放。指令按 JamMate 的小节时钟更新生成条件。'
+      : cold ? '开始后按现有素材生成一段独立试听。' : '发送指令后，MRT2 会在下方生成独立试听。';
   }
   backendStatus.textContent = mrtReady ? '' : 'MRT2 在另一个服务中可用。';
   if (!mrtReady && ['4193', '4195'].includes(location.port) && !mrt) {
@@ -260,6 +264,11 @@ function show(view, live) {
       return item;
     }));
   }
+  if (live.mrt2Stream) {
+    const hint = byId('jam-mrt2-hint');
+    hint.textContent = view.current_bar === null
+      ? '本地 MRT2 正在准备首帧…' : '本地 MRT2 流式播放 · 声部和小节标记对应生成条件';
+  }
   const reply = view.feedback;
   if (reply) {
     const label = {buffered: '下一小节起拍后处理', thinking: '正在理解', arranging: view.renderer === 'mrt2' ? '正在生成 MRT2 试听，伴奏继续' : '正在编排',
@@ -369,8 +378,47 @@ async function loadPreview(live, id) {
   }
 }
 
+function queueMrt2Bar(live, packet) {
+  const stream = live.mrt2Stream;
+  live.buffered = packet.bar;
+  stream.pending = stream.pending.then(() => readMrt2Bar(live.id, packet, stream.controller.signal,
+    async (pcm, offset) => {
+      const planned = packet.start / live.rate + offset / MRT2_RATE;
+      // Keep the Web Audio queue short so stale audio cannot accumulate.
+      while (run === live && live.epoch !== null
+          && live.epoch + planned - live.clock.currentTime > .32) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      if (run !== live) return;
+      const now = live.clock.currentTime;
+      if (live.epoch === null) live.epoch = now + .12 - planned;
+      let at = live.epoch + planned;
+      if (at < now + .008) {
+        live.gaps += 1;
+        at = now + .05;
+        live.epoch = at - planned;
+      }
+      const node = live.clock.createBufferSource();
+      node.buffer = stereoPcmBuffer(live.clock, pcm);
+      node.connect(live.output);
+      node.onended = () => node.disconnect();
+      node.start(at);
+      stream.end = at + node.buffer.duration;
+      if (offset === 0) live.markers.push({bar: packet.bar, at});
+      live.recorded.push({at, end: stream.end, pcm});
+    })).catch(error => {
+      if (run !== live) return;
+      debug.error('MRT2 流式播放', error);
+      end(error.message || '本地 MRT2 音频流已中断。');
+    });
+}
+
 async function enqueue(live, packet) {
   if (packet.bar <= live.buffered) return;
+  if (live.mrt2Stream) {
+    queueMrt2Bar(live, packet);
+    return;
+  }
   const bytes = Uint8Array.from(atob(packet.wav), character => character.charCodeAt(0));
   const buffer = await live.clock.decodeAudioData(bytes.buffer);
   if (run !== live) return;
@@ -401,9 +449,10 @@ async function poll(live) {
     while (live.markers.length > 1 && live.markers[1].at <= now) live.markers.shift();
     const current = live.markers[0];
     const started = current && current.at <= now ? current.bar : -1;
+    const playbackTime = live.mrt2Stream ? Math.min(now, live.mrt2Stream.end) : now;
     const view = await post('poll', {
       session: live.id, started, buffered: live.buffered,
-      sample: Math.max(0, Math.floor((now - live.epoch) * live.rate)),
+      sample: live.epoch === null ? 0 : Math.max(0, Math.floor((playbackTime - live.epoch) * live.rate)),
     });
     if (run !== live) return;
     if (view.next) await enqueue(live, view.next);
@@ -436,6 +485,7 @@ function end(message = '会话已结束。') {
   stopAutoPreview(live);
   lastPerformance = performanceSnapshot(live) ?? lastPerformance;
   run = null;
+  live.mrt2Stream?.controller.abort();
   manual.stop(live.started);
   debug.stop();
   clearTimeout(live.timer);
@@ -497,6 +547,9 @@ async function startJam(mode) {
   }
   const live = {clock, mode, id: null, rate: 0, epoch: null, buffered: -1,
     markers: [], recorded: [], autoRecorded: [], gaps: 0, failures: 0, sending: false};
+  if (renderer.value === 'mrt2_stream') {
+    live.mrt2Stream = {controller: new AbortController(), pending: Promise.resolve(), end: 0};
+  }
   live.output = live.clock.createGain();
   live.baselineGate = live.clock.createGain();
   live.autoOutput = live.clock.createGain();
@@ -763,8 +816,10 @@ useCaption.addEventListener('click', () => {
   input.focus();
 });
 
-function waveBlob(samples, sampleRate) {
-  const wave = new DataView(new ArrayBuffer(44 + samples.length * 2));
+function waveBlob(samples, sampleRate, right = null) {
+  const channels = right ? 2 : 1;
+  const dataBytes = samples.length * channels * 2;
+  const wave = new DataView(new ArrayBuffer(44 + dataBytes));
   const writeTag = (offset, tag) => {
     for (const [i, letter] of [...tag].entries()) wave.setUint8(offset + i, letter.charCodeAt(0));
   };
@@ -774,15 +829,17 @@ function waveBlob(samples, sampleRate) {
   writeTag(12, 'fmt ');
   wave.setUint32(16, 16, true);
   wave.setUint16(20, 1, true);
-  wave.setUint16(22, 1, true);
+  wave.setUint16(22, channels, true);
   wave.setUint32(24, sampleRate, true);
-  wave.setUint32(28, sampleRate * 2, true);
-  wave.setUint16(32, 2, true);
+  wave.setUint32(28, sampleRate * channels * 2, true);
+  wave.setUint16(32, channels * 2, true);
   wave.setUint16(34, 16, true);
   writeTag(36, 'data');
-  wave.setUint32(40, samples.length * 2, true);
-  for (const [i, sample] of samples.entries()) {
-    wave.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 32767, true);
+  wave.setUint32(40, dataBytes, true);
+  for (let i = 0; i < samples.length; i++) {
+    const offset = 44 + i * channels * 2;
+    wave.setInt16(offset, Math.max(-1, Math.min(1, samples[i])) * 32767, true);
+    if (right) wave.setInt16(offset + 2, Math.max(-1, Math.min(1, right[i])) * 32767, true);
   }
   return new Blob([wave], {type: 'audio/wav'});
 }
@@ -805,7 +862,7 @@ function performanceSnapshot(live) {
   const end = Math.min(now, bars.reduce((last, bar) => Math.max(last, bar.end), start));
   const clips = live.autoRecorded.filter(clip => clip.at < end && clip.end > clip.at)
     .map(clip => ({...clip, end: Math.min(clip.end, end)}));
-  return {rate: live.rate, bars, clips, start, end};
+  return {rate: live.mrt2Stream ? MRT2_RATE : live.rate, bars, clips, start, end, stereo: Boolean(live.mrt2Stream)};
 }
 
 function updateExport() {
@@ -822,13 +879,17 @@ exportButton.addEventListener('click', async () => {
   try {
     const OfflineAudio = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const length = Math.max(1, Math.round((take.end - take.start) * take.rate));
-    const mix = new OfflineAudio(1, length, take.rate);
+    const mix = new OfflineAudio(take.stereo ? 2 : 1, length, take.rate);
     const baseline = mix.createGain();
     baseline.connect(mix.destination);
     for (const bar of take.bars) {
       const source = mix.createBufferSource();
-      const bytes = Uint8Array.from(atob(bar.wav), character => character.charCodeAt(0));
-      source.buffer = await mix.decodeAudioData(bytes.buffer);
+      if (bar.pcm) {
+        source.buffer = stereoPcmBuffer(mix, bar.pcm);
+      } else {
+        const bytes = Uint8Array.from(atob(bar.wav), character => character.charCodeAt(0));
+        source.buffer = await mix.decodeAudioData(bytes.buffer);
+      }
       source.connect(baseline);
       source.start(bar.at - take.start);
     }
@@ -843,7 +904,8 @@ exportButton.addEventListener('click', async () => {
       source.start(at, 0, duration);
     }
     const result = await mix.startRendering();
-    const url = URL.createObjectURL(waveBlob(result.getChannelData(0), result.sampleRate));
+    const right = take.stereo ? result.getChannelData(1) : null;
+    const url = URL.createObjectURL(waveBlob(result.getChannelData(0), result.sampleRate, right));
     const link = document.createElement('a');
     link.href = url;
     link.download = 'jammate-performance.wav';
@@ -1033,6 +1095,7 @@ post('status', {}).then(view => {
   mrtLiveState = view.mrt2_live_state === true;
   openingChecked = true;
   mrtReady = Boolean(view.mrt2);
+  mrt2StreamReady = Boolean(view.mrt2_stream && window.ReadableStream);
   voiceStatus.textContent = voiceAvailability();
   controls();
   if (run?.voice?.processor) startCaptions(run, run.voice);

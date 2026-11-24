@@ -10,6 +10,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from contextlib import closing
+from urllib.parse import parse_qs
 
 import numpy as np
 import soundfile as sf
@@ -27,11 +28,46 @@ ROOT = Path(__file__).resolve().parents[2] / "web"
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/api/ready":
+        path, _, query = self.path.partition("?")
+        if path == "/api/jam/mrt2-stream":
+            self.send_mrt2_bar(query)
+        elif self.path == "/api/ready":
             self.json_response(200, {"service": SERVICE_ID, "root": str(ROOT.parent),
                                      "implementation": self.server.reference.implementation})
         else:
             super().do_GET()
+
+    def send_mrt2_bar(self, query):
+        port = self.server.server_port
+        if (self.headers.get("Sec-Fetch-Site") == "cross-site"
+                or self.headers.get("Origin") not in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}")):
+            self.json_response(403, {"error": "请从本机工作台发起请求。"})
+            return
+        response_started = False
+        try:
+            values = parse_qs(query, max_num_fields=2, strict_parsing=True)
+            session, = values["session"]
+            index, = values["bar"]
+            with self.server.jam.open_mrt2_bar(session, int(index)) as (length, chunks):
+                with closing(chunks):
+                    first = next(chunks)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", str(length))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    response_started = True
+                    self.wfile.write(first)
+                    for chunk in chunks:
+                        self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+        except (KeyError, ValueError, ImportError, RuntimeError, OSError, StopIteration) as error:
+            if response_started:
+                self.log_error("MRT2 stream interrupted: %s", error)
+                self.close_connection = True
+            else:
+                self.json_response(400, {"error": f"MRT2 流式生成失败：{error}"})
 
     def json_response(self, status, data):
         body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode()

@@ -11,16 +11,16 @@ import soundfile as sf
 
 from jammate.render.mrt2 import FRAME_RATE, OFFICIAL_SOURCE, generate as generate_upstream, midi_conditioning
 
-from .inference import DRUM_KEY, PITCH_KEY, SAMPLE_RATE, STYLE_KEY, encode_style, generate_frame
+from .inference import (
+    DRUM_KEY, PITCH_KEY, SAMPLE_RATE, STYLE_KEY, create_mlxfn_model, encode_style, generate_frame,
+)
 
 _inference_lock = Lock()
 
 
 @lru_cache(maxsize=1)
 def _load_mlxfn(model):
-    from magenta_rt import MagentaRT2StdMlxfn
-
-    return MagentaRT2StdMlxfn(size=model)
+    return create_mlxfn_model(model)
 
 
 def generate(prompt, *, output, duration, midi=None, conditions=None, backend='jax', model='mrt2_small'):
