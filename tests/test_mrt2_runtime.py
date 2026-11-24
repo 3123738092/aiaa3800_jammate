@@ -325,3 +325,47 @@ def test_native_mrt2_shortens_tail_spans_and_keeps_their_onsets(tmp_path, empty_
     conditions = json.loads((runtime.last_artifacts / "conditioning.json").read_text())
     assert conditions["pitch_spans"][-1] == {"frame": 238, "length": 2, "pitch": 60}
     assert conditions["drum_spans"] == [{"frame": 239, "length": 1}]
+
+
+
+def test_runtime_prefers_installed_exported_mlx_on_apple_silicon(tmp_path, monkeypatch):
+    import jammate.render.mrt2 as module
+    from jammate.render.runtime import create_runtime
+
+    monkeypatch.delenv("JAMMATE_MRT2_ENGINE", raising=False)
+    monkeypatch.setattr(module, "system", lambda: "Darwin")
+    monkeypatch.setattr(module, "machine", lambda: "arm64")
+    monkeypatch.setattr(module, "find_spec", lambda name: object())
+    monkeypatch.setattr(module, "_has_exported_mlx_model", lambda model: model == "mrt2_small")
+    monkeypatch.setenv("JAMMATE_MRT2_MODEL", "mrt2_small")
+    assert create_runtime(tmp_path, backend="mrt2").engine == "mlx"
+    monkeypatch.setenv("JAMMATE_MRT2_MODEL", "mrt2_base")
+    assert create_runtime(tmp_path, backend="mrt2").engine == "jax"
+    monkeypatch.setenv("JAMMATE_MRT2_MODEL", "mrt2_small")
+    monkeypatch.setenv("JAMMATE_MRT2_ENGINE", "jax")
+    assert create_runtime(tmp_path, backend="mrt2").engine == "jax"
+
+
+def test_mlx_loader_uses_exported_model_without_requiring_checkpoint(monkeypatch):
+    import jammate.render.mrt2 as module
+
+    fake = SimpleNamespace(MagentaRT2StdMlxfn=lambda **kwargs: "exported",
+                           MagentaRT2Mlx=lambda **kwargs: "checkpoint")
+    monkeypatch.setitem(sys.modules, "magenta_rt", fake)
+    monkeypatch.setattr(module, "_has_exported_mlx_model", lambda model: True)
+    uncached_load = module.load_system.__wrapped__
+    assert uncached_load("mlx", "mrt2_small") == "exported"
+    monkeypatch.setattr(module, "_has_exported_mlx_model", lambda model: False)
+    assert uncached_load("mlx", "mrt2_small") == "checkpoint"
+
+
+def test_isolated_preview_explains_missing_model_without_returning_raw_stderr(tmp_path, monkeypatch):
+    import jammate.render.mrt2 as module
+
+    result = SimpleNamespace(returncode=1,
+                             stderr=b"private traceback\nFileNotFoundError: cache/magenta-rt-v2/checkpoints/mrt2_small.safetensors")
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: result)
+    with pytest.raises(RuntimeError, match="MAGENTA_HOME") as error:
+        module.generate_isolated("warm band", output=tmp_path / "preview.wav", duration=1.)
+    assert "jax/mrt2_small" in str(error.value)
+    assert "private traceback" not in str(error.value)

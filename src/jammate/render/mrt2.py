@@ -10,7 +10,10 @@ from functools import lru_cache
 import hashlib
 import json
 import math
+import os
+from importlib.util import find_spec
 from pathlib import Path
+from platform import machine, system
 import subprocess
 import sys
 import time
@@ -22,11 +25,37 @@ FRAME_RATE = 25
 OFFICIAL_SOURCE = "https://github.com/magenta/magenta-realtime/tree/694a545e4ba0b88bf1150137b129582166d3e07f"
 
 
+def _has_exported_mlx_model(model):
+    from magenta_rt.paths import models_dir
+
+    folder = models_dir() / model
+    return ((folder / f"{model}.mlxfn").is_file()
+            and (folder / f"{model}_state.safetensors").is_file())
+
+
+def configured_backend(model):
+    configured = os.environ.get("JAMMATE_MRT2_ENGINE")
+    if configured is not None:
+        return configured
+    if system() == "Darwin" and machine() == "arm64" and find_spec("mlx") is not None:
+        try:
+            if _has_exported_mlx_model(model):
+                return "mlx"
+        except ImportError:
+            pass
+    return "jax"
+
+
 @lru_cache(maxsize=1)
 def load_system(backend, model):
     import magenta_rt
 
-    cls = magenta_rt.MagentaRT2Jax if backend == "jax" else magenta_rt.MagentaRT2Mlx
+    if backend == "jax":
+        cls = magenta_rt.MagentaRT2Jax
+    elif _has_exported_mlx_model(model):
+        cls = magenta_rt.MagentaRT2StdMlxfn
+    else:
+        cls = magenta_rt.MagentaRT2Mlx
     return cls(size=model, cfg_scales={"musiccoca": 3., "notes": 3., "drums": 1.})
 
 
@@ -136,7 +165,18 @@ def generate_isolated(prompt, *, output, duration, midi=None, conditions=None, b
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("MRT2 inference timed out") from exc
     if process.returncode:
-        raise RuntimeError("MRT2 inference process failed")
+        stderr = process.stderr.decode("utf-8", errors="replace")
+        detail = ""
+        if ("FileNotFoundError:" in stderr and "magenta-rt-v2" in stderr
+                or "[import_function] Failed to open" in stderr):
+            detail = " 缺少模型文件或资源，请检查 MAGENTA_HOME 是否指向已下载的模型缓存。"
+        elif "No Metal device available" in stderr or "[metal::load_device]" in stderr:
+            detail = " 这个服务进程无法访问 Metal GPU，请在本机终端启动工作台。"
+        elif "Install magenta-rt 2.0.3" in stderr or "ModuleNotFoundError:" in stderr:
+            detail = " 当前工作台 Python 环境缺少模型依赖。"
+        raise RuntimeError(
+            f"MRT2 inference process failed ({backend}/{model}, exit {process.returncode}).{detail}"
+        )
     return json.loads(output.with_suffix(".inference.json").read_text(encoding="utf-8"))
 
 

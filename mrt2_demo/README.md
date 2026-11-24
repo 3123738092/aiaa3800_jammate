@@ -31,7 +31,7 @@ runtime = create_runtime(output, backend="mrt2", generator=generate, allow_previ
 result = runtime.execute(manager, plan)
 ```
 
-子项目 CLI 和「一起 Jam」的流式播放选项都可使用本地 `.mlxfn`。网页的整段 MRT2 试听沿用 JamMate 内置生成器。
+子项目 CLI 和「一起 Jam」的流式播放选项都可使用本地 `.mlxfn`。Apple Silicon 上，网页整段试听优先用已下载的 `.mlxfn`。可以用 `JAMMATE_MRT2_ENGINE=jax` 指定 JAX，这时需要单独的 checkpoint。修改启动环境后重启工作台服务。
 
 ## 在「一起 Jam」边生成边播放
 

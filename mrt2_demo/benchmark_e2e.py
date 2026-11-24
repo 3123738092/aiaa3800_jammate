@@ -25,6 +25,7 @@ from jammate.orchestration.llm import LLMAgent, ModelReply
 from jammate.orchestration.llm_config import LLMConfig
 from jammate.orchestration.manager import StateManager
 from jammate.render.capabilities import BackendCapabilityError
+from jammate.render.mrt2 import configured_backend
 from jammate.render.runtime import create_runtime
 from jammate.state import JamState
 
@@ -339,8 +340,9 @@ def run_suite(output, repeats, live_config=None, *, scenarios=SCENARIOS):
     output.mkdir(parents=True, exist_ok=False)
     if live_config is not None:
         scenarios = (*scenarios, LIVE_SCENARIO)
-    backend = os.environ.get('JAMMATE_MRT2_ENGINE', 'jax')
-    summary = {'status': 'running', 'backend': backend, 'model': os.environ.get('JAMMATE_MRT2_MODEL', 'mrt2_small'),
+    model = os.environ.get('JAMMATE_MRT2_MODEL', 'mrt2_small')
+    backend = configured_backend(model)
+    summary = {'status': 'running', 'backend': backend, 'model': model,
                'python': platform.python_version(), 'platform': platform.platform(), 'versions': package_versions(backend),
                'live_llm': live_config is not None, 'repeats': repeats, 'scenarios': {}}
     summary_path = output / 'summary.json'
