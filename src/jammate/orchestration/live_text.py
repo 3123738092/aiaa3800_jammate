@@ -12,7 +12,8 @@ from uuid import uuid4
 from jammate.contracts import InputEvent, PlanError
 from jammate.instruments import added_program
 from .agent import SCOPES
-from .explicit_request import compile_jev_request, explicit_request
+from .explicit_request import compile_jev_request, explicit_mix_plan, explicit_request
+from .initiative import initiative_plan
 from .key_intent import explicit_key_plan
 from .llm import available_instruments, validate_plan
 from .plans import make_plan
@@ -145,7 +146,9 @@ def _exact_plan(events, state, plan_id):
     if len(clauses) == 1 and clauses[0] in _STOP:
         return make_plan(state, events, plan_id, "LISTEN", [], ["tempo", "key", "progression"],
                          {"playing": False}, 1, "停止演奏。", [])
-    plan = explicit_key_plan(events, state, plan_id) or explicit_progression_plan(events, state, plan_id)
+    plan = (initiative_plan(events, state, plan_id) or explicit_key_plan(events, state, plan_id)
+            or explicit_progression_plan(events, state, plan_id)
+            or explicit_mix_plan(events, state, plan_id))
     if plan:
         return plan
     parsed = explicit_request(events, state=state)

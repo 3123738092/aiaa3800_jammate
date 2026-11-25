@@ -8,6 +8,7 @@ from dataclasses import replace
 from jammate.generate.harmony import harmony_cycle
 from jammate.generate.motif_backing import follow_motif
 from jammate.generate.patterns import added_instrument_bar, bass_bar, comp_bar, drum_bar
+from jammate.generate.performance import perform_backing
 from jammate.generate.rhythm import rhythm_parts, rhythmic_hits
 from jammate.generate.texture import apply_texture
 from jammate.instruments import added_program
@@ -48,6 +49,9 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         backing = drum_bar(state.energy, phrase_pos)
         if chord is not None:
             backing += bass_bar(chord, state.energy) + comp_bar(chord, state.energy)
+            if state.energy > 0 and not (state.accompaniment_motif and bar_index >= state.accompaniment_motif.start_bar):
+                backing = perform_backing(backing, chord, chord_for_bar(state, max(0, bar_index - 1)),
+                                          chord_for_bar(state, bar_index + 1), bar_index, state.energy)
     for layer in state.layers:
         if chord is not None and layer.active and added_program(layer.name) is not None:
             part = added_instrument_bar(layer.name, chord, phrase_pos)

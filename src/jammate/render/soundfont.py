@@ -66,9 +66,10 @@ class SoundFontRenderer:
         return subprocess.check_output(["wslpath", "-w", str(path)], text=True, timeout=2).strip()
 
     @lru_cache(maxsize=32)
-    def _stem(self, notes, bpm, sample_rate, frames, programs=()):
+    def _stem(self, notes, bpm, sample_rate, frames, programs=(), *, performance_mix=False):
         with TemporaryDirectory(prefix="jammate-soundfont-") as directory:
-            midi = write_midi(notes, bpm, Path(directory) / "backing.mid", programs=dict(programs))
+            midi = write_midi(notes, bpm, Path(directory) / "backing.mid", programs=dict(programs),
+                              performance_mix=performance_mix)
             wave = Path(directory) / "backing.wav"
             command = [str(self.executable), "-ni", "-F", self._argument(wave), "-r", str(sample_rate),
                        "-g", "0.36", self._bank_path, self._argument(midi)]
@@ -111,5 +112,5 @@ class SoundFontRenderer:
         if not notes:
             return np.zeros(frames, dtype=np.float32)
         programs = self.profile_timbres(profile) if timbres is None else self.validate_timbres(timbres)
-        audio = self._stem(notes, bpm, sample_rate, frames, tuple(sorted(programs.items())))
+        audio = self._stem(notes, bpm, sample_rate, frames, tuple(sorted(programs.items())), performance_mix=True)
         return np.pad(audio, (0, frames - len(audio))) if len(audio) < frames else audio

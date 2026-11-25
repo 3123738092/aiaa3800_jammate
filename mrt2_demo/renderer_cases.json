@@ -1,0 +1,60 @@
+{
+  "prompts": {
+    "A01": "bossa nova, nylon guitar, light percussion",
+    "A02": "巴萨诺瓦，尼龙弦吉他，轻柔打击乐",
+    "A03": "A bossa nova arrangement featuring nylon-string guitar and light percussion.",
+    "A04": "一段巴萨诺瓦风格的音乐，以尼龙弦吉他和轻柔打击乐为主。",
+    "A05": "hard rock, distorted guitar riffs, driving drums",
+    "A06": "硬摇滚，失真吉他 Riff，富有推进感的鼓点",
+    "A07": "A hard rock arrangement featuring distorted guitar riffs and driving drums.",
+    "A08": "一段硬摇滚音乐，以失真吉他 Riff 和富有推进感的鼓点为主。"
+  },
+  "system_inputs": {
+    "bossa-zh": "给我一段巴萨诺瓦音乐，以尼龙弦吉他为主，打击乐轻一点。",
+    "bossa-en": "Give me some bossa nova with nylon guitar and light percussion.",
+    "rock-zh": "来点硬摇滚，失真吉他 Riff，鼓点有推进感。",
+    "rock-en": "Give me some hard rock with distorted guitar riffs and driving drums."
+  },
+  "fixtures": {
+    "H01": "真人短哼唱，使用获得授权的文件",
+    "H02": "真人长短音、重复音与休止，使用获得授权的文件",
+    "H03": "同一源导出的 WAV 与 AAC/M4A",
+    "H04": "已知 Motif 的正确 MIDI 和同源音频的识别 MIDI",
+    "H05": "Bossa Nova 历史正向样本，另保留新生成的 A01",
+    "H06": "Hard Rock 历史正向样本，另保留新生成的 A05",
+    "H07": "短击打序列",
+    "H08": "静音与固定种子低幅噪声"
+  },
+  "motifs": {
+    "A": [[0, 60, 1], [1, 64, 1], [2, 67, 2]],
+    "B": [[0, 64, 2], [2, 64, 0.5], [2.5, 67, 0.5], [3.5, 69, 0.5]]
+  },
+  "system_turns": {
+    "E01": "给我一段乡村音乐，89 BPM，轻松一点",
+    "E02": "给我一段巴萨诺瓦音乐",
+    "E03": "来点硬摇滚，失真吉他突出一点",
+    "E04": "我给你个旋律",
+    "E05": "我给你个节奏",
+    "E06": "保持这个旋律，鼓再猛一点",
+    "E07": "把键盘和其他弦乐的声音以及密度都压低，突出吉他的声音，我听不到吉他。",
+    "E08": "把它改成 D 大调，其他保持",
+    "E09": "速度慢一点",
+    "E10": "把旋律改得明亮通透一些",
+    "E11": "太满了，给我留点空间，我想自己唱",
+    "E12": "Nice，就这个感觉继续",
+    "E13": "你来一句新的 Riff",
+    "E14": "回应 AI 刚才提出的 Riff",
+    "E15": ["鼓再强一点", "等一下，保持原样"],
+    "E16": "停止演奏"
+  },
+  "timelines": {
+    "bossa": [[0, "A01"], [10, "More energetic, keep the same groove."], [20, "H01"],
+      [30, "Less percussion, more space for the melody."], [40, "Change to D major, keep the style and rhythm."],
+      [50, "Nice, keep this going."], [60, "Stop"]],
+    "rock": [[0, "A05"], [10, "Motif B"], [20, "鼓再猛一点"], [30, "等一下，恢复原样"], [40, "Stop"]]
+  },
+  "long_run": {
+    "F01": ["fluidsynth", "closed"], "F02": ["mrt2_direct", "closed"], "F03": ["mrt2", "closed"],
+    "F04": ["synth", "open"], "F05": ["synth", "closed"], "F06": "连续哼唱、拍手、改口及停止"
+  }
+}

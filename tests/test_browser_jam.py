@@ -1,11 +1,70 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from types import SimpleNamespace
 
 from jammate.browser_jam import BrowserJam, BrowserJamService, voice_command
+from jammate.contracts.adapters import from_text
+from jammate.interaction import Layer
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.llm import ProviderFailure
 from jammate.orchestration.tempo_intent import tempo_clause
 from jammate.state import JamState
+
+
+def test_scoped_mix_controls_skip_note_regeneration_and_keep_other_parts(monkeypatch):
+    def unexpected(*args, **kwargs):
+        raise AssertionError("pure mix controls should skip the score arranger")
+
+    monkeypatch.setattr("jammate.browser_jam.LLMBackendArranger", unexpected)
+    state = JamState(session_id="mix-controls")
+    state = state.with_updates(layers=(*state.layers, Layer("strings"), Layer("guitar")))
+    event = from_text("start", session_id=state.session_id)
+    with ThreadPoolExecutor(1) as workers:
+        jam = BrowserJam(96, RuleAgent, workers,
+                         opening=(state, (event,), {"mode": "warm", "instruments": []}))
+        jam.reserve()
+        first = jam.snapshot()["next"]
+        jam.poll(0, 0, 0)
+        jam.submit("鼓再猛一点")
+        jam.future.result(timeout=2)
+        ramp = jam.poll(0, first["end"] - 1000, 0)["next"]
+        jam.poll(1, ramp["start"], 1)
+        protected_drums = tuple(note for note in jam.runtime.preview_next_bar().notes if note.instrument == "drums")
+        ramp_state = jam.manager.state
+        jam.arrangement_config = SimpleNamespace(timeout_s=.1)
+        jam.submit("把键盘和其他弦乐的声音以及密度都压低，突出吉他的声音，我听不到吉他。")
+        jam.future.result(timeout=2)
+        queued = jam.poll(1, ramp["end"] - 1000, 1)
+        assert queued["feedback"]["status"] == "scheduled"
+        assert tuple(note for note in jam.reserved.notes if note.instrument == "drums") == protected_drums
+        feedback = jam.poll(2, queued["next"]["start"], 2)["feedback"]
+        assert feedback["playback"]["mode"] == "rendered_score"
+        target = jam.manager.state
+        assert target.layer("keys").level < state.layer("keys").level
+        assert target.layer("strings").density < state.layer("strings").density
+        assert target.layer("guitar").level > state.layer("guitar").level
+        assert target.layer("drums") == ramp_state.layer("drums") and target.layer("bass") == state.layer("bass")
+        jam.close()
+
+
+def test_keep_turn_does_not_start_an_mrt2_preview():
+    with ThreadPoolExecutor(1) as workers:
+        jam = BrowserJam(96, RuleAgent, workers, renderer="mrt2")
+        jam.reserve()
+        first = jam.snapshot()["next"]
+        jam.poll(0, 0, 0)
+        assert jam.submit("保持原样")["status"] == "buffered"
+        following = jam.poll(1, first["end"], 1)["next"]
+        jam.future.result(timeout=2)
+        assert jam.preview_job is None
+        scheduled = jam.snapshot()["feedback"]
+        assert scheduled["keeps_material"] is True
+        for bar in range(2, scheduled["bar"] + 1):
+            view = jam.poll(bar, following["start"], bar)
+            following = view["next"]
+        assert view["feedback"]["status"] == "applied"
+        assert jam.preview_future is None
+        jam.close()
 
 
 def test_browser_confirms_the_audio_bar_before_committing_feedback():
@@ -103,8 +162,9 @@ def test_long_humming_clip_reaches_analysis_in_opening_and_live_capture(monkeypa
 
     durations = []
 
-    def analyze(audio, rate, *, mode, session_id, bpm):
+    def analyze(audio, rate, *, mode, session_id, bpm, allow_no_notes=False):
         assert mode == "humming"
+        assert not allow_no_notes
         durations.append(len(audio) / rate)
         return None, False
 
@@ -114,8 +174,8 @@ def test_long_humming_clip_reaches_analysis_in_opening_and_live_capture(monkeypa
         clip = recording(16)
         with pytest.raises(ValueError, match="没有识别到音符"):
             service.opening_events({"humming": clip})
-        with pytest.raises(ValueError, match="12 秒以内"):
-            service.opening_events({"rhythm": clip})
+        with pytest.raises(ValueError, match="18 秒以内"):
+            service.opening_events({"rhythm": recording(19)})
         start = service.dispatch("start", {"opening_mode": "cold", "opening": {"text": "96 BPM"}})
         session = service.sessions[start["session"]]
         assert service.capture(session, {**clip, "mode": "humming"}) == {"recognition": "no_melody"}
@@ -380,7 +440,8 @@ def test_spoken_chinese_bpm_numbers_use_the_same_tempo_parser():
     assert tempo_clause("把速度调到一百零五 bpm").value == 105
     assert tempo_clause("把速度调到一百二十 bpm").value == 120
     assert tempo_clause("再减四 bpm").value == 4
-    assert tempo_clause("速度调到两百 bpm").refusal(JamState(session_id="voice_test"))
+    assert tempo_clause("速度调到两百 bpm").refusal(JamState(session_id="voice_test")) is None
+    assert tempo_clause("速度调到两百六十 bpm").refusal(JamState(session_id="voice_test"))
     assert tempo_clause("速度调到一百二 bpm") is None
 
 

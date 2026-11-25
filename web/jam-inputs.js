@@ -3,7 +3,7 @@ import {initOpeningMic} from './jam-opening-mic.js';
 const rate = 16000;
 const titles = {rhythm: '拍手', humming: '哼唱'};
 
-export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange, onRecord, sendEvent}) {
+export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange, onRecord, sendEvent, rhythmTiming}) {
   const root = document.getElementById('jam-opening');
   const text = document.getElementById('jam-opening-text');
   const status = document.getElementById('jam-opening-status');
@@ -20,6 +20,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
   let take = null;
   let pending = false;
   let hummingSeconds = 0;
+  let rhythmOpeningSeconds = 18;
   const mic = initOpeningMic({text, post, encodeWave, onChange,
     async receiveMusic(mode, blob) {
       const card = cards.find(item => item.mode === mode);
@@ -36,7 +37,7 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
   });
 
   function durationLimit(card, live) {
-    return (card.mode === 'humming' && hummingSeconds) || (live ? 9 : 12);
+    return (card.mode === 'humming' && hummingSeconds) || (live ? 9 : rhythmOpeningSeconds);
   }
 
   function clearTrimAudio(card) {
@@ -66,9 +67,11 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
   }
 
   function update({starting = false, ready = false, checked = false, cold = false, hummingSeconds: limit = 0,
+                   rhythmOpeningSeconds: rhythmLimit = 18,
                    hummingCompletion = false} = {}) {
     pending = starting;
     hummingSeconds = limit;
+    rhythmOpeningSeconds = rhythmLimit;
     const live = liveSession();
     mic.update({live: Boolean(live), blocked: starting || Boolean(take) ||
       cards.some(card => card.busy || card.selection), supported: supportsRecording});
@@ -307,10 +310,11 @@ export function initJamInputs({post, encodeWave, waveBlob, liveSession, onChange
       card.status.textContent = '正在识别' + titles[card.mode] + '…';
       onChange();
       try {
-        const {event} = await post('capture', {session: live.id, mode: card.mode, ...payload(card)}, 28000);
+        const {event} = await post('capture', {session: live.id, mode: card.mode, ...payload(card),
+          rhythm_timing: rhythmTiming?.()}, 28000);
         if (liveSession() !== live) return;
-        if (!event) throw new Error(card.mode === 'rhythm' ?
-          '未识别到节奏，请跟拍一整小节。' : '未识别到音符，请重新录制。');
+        if (!event) throw new Error(card.mode === 'rhythm' ? (rhythmTiming?.() === 'feel' ?
+          '未识别到两个清晰起音，请重新录制。' : '未识别到节奏，请跟拍一整小节。') : '未识别到可用哼唱，请重新录制。');
         if (await sendEvent(live, event)) card.status.textContent = '已发送' + titles[card.mode] + '到当前 Jam。';
         else card.status.textContent = '发送失败，可以重试。';
       } catch (error) {

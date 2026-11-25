@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JamMate · 一起 Jam</title>
   <link rel="stylesheet" href="lab.css">
-  <link rel="stylesheet" href="jam.css?v=opening-mic">
+  <link rel="stylesheet" href="jam.css?v=pipeline-log">
 </head>
 <body>
 <main class="jam-workspace">
@@ -29,7 +29,7 @@
       <summary>手动指定 BPM 和调性</summary>
       <div class="jam-cold-fields">
         <label for="jam-cold-bpm">BPM
-          <input id="jam-cold-bpm" type="number" min="60" max="180" step="any" placeholder="自动">
+          <input id="jam-cold-bpm" type="number" min="30" max="250" step="any" placeholder="自动">
         </label>
         <label for="jam-cold-key">调性
           <select id="jam-cold-key">
@@ -83,6 +83,10 @@
           <button type="button" data-clear hidden>移除</button>
         </div>
         <label class="jam-file jam-dropzone">拖入音频，或点击选择<input type="file" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm,.flac,.aac" aria-label="选择拍手音频"></label>
+        <label>拍手用途 <select id="jam-rhythm-timing">
+          <option value="strict">精确定速 · 先数拍</option>
+          <option value="feel">节奏草图 · 使用当前 BPM</option>
+        </select></label>
         <p data-input-status role="status">等待拍手录音</p>
         <audio controls hidden data-input-audio aria-label="试听拍手"></audio>
         <button type="button" data-send hidden>发送拍手到 Jam</button>
@@ -131,7 +135,7 @@
         <details class="jam-advanced">
           <summary>高级设置</summary>
           <label for="jam-bpm" id="jam-warm-bpm">手动 BPM（可选）
-            <input id="jam-bpm" type="number" min="60" max="180" step="any" placeholder="自动">
+            <input id="jam-bpm" type="number" min="30" max="250" step="any" placeholder="自动">
           </label>
           <label for="jam-arranger">编排方式 <select id="jam-arranger">
             <option value="rule">本地规则</option>
@@ -142,6 +146,7 @@
             <option value="fluidsynth" disabled>FluidSynth 音色库</option>
             <option value="mrt2" disabled>MRT2 生成试听</option>
             <option value="mrt2_stream" disabled>MRT2 本地流式播放</option>
+            <option value="mrt2_direct" disabled>MRT2 独立生成（BandPlan 直连）</option>
           </select></label>
           <div id="jam-timbres" hidden>
             <label for="jam-override-timbres" id="jam-override-timbres-row">
@@ -164,6 +169,9 @@
             <option value="humming">只识别哼唱</option>
           </select></label>
           <p id="jam-backend-status" role="status"></p>
+          <label id="jam-mrt2-reference-row" hidden>
+            哼唱音频用作 MRT2 风格参考 <input id="jam-mrt2-reference" type="checkbox">
+          </label>
         </details>
         <div class="jam-buttons">
           <button id="jam-start" type="button" disabled>分析素材并开始</button>
@@ -222,6 +230,7 @@
   </div>
   <section class="panel jam-export" aria-label="伴奏导出">
     <button id="jam-export" type="button" disabled>导出已播伴奏 WAV</button>
+    <button id="jam-debug-open" type="button" aria-controls="jam-debug">查看调试日志</button>
     <span id="jam-export-status" class="muted" role="status"></span>
   </section>
   <section class="panel" id="jam-preview-output" hidden>
@@ -231,7 +240,7 @@
     <a id="jam-preview-download" download="jam-preview.wav">下载 WAV</a>
   </section>
   <details class="jam-debug" id="jam-debug">
-    <summary>会话调试 <span id="jam-debug-summary">等待开始</span></summary>
+    <summary>会话调试日志 <span id="jam-debug-summary">等待开始</span></summary>
     <div class="jam-debug-content">
       <dl class="jam-debug-music">
         <div><dt>当前速度</dt><dd id="jam-debug-bpm">—</dd></div>
@@ -240,7 +249,17 @@
         <div><dt>和弦进行</dt><dd id="jam-debug-progression">—</dd></div>
       </dl>
       <div class="jam-debug-toolbar">
-        <h2>钢琴卷帘</h2>
+        <h2>端到端流水</h2>
+        <div>
+          <label>输入 <select id="jam-debug-turn"><option value="">最新输入</option></select></label>
+          <button id="jam-debug-copy" type="button" disabled>复制调试 JSON</button>
+        </div>
+      </div>
+      <p class="jam-debug-muted" id="jam-debug-status" role="status">开始演奏后记录输入、模型和排程。</p>
+      <ol id="jam-debug-pipeline" class="jam-debug-pipeline" aria-label="所选输入的处理步骤"></ol>
+      <p id="jam-debug-turn-status"></p>
+      <div class="jam-debug-toolbar">
+        <h2>小节输出与钢琴卷帘</h2>
         <div>
           <label>小节 <select id="jam-debug-bar">
             <option value="current">当前</option><option value="queued">待播</option>
@@ -249,6 +268,7 @@
         </div>
       </div>
       <p class="jam-debug-muted" id="jam-debug-score-status">演奏开始后显示实际送去合成的音符。</p>
+      <dl id="jam-debug-output" class="jam-debug-output" aria-label="当前选择小节的输出"></dl>
       <div class="jam-debug-roll"><canvas id="jam-debug-roll" role="img" aria-label="实际排程音符的钢琴卷帘图"></canvas></div>
       <div class="jam-debug-table">
         <table>
@@ -258,16 +278,7 @@
           <tbody id="jam-debug-tracks"></tbody>
         </table>
       </div>
-      <div class="jam-debug-toolbar jam-debug-history">
-        <h2>逐轮记录</h2>
-        <div>
-          <label>指令 <select id="jam-debug-turn"><option value="">最新输入</option></select></label>
-          <button id="jam-debug-copy" type="button" disabled>复制调试 JSON</button>
-        </div>
-      </div>
-      <p class="jam-debug-muted" id="jam-debug-status" role="status">开始演奏后记录输入、模型和排程。</p>
-      <p id="jam-debug-turn-status"></p>
-      <div class="jam-debug-data">
+      <div class="jam-debug-data jam-debug-history">
         <details><summary>开场素材、编制与模型</summary><pre id="jam-debug-opening">—</pre></details>
         <details><summary>InputEvent</summary><pre id="jam-debug-event">—</pre></details>
         <details><summary>JamState</summary><pre id="jam-debug-state">—</pre></details>
@@ -280,6 +291,6 @@
   </details>
   <p class="muted">已确认播放的小节和指令状态会实时更新。刷新页面会结束本次会话。</p>
 </main>
-<script type="module" src="jam.js?v=mrt2-stream"></script>
+<script type="module" src="jam.js?v=pipeline-log"></script>
 </body>
 </html>

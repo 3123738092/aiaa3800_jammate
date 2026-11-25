@@ -1,3 +1,5 @@
+import {outputRows, pipelineStages, streamForBar} from './jam-pipeline-debug.js?v=pipeline-log';
+
 const colors = ['#71d7a4', '#f2bd73', '#7cb9f2', '#d7a7e9', '#f38f91', '#7bd8d7'];
 const pitches = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 const drumNames = {35: '底鼓', 36: '底鼓', 38: '军鼓', 40: '军鼓', 42: '闭镲', 44: '踏镲',
@@ -16,6 +18,7 @@ export function initJamDebug(post, label) {
   let pending = false;
   let missing = false;
   let browserErrors = [];
+  let browserPlayback = null;
   let status = '';
   let trackChoices = '';
   let turnChoices = '';
@@ -29,6 +32,43 @@ export function initJamDebug(post, label) {
 
   function json(name, value) {
     write(name, value == null ? '—' : JSON.stringify(value, null, 2));
+  }
+
+  function changedContent(target, data) {
+    const signature = JSON.stringify(data);
+    if (target.dataset.signature === signature) return false;
+    target.dataset.signature = signature;
+    return true;
+  }
+
+  function fields(rows) {
+    return rows.filter(([, value]) => value != null && value !== '').map(([key, value]) => {
+      const row = document.createElement('div');
+      const title = document.createElement('dt'), text = document.createElement('dd');
+      title.textContent = key;
+      text.textContent = value;
+      row.append(title, text);
+      return row;
+    });
+  }
+
+  function paintPipeline(selectedTurn) {
+    const rows = pipelineStages(frame, selectedTurn);
+    const pipeline = field('pipeline');
+    if (changedContent(pipeline, rows)) {
+      pipeline.replaceChildren(...rows.map(([name, entries]) => {
+        const item = document.createElement('li');
+        item.dataset.stage = name;
+        const title = document.createElement('h3'), description = document.createElement('dl');
+        title.textContent = name;
+        description.append(...fields(entries.length ? entries : [['状态', '暂无记录']]));
+        item.append(title, description);
+        return item;
+      }));
+    }
+    const output = field('output');
+    const sound = outputRows(frame, visibleBar, browserPlayback);
+    if (changedContent(output, sound)) output.replaceChildren(...fields(sound));
   }
 
   function options(select, defaultLabel, values) {
@@ -117,8 +157,10 @@ export function initJamDebug(post, label) {
   function paint() {
     if (!panel.open) return;
     const state = frame?.jam_state;
-    const selectedTurn = frame?.turns.find(item => item.input_event.event_id === turn.value) ?? frame?.turns[0];
-    const engine = frame?.renderer === 'mrt2' ? '实时伴奏 / MRT2 独立试听' : frame?.renderer === 'fluidsynth' ? 'FluidSynth' : '内置合成器';
+    const selectedTurn = turn.value === 'opening' ? null :
+      frame?.turns.find(item => item.input_event.event_id === turn.value) ?? frame?.turns[0];
+    const engine = {mrt2: '实时伴奏 / MRT2 独立试听', fluidsynth: 'FluidSynth',
+      mrt2_direct: 'MRT2 独立生成', mrt2_stream: 'MRT2 音符条件流式'}[frame?.renderer] ?? '内置合成器';
     write('summary', frame ? 'v' + state.state_version + ' · ' + engine : '等待开始');
     write('bpm', frame ? frame.bpm + ' BPM' : '—');
     const key = frame?.key?.replace(' major', ' 大调').replace(' minor', ' 小调');
@@ -128,8 +170,11 @@ export function initJamDebug(post, label) {
     write('status', status || (frame ? '保留最近 12 轮。小节从 1 起显示，原始 JSON 从 0 起。' : '开始演奏后记录输入、模型和排程。'));
 
     visibleBar = frame?.[barSelect.value] ?? null;
+    paintPipeline(selectedTurn);
     if (frame?.renderer === 'mrt2' && visibleBar) {
       write('score-status', '第 ' + (visibleBar.bar_index + 1) + ' 小节 · 实时伴奏音符。MRT2 试听条件见「模型、回复与错误」。');
+    } else if (frame?.renderer === 'mrt2_direct' && visibleBar) {
+      write('score-status', '第 ' + (visibleBar.bar_index + 1) + ' 小节 · BandPlan 文本条件见「模型、回复与错误」。');
     } else {
       write('score-status', visibleBar ? '第 ' + (visibleBar.bar_index + 1) + ' 小节 · ' +
         visibleBar.tempo_bpm + ' BPM · ' + visibleBar.notes.length + ' 个音符' :
@@ -172,6 +217,7 @@ export function initJamDebug(post, label) {
     drawRoll();
 
     const nextTurns = frame?.turns.map(item => [item.input_event.event_id, item.feedback.text.slice(0, 54)]) ?? [];
+    if (frame?.opening) nextTurns.unshift(['opening', '开场']);
     if (JSON.stringify(nextTurns) !== turnChoices) {
       turnChoices = JSON.stringify(nextTurns);
       options(turn, '最新输入', nextTurns);
@@ -181,15 +227,19 @@ export function initJamDebug(post, label) {
     write('turn-status', reply ? [statuses[activeStatus] ?? activeStatus,
       reply.bar != null ? '第 ' + (reply.bar + 1) + ' 小节' : '',
       reply.message, selectedTurn.elapsed_ms != null ? Math.round(selectedTurn.elapsed_ms) + ' ms' : ''].filter(Boolean).join(' · ') :
-      '尚未收到指令。');
+      frame?.opening ? '当前查看开场。' : '尚未收到指令。');
     json('opening', frame?.opening);
     json('event', selectedTurn?.input_event ?? frame?.opening?.input_events);
     json('state', state ? {current: state, at_decision: selectedTurn?.decision_state,
       after_playback: selectedTurn?.state_after_playback} : null);
     json('plan', selectedTurn ? {proposed: selectedTurn.proposed_plan, bound: selectedTurn.bound_plan,
-      status: selectedTurn.plan_status ?? reply.status, slot: selectedTurn.slot, playback_started: selectedTurn.playback_receipt} : null);
-    json('models', selectedTurn ? {decision: selectedTurn.decision, arrangement: selectedTurn.arrangement,
-      inference: selectedTurn.inference, mrt2_conditions: selectedTurn.conditioning, error: selectedTurn.error} : null);
+      status: selectedTurn.plan_status ?? reply.status, slot: selectedTurn.slot, playback_started: selectedTurn.playback_receipt} :
+      frame?.opening && {bound: frame.opening.mrt2_plan ?? frame.opening.solo_plan ?? frame.opening.melody_replay_plan,
+        playback_started: frame.opening.playback_receipt});
+    const stream = streamForBar(frame, visibleBar);
+    json('models', selectedTurn || stream ? {decision: selectedTurn?.decision, arrangement: selectedTurn?.arrangement,
+      inference: selectedTurn?.inference, mrt2_conditions: selectedTurn?.conditioning, stream,
+      error: selectedTurn?.error} : null);
     json('capture', frame || browserErrors.length ? {capture: frame?.captures, browser: browserErrors} : null);
     json('notes', visibleBar);
     field('copy').disabled = !frame && !browserErrors.length;
@@ -223,11 +273,16 @@ export function initJamDebug(post, label) {
     paint();
     refresh();
   });
+  field('open').addEventListener('click', () => {
+    panel.open = true;
+    panel.scrollIntoView({block: 'start'});
+    panel.querySelector('summary').focus({preventScroll: true});
+  });
   for (const control of [track, barSelect, turn]) control.addEventListener('change', paint);
   new ResizeObserver(drawRoll).observe(canvas.parentElement);
   field('copy').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify({...frame, browser_errors: browserErrors}, null, 2));
+      await navigator.clipboard.writeText(JSON.stringify({...frame, browser_playback: browserPlayback, browser_errors: browserErrors}, null, 2));
       write('status', '调试 JSON 已复制。');
     } catch {
       write('status', '无法直接复制。你可以展开下方 JSON 并手动复制。');
@@ -240,6 +295,7 @@ export function initJamDebug(post, label) {
       pending = missing = false;
       nextRefresh = 0;
       browserErrors = [];
+      browserPlayback = null;
       status = '';
       turn.value = track.value = '';
       barSelect.value = 'current';
@@ -247,8 +303,12 @@ export function initJamDebug(post, label) {
       refresh();
     },
     refresh,
+    setPlayback(playback) {
+      browserPlayback = playback;
+    },
     stop() {
       session = null;
+      if (browserPlayback) browserPlayback = {...browserPlayback, source: '已停止'};
       status = frame ? '会话已结束，保留最后一次调试快照。' : '';
       paint();
     },

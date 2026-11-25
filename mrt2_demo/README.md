@@ -1,5 +1,7 @@
 # JamMate MRT2 demo
 
+Renderer 与 Runtime 专项的固定输入、复跑命令和实测结果见 [Renderer Runtime 验收报告](../docs/RENDERER_RUNTIME_REPORT.md)。
+
 这个子项目用 JamMate 的 `InputEvent`、`JamState`、`BandPlan` 和 `StateManager` 驱动本地 MRT2 推理，也保留了独立的流式播放和实验入口。主要依赖和模型准备见 [JamMate MRT2 后端文档](../docs/MRT2_BACKEND.md)。
 
 ## 本地运行
@@ -43,7 +45,29 @@ python -m jammate.input_server --implementation workspace --port 4185
 
 浏览器打开 `http://127.0.0.1:4185/jam.html`。使用本地规则和冷启动时，可以用「96 BPM，C 大调，反拍」作为开场，再发送「快一点」验证小节更新。已有 LLM 配置时，也可以选大模型 Agent。语音、拍手和哼唱沿用本页面的输入流程。
 
+### Mac 运行 MRT2，Windows 调试网页
+
+1. 两台机器使用能相互访问的网络。在 Mac 的「系统设置 → 通用 → 共享 → 远程登录」中开启 SSH，访问范围选择自己的账号。远程登录详情会显示账号和主机地址。 [Apple 远程登录说明](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)
+2. 在 Mac 的仓库根目录，进入已有 MRT2/MLX 的 Python 环境。将 `MAGENTA_HOME` 指向 Mac 上的模型目录并启动服务，例如：
+
+   ```bash
+   PYTHONPATH=src MAGENTA_HOME=/path/to/models python -m jammate.input_server --implementation workspace --port 4215
+   ```
+
+   Mac 可先打开 `http://127.0.0.1:4215/jam.html`，确认「MRT2 独立生成」可选。需要同时测试 SoundFont 时，可追加 `--fluidsynth /path/to/fluidsynth`。
+3. Windows PowerShell 使用 OpenSSH Client。将 `macuser@MAC_IP` 换成 Mac 的账号和地址，运行以下命令，并保持窗口开启。两端端口保持一致，符合 JamMate 的同源检查。 [Windows OpenSSH Client 安装说明](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)
+
+   ```powershell
+   ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:4215:127.0.0.1:4215 macuser@MAC_IP
+   ```
+
+4. 在 Windows Chrome 或 Edge 打开 `http://127.0.0.1:4215/jam.html`，选择 MRT2 独立生成，然后打开「查看调试日志」。网页的麦克风、播放和 DevTools 在 Windows，JamState、编排和 MRT2 模型在 Mac。本地回环 URL 可获得浏览器麦克风权限。两边浏览器各自新建会话，调试时在同一个 Windows 标签页内复现素材和操作。 [浏览器安全上下文说明](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Secure_Contexts)
+
+连接失败时，在 Windows 运行 `Test-NetConnection MAC_IP -Port 22` 检查 SSH，再用 `Invoke-RestMethod http://127.0.0.1:4215/api/ready` 检查转发和 Mac 服务。调试日志可切换查看开场或某轮输入，小节选择可独立检查当前或待播输出。需要复盘时用「复制调试 JSON」保存 BandPlan、模型条件和起拍回执。
+
 JamMate 提供按小节编排的条件，同一个 MRT2 会话连续生成并按 40 ms 块发送 48 kHz 双声道 PCM。浏览器维护短播放缓冲，在收到首批音频后开始播放。会话中可继续给出指令，新计划按 JamMate 的小节时钟更新条件，播放导出可保存双声道 WAV。页面的声部和计划状态描述输入条件，MRT2 生成的听感由试听确认。「MRT2 生成试听」选项仍可导出完整 WAV。
+
+要试听由 MRT2 作曲的版本，在「一起 Jam → 高级设置 → 生成后端」选择「MRT2 独立生成（BandPlan 直连）」。此模式将 BandPlan 和当前的速度、调性、声部等目标转为 MusicCoCa 文本条件，整段声音由本地 MRT2 生成。可在冷启动填写风格，例如「轻柔的爵士钢琴和低音贝斯」，边听边发送演奏指令，结束后导出 WAV。精确速度、和弦、哼唱复现和单声部静音需要通过试听确认。
 
 ## 流式播放与实验
 

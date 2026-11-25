@@ -110,8 +110,14 @@ def _cross_validate(data: dict[str, Any]) -> None:
         if payload["status"] != expected:
             raise InputEventError(f"payload.status: expected {expected}")
         duration = payload["audio_duration_s"]
-        bar_end = rhythm["beat_origin_s"] + rhythm["beats_per_bar"] * 60 / rhythm["tempo_bpm"]
-        if bar_end > duration + TIME_TOLERANCE_S:
+        seconds_per_beat = 60 / rhythm["tempo_bpm"]
+        if payload["confidence_kind"] == "feel_grid_heuristic":
+            if payload["tempo_source"] != "session" or len(beats) < 2:
+                raise InputEventError("rhythm feel requires two onsets on the session tempo grid")
+            # A detected onset can round forward by half a sixteenth note.
+            if rhythm["beat_origin_s"] + (beats[-1] - .125) * seconds_per_beat > duration + TIME_TOLERANCE_S:
+                raise InputEventError("payload.audio_duration_s: rhythm sketch onsets exceed the clip")
+        elif rhythm["beat_origin_s"] + rhythm["beats_per_bar"] * seconds_per_beat > duration + TIME_TOLERANCE_S:
             raise InputEventError("payload.audio_duration_s: must contain the complete rhythm bar")
     else:
         melody = payload["melody"]

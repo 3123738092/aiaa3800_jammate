@@ -1,6 +1,8 @@
 import {MRT2_RATE, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
-import {initJamDebug} from './jam-debug.js?v=2';
-import {initJamInputs} from './jam-inputs.js?v=opening-mic';
+import {cancelHandoff, scheduleHandoff} from './jam-renderer-audio.js';
+import {pcmWave, StreamRecording, waveHeader} from './jam-recording.js';
+import {initJamDebug} from './jam-debug.js?v=pipeline-log';
+import {initJamInputs} from './jam-inputs.js?v=harness-audit';
 import {addressedCommand, initNodConfirmation} from './jam-nod.js?v=2';
 
 const byId = id => document.getElementById(id);
@@ -19,6 +21,7 @@ const timbreOverride = byId('jam-override-timbres'), captureMode = byId('jam-inp
 const timbreSelects = {keys: byId('jam-keys-program'), bass: byId('jam-bass-program')};
 const previewAudio = byId('jam-preview-audio'), previewPanel = byId('jam-preview-output');
 const autoPreview = byId('jam-mrt2-auto'), autoPreviewRow = byId('jam-mrt2-auto-row');
+const audioReference = byId('jam-mrt2-reference'), rhythmTiming = byId('jam-rhythm-timing');
 const backendStatus = byId('jam-backend-status');
 const form = byId('jam-feedback'), input = byId('jam-text'), send = byId('jam-send');
 const playback = byId('jam-playback'), feedbackStatus = byId('jam-feedback-status');
@@ -40,7 +43,8 @@ let coldAvailable = false;
 let openingChecked = false;
 let musicCaptureAvailable = false;
 let hummingSeconds = 0;
-let mrtReady = false, mrt2StreamReady = false;
+let rhythmOpeningSeconds = 18;
+let mrtReady = false, mrt2StreamReady = false, mrt2DirectReady = false;
 let timbreCatalog = null;
 let run = null;
 let lastPerformance = null;
@@ -72,6 +76,7 @@ const nod = initNodConfirmation({reportError: debug.error});
 let pausedVoice = null;
 const manual = initJamInputs({
   post, encodeWave, waveBlob, liveSession: () => run?.started ? run : null, onChange: controls,
+  rhythmTiming: () => rhythmTiming.value,
   sendEvent: (live, event) => sendToJam(live, null, event.source, null, event),
   onRecord(recording) {
     if (recording) {
@@ -98,15 +103,23 @@ function controls() {
   openingMode.querySelector('option[value="cold"]').disabled = !coldAvailable;
   openingModeNote.textContent = cold
     ? '按已提供素材演奏。只有哼唱时复奏一次。可以指定和弦进行来加入伴奏。'
-    : '模型会补全乐器、调性与和弦进行。识别到哼唱旋律时，乐队会用它安排后续伴奏。';
+    : '明确指定的独奏和纯鼓开场会保持单声部。开放式开场允许补全，MRT2 独立生成会直接使用音乐风格条件。';
   const mrtOption = renderer.querySelector('option[value="mrt2"]');
   mrtOption.disabled = !mrtReady || (cold && !coldMrtReady);
   const streamOption = renderer.querySelector('option[value="mrt2_stream"]');
   streamOption.disabled = !mrt2StreamReady;
+  const directOption = renderer.querySelector('option[value="mrt2_direct"]');
+  directOption.disabled = !mrt2DirectReady;
   if ((mrtOption.disabled && renderer.value === 'mrt2')
-      || (streamOption.disabled && renderer.value === 'mrt2_stream')) renderer.value = 'synth';
+      || (streamOption.disabled && renderer.value === 'mrt2_stream')
+      || (directOption.disabled && renderer.value === 'mrt2_direct')) renderer.value = 'synth';
   for (const control of [bpmInput, agent, arranger, renderer]) control.disabled = Boolean(run);
   const mrt = renderer.value === 'mrt2', stream = renderer.value === 'mrt2_stream';
+  const direct = renderer.value === 'mrt2_direct';
+  byId('jam-mrt2-reference-row').hidden = !direct;
+  audioReference.disabled = Boolean(run) || !direct;
+  arranger.closest('label').hidden = direct;
+  arranger.disabled = Boolean(run) || direct;
   const starting = Boolean(run) && !run.started;
   play.disabled = Boolean(run) || !canOpen || !manual.ready(useColdSettings && Boolean(coldBpm.value || coldKey.value));
   play.textContent = starting ? '正在识别与编制…' : '分析素材并开始';
@@ -125,10 +138,12 @@ function controls() {
     control.disabled = !timbreCatalog || starting || (!run?.started && !timbreOverride.checked);
   }
   const mrtHint = byId('jam-mrt2-hint');
-  mrtHint.hidden = !mrt && !stream;
+  mrtHint.hidden = !mrt && !stream && !direct;
   autoPreviewRow.hidden = !mrt || !mrtLiveState;
   if (!run?.started) {
-    mrtHint.textContent = stream
+    mrtHint.textContent = direct
+      ? 'MRT2 根据 BandPlan 独立生成并流式播放。速度、调性和声部是生成目标。'
+      : stream
       ? '从本机 MRT2 模型边生成边播放。指令按 JamMate 的小节时钟更新生成条件。'
       : cold ? '开始后按现有素材生成一段独立试听。' : '发送指令后，MRT2 会在下方生成独立试听。';
   }
@@ -155,7 +170,7 @@ function controls() {
   captionsToggle.textContent = captions ? '暂停语音转录' : '开启语音转录';
   captionsToggle.setAttribute('aria-pressed', String(Boolean(captions)));
   useCaption.disabled = !canSend || !captions?.final || Boolean(captions.interim);
-  manual.update({starting, ready: canOpen, checked: openingChecked, cold, hummingSeconds,
+  manual.update({starting, ready: canOpen, checked: openingChecked, cold, hummingSeconds, rhythmOpeningSeconds,
     hummingCompletion: hummingCompletionReady});
 }
 
@@ -197,7 +212,7 @@ function selectedTimbres() {
 function showTimbres(live) {
   if (!timbreCatalog || timbrePanel.hidden || live?.timbreSending) return;
   const state = live?.timbres;
-  let text = '演奏中可以切换，音色在小节起拍时生效。';
+  let text = `当前 SoundFont 有 ${Object.keys(timbreCatalog.programs).length} 种音色。演奏中可按小节切换。`;
   if (state) {
     const names = timbreCatalog.programs;
     text = `当前音色 · ${names[state.active.keys]} / ${names[state.active.bass]}`;
@@ -240,8 +255,8 @@ function show(view, live) {
     updateExport();
   }
   playback.textContent = view.current_bar === null ? '准备播放' : view.playing ? '正在演奏' : '已停奏 · 可继续发送指令';
-  if (previewPlaying()) playback.textContent += ' · 试听中，伴奏已静音';
-  else if (live.autoClip?.at <= live.clock.currentTime) playback.textContent += ' · MRT2 片段';
+  if (previewPlaying()) playback.textContent += ' · 手动试听';
+  else if (live.autoClip?.at <= live.clock.currentTime) playback.textContent += ' · MRT2 片段已开始播放';
   if (live.gaps > 0) playback.textContent += ` · 缓冲重接 ${live.gaps} 次`;
   byId('jam-bar').textContent = view.current_bar === null ? '—' : view.current_bar + 1;
   byId('jam-current-bpm').textContent = Math.round(view.bpm * 10) / 10;
@@ -267,13 +282,16 @@ function show(view, live) {
   if (live.mrt2Stream) {
     const hint = byId('jam-mrt2-hint');
     hint.textContent = view.current_bar === null
-      ? '本地 MRT2 正在准备首帧…' : '本地 MRT2 流式播放 · 声部和小节标记对应生成条件';
+      ? '本地 MRT2 正在准备首帧…'
+      : live.directMrt2 ? 'MRT2 独立生成中 · 页面显示 BandPlan 的生成目标'
+        : '本地 MRT2 流式播放 · 声部和小节标记对应生成条件';
   }
   const reply = view.feedback;
   if (reply) {
     const label = {buffered: '下一小节起拍后处理', thinking: '正在理解', arranging: view.renderer === 'mrt2' ? '正在生成 MRT2 试听，伴奏继续' : '正在编排',
       preview: 'MRT2 试听已就绪',
-      scheduled: `将于第 ${reply.bar + 1} 小节生效`, applied: `已在第 ${reply.bar + 1} 小节生效`,
+      scheduled: `将于第 ${reply.bar + 1} 小节生效`, applied: live.directMrt2
+        ? `第 ${reply.bar + 1} 小节已将计划送入 MRT2` : `已在第 ${reply.bar + 1} 小节生效`,
       waiting_ready: '仍在准备，原伴奏继续', expired: '保持当前演奏', held: '保持当前演奏'}[reply.status];
     const detail = reply.message === reply.text ? '' : reply.message;
     const text = [`「${reply.text}」`, label, detail].filter(Boolean).join(' · ');
@@ -288,7 +306,7 @@ function show(view, live) {
   if (openingPreview) {
     const label = {
       generating: 'MRT2 正在生成开场试听…',
-      completed: autoPreview.checked && mrtLiveState ? 'MRT2 开场片段已就绪，将在小节起拍接入。' : 'MRT2 开场试听已就绪，向下滚动即可播放。',
+      completed: previewPlaybackLabel(live, view, 'opening_' + live.id),
       waiting_material: '等待可演奏素材。仅设置速度或调性时没有开场音频。',
       failed: 'MRT2 开场试听失败 · ' + (openingPreview.error ?? ''),
     }[openingPreview.status];
@@ -297,49 +315,73 @@ function show(view, live) {
   }
   const preview = view.preview_status;
   if (preview) {
-    const label = {generating: '状态已生效，MRT2 正在生成…',
-      completed: autoPreview.checked ? 'MRT2 新片段已就绪，将在小节起拍接入。' : 'MRT2 新片段已就绪，可以试听。', failed: 'MRT2 生成失败 · ' + (preview.error ?? '')}[preview.status];
+    const label = {generating: '实时伴奏已接收计划，MRT2 正在生成…',
+      completed: previewPlaybackLabel(live, view, preview.event),
+      failed: 'MRT2 生成失败，实时伴奏继续 · ' + (preview.error ?? '')}[preview.status];
     const hint = byId('jam-mrt2-hint');
     if (label && hint.textContent !== label) hint.textContent = label;
   }
   live.autoWanted = live.sending ? null : view.auto_preview_id ?? null;
-  if (live.autoClip && live.autoClip.id !== live.autoWanted) stopAutoPreview(live);
+  if (live.autoClip && (!view.playing || (live.autoClip.id !== live.autoWanted
+      && live.autoClip.at > live.clock.currentTime))) stopAutoPreview(live);
+  if (view.feedback?.status === 'applied' && view.feedback.keeps_material === false
+      && live.autoClip && live.autoClip.id !== view.feedback.id) stopAutoPreview(live);
+  if (!view.playing && previewPlaying()) previewAudio.pause();
   if (view.preview_id && live.previewId !== view.preview_id) loadPreview(live, view.preview_id);
   scheduleAutoPreview(live);
+  const playingAuto = live.autoClip && live.autoClip.at <= live.clock.currentTime;
+  debug.setPlayback({source: previewPlaying() ? 'MRT2 手动试听' : playingAuto ? 'MRT2 片段接管' :
+    view.current_bar == null ? '等待起拍' : !view.playing ? '演奏已停止' :
+    live.mrt2Stream ? 'MRT2 流式 PCM' : '实时伴奏',
+    preview_id: previewPlaying() ? live.previewId : playingAuto ? live.autoClip.id : null,
+    bar: view.current_bar, buffer_reconnections: live.gaps});
   debug.refresh();
 }
 
-function stopAutoPreview(live) {
+function previewPlaybackLabel(live, view, id) {
   const clip = live.autoClip;
-  if (!clip) return;
-  live.autoClip = null;
+  if (clip?.id === id) {
+    return clip.at <= live.clock.currentTime ? 'MRT2 片段已开始播放。' : 'MRT2 片段已排程，等待小节起拍。';
+  }
+  if (live.autoPlayed === id) return view.playing ? 'MRT2 片段已播放，实时伴奏继续。' : 'MRT2 片段已播放。';
+  if (autoPreview.checked && mrtLiveState && view.auto_preview_id === id) return 'MRT2 片段就绪，等待接入。';
+  return 'MRT2 片段就绪，可以试听。';
+}
+
+function stopAutoPreview(live, pendingOnly = false) {
+  const clip = live.autoClip;
   const now = live.clock.currentTime;
+  if (!clip || (pendingOnly && clip.at <= now)) return;
+  live.autoClip = null;
+  if (clip.at <= now) live.autoPlayed = clip.id;
   clip.record.end = Math.min(clip.record.end, Math.max(clip.at, now));
-  live.baselineGate.gain.cancelScheduledValues(now);
-  live.baselineGate.gain.setValueAtTime(1, now);
+  cancelHandoff(live.baselineGate.gain, clip.gate.gain, clip.at, clip.end, now);
   clip.node.stop(now);
 }
 
 function scheduleAutoPreview(live) {
   const ready = live.autoReady;
-  if (!autoPreview.checked || previewPlaying() || live.sending || !ready ||
+  if (live.directMrt2 || !autoPreview.checked || previewPlaying() || live.sending || !ready ||
       ready.id !== live.autoWanted || ready.id === live.autoPlayed || live.autoClip) return;
   const now = live.clock.currentTime;
   const boundary = live.markers.find(marker => marker.at >= now + .07);
   if (!boundary) return;
   const at = boundary.at, end = at + ready.buffer.duration;
   const node = live.clock.createBufferSource();
+  const gate = live.clock.createGain();
   node.buffer = ready.buffer;
-  node.connect(live.autoOutput);
+  node.connect(gate).connect(live.autoOutput);
   const record = {at, end, wav: ready.wav};
   live.autoRecorded.push(record);
-  live.autoPlayed = ready.id;
-  live.autoClip = {id: ready.id, at, node, record};
-  live.baselineGate.gain.setValueAtTime(0, at);
-  live.baselineGate.gain.setValueAtTime(1, end);
+  live.autoClip = {id: ready.id, at, end, node, gate, record};
+  scheduleHandoff(live.baselineGate.gain, gate.gain, at, end, now);
   node.onended = () => {
     node.disconnect();
-    if (live.autoClip?.node === node) live.autoClip = null;
+    gate.disconnect();
+    if (live.autoClip?.node === node) {
+      live.autoPlayed = ready.id;
+      live.autoClip = null;
+    }
   };
   node.start(at);
 }
@@ -405,7 +447,7 @@ function queueMrt2Bar(live, packet) {
       node.start(at);
       stream.end = at + node.buffer.duration;
       if (offset === 0) live.markers.push({bar: packet.bar, at});
-      live.recorded.push({at, end: stream.end, pcm});
+      live.streamRecording.append(packet.bar, at, pcm);
     })).catch(error => {
       if (run !== live) return;
       debug.error('MRT2 流式播放', error);
@@ -527,6 +569,7 @@ async function startJam(mode) {
   if (run || !canOpen || !manual.ready(hasSettings) || !tempoInput.reportValidity()) return;
   if (mode === 'humming' && !manual.hasHumming()) return;
   const opening = manual.request();
+  opening.rhythm_timing = rhythmTiming.value;
   if (key) opening.key = key;
   if (hasSettings && !opening.text && !opening.rhythm && !opening.humming) {
     opening.text = [tempoInput.value && tempoInput.value + ' BPM', key].filter(Boolean).join('，');
@@ -546,15 +589,21 @@ async function startJam(mode) {
     return;
   }
   const live = {clock, mode, id: null, rate: 0, epoch: null, buffered: -1,
-    markers: [], recorded: [], autoRecorded: [], gaps: 0, failures: 0, sending: false};
-  if (renderer.value === 'mrt2_stream') {
+    markers: [], recorded: [], autoRecorded: [], gaps: 0, failures: 0, sending: false,
+    directMrt2: renderer.value === 'mrt2_direct'};
+  if (live.directMrt2 || renderer.value === 'mrt2_stream') {
     live.mrt2Stream = {controller: new AbortController(), pending: Promise.resolve(), end: 0};
+    live.streamRecording = new StreamRecording();
   }
   live.output = live.clock.createGain();
-  live.baselineGate = live.clock.createGain();
-  live.autoOutput = live.clock.createGain();
-  live.output.connect(live.baselineGate).connect(live.clock.destination);
-  live.autoOutput.connect(live.clock.destination);
+  if (live.directMrt2) {
+    live.output.connect(live.clock.destination);
+  } else {
+    live.baselineGate = live.clock.createGain();
+    live.autoOutput = live.clock.createGain();
+    live.output.connect(live.baselineGate).connect(live.clock.destination);
+    live.autoOutput.connect(live.clock.destination);
+  }
   run = live;
   debug.start(null);
   controls();
@@ -563,7 +612,8 @@ async function startJam(mode) {
     await resumePlayback(live.clock);
     if (run !== live) return;
     const view = await post('start', {opening, opening_mode: mode, ...settings, agent: agent.value, renderer: renderer.value,
-      arranger: arranger.value, allow_preview: renderer.value === 'mrt2'}, 85000);
+      arranger: live.directMrt2 ? 'rule' : arranger.value, allow_preview: renderer.value === 'mrt2',
+      mrt2_audio_reference: live.directMrt2 && audioReference.checked}, 85000);
     if (run !== live) {
       releaseSession(view.session);
       return;
@@ -600,7 +650,7 @@ async function sendToJam(live, text, source, voice = null, event = null) {
   if (!live?.id || (!text && !event)) return;
   if (live.sending) await live.sending;
   if (run !== live || (voice && live.voice !== voice)) return;
-  stopAutoPreview(live);
+  stopAutoPreview(live, true);
   live.autoWanted = null;
   live.sending = post('feedback', {session: live.id, ...(event ? {event} : {text, source})}).catch(error => ({error}));
   controls();
@@ -650,11 +700,11 @@ function previewPlaying() {
 function setListening(live, listening) {
   const gain = live.output.gain;
   const now = live.clock.currentTime;
-  const mute = previewPlaying();
-  live.autoOutput.gain.setTargetAtTime(listening ? .42 : 1, now, .04);
+  const mute = !live.directMrt2 && previewPlaying();
+  live.autoOutput?.gain.setTargetAtTime(listening ? .42 : 1, now, .04);
   gain.cancelScheduledValues(now);
-  gain.setTargetAtTime(mute ? 0 : listening ? .42 : 1, now, mute ? .015 : .04);
-  if (mute) gain.setValueAtTime(0, now + .09);
+  if (mute) gain.setValueAtTime(0, now);
+  else gain.setTargetAtTime(listening ? .42 : 1, now, .04);
 }
 
 function releaseVoice(live) {
@@ -819,29 +869,13 @@ useCaption.addEventListener('click', () => {
 function waveBlob(samples, sampleRate, right = null) {
   const channels = right ? 2 : 1;
   const dataBytes = samples.length * channels * 2;
-  const wave = new DataView(new ArrayBuffer(44 + dataBytes));
-  const writeTag = (offset, tag) => {
-    for (const [i, letter] of [...tag].entries()) wave.setUint8(offset + i, letter.charCodeAt(0));
-  };
-  writeTag(0, 'RIFF');
-  wave.setUint32(4, wave.byteLength - 8, true);
-  writeTag(8, 'WAVE');
-  writeTag(12, 'fmt ');
-  wave.setUint32(16, 16, true);
-  wave.setUint16(20, 1, true);
-  wave.setUint16(22, channels, true);
-  wave.setUint32(24, sampleRate, true);
-  wave.setUint32(28, sampleRate * channels * 2, true);
-  wave.setUint16(32, channels * 2, true);
-  wave.setUint16(34, 16, true);
-  writeTag(36, 'data');
-  wave.setUint32(40, dataBytes, true);
+  const wave = new DataView(new ArrayBuffer(dataBytes));
   for (let i = 0; i < samples.length; i++) {
-    const offset = 44 + i * channels * 2;
+    const offset = i * channels * 2;
     wave.setInt16(offset, Math.max(-1, Math.min(1, samples[i])) * 32767, true);
     if (right) wave.setInt16(offset + 2, Math.max(-1, Math.min(1, right[i])) * 32767, true);
   }
-  return new Blob([wave], {type: 'audio/wav'});
+  return new Blob([waveHeader(sampleRate, channels, samples.length), wave], {type: 'audio/wav'});
 }
 
 function encodeWave(samples, sampleRate) {
@@ -854,6 +888,7 @@ function encodeWave(samples, sampleRate) {
 }
 
 function performanceSnapshot(live) {
+  if (live?.streamRecording) return live.streamRecording.snapshot(live.clock.currentTime);
   if (!live?.recorded.length) return null;
   const now = live.clock.currentTime;
   const bars = live.recorded.filter(bar => bar.at < now);
@@ -862,12 +897,39 @@ function performanceSnapshot(live) {
   const end = Math.min(now, bars.reduce((last, bar) => Math.max(last, bar.end), start));
   const clips = live.autoRecorded.filter(clip => clip.at < end && clip.end > clip.at)
     .map(clip => ({...clip, end: Math.min(clip.end, end)}));
-  return {rate: live.mrt2Stream ? MRT2_RATE : live.rate, bars, clips, start, end, stereo: Boolean(live.mrt2Stream)};
+  return {rate: live.rate, bars, clips, start, end};
 }
 
 function updateExport() {
   exportButton.disabled = exporting || !((run ? run.exportReady : lastPerformance) &&
-    (window.OfflineAudioContext || window.webkitOfflineAudioContext));
+    (run?.streamRecording || lastPerformance?.pcm || window.OfflineAudioContext || window.webkitOfflineAudioContext));
+}
+
+async function performanceWave(take, length) {
+  if (take.pcm) return pcmWave(take);
+  const OfflineAudio = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const mix = new OfflineAudio(1, length, take.rate);
+  const baseline = mix.createGain();
+  baseline.connect(mix.destination);
+  for (const bar of take.bars) {
+    const source = mix.createBufferSource();
+    const bytes = Uint8Array.from(atob(bar.wav), character => character.charCodeAt(0));
+    source.buffer = await mix.decodeAudioData(bytes.buffer);
+    source.connect(baseline);
+    source.start(bar.at - take.start);
+  }
+  for (const clip of take.clips) {
+    const at = clip.at - take.start, duration = clip.end - clip.at;
+    const source = mix.createBufferSource();
+    const gate = mix.createGain();
+    const bytes = Uint8Array.from(atob(clip.wav), character => character.charCodeAt(0));
+    source.buffer = await mix.decodeAudioData(bytes.buffer);
+    source.connect(gate).connect(mix.destination);
+    scheduleHandoff(baseline.gain, gate.gain, at, at + duration, 0);
+    source.start(at, 0, duration);
+  }
+  const result = await mix.startRendering();
+  return waveBlob(result.getChannelData(0), result.sampleRate);
 }
 
 exportButton.addEventListener('click', async () => {
@@ -877,35 +939,8 @@ exportButton.addEventListener('click', async () => {
   updateExport();
   exportStatus.textContent = '正在合成 WAV…';
   try {
-    const OfflineAudio = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const length = Math.max(1, Math.round((take.end - take.start) * take.rate));
-    const mix = new OfflineAudio(take.stereo ? 2 : 1, length, take.rate);
-    const baseline = mix.createGain();
-    baseline.connect(mix.destination);
-    for (const bar of take.bars) {
-      const source = mix.createBufferSource();
-      if (bar.pcm) {
-        source.buffer = stereoPcmBuffer(mix, bar.pcm);
-      } else {
-        const bytes = Uint8Array.from(atob(bar.wav), character => character.charCodeAt(0));
-        source.buffer = await mix.decodeAudioData(bytes.buffer);
-      }
-      source.connect(baseline);
-      source.start(bar.at - take.start);
-    }
-    for (const clip of take.clips) {
-      const at = clip.at - take.start, duration = clip.end - clip.at;
-      const source = mix.createBufferSource();
-      const bytes = Uint8Array.from(atob(clip.wav), character => character.charCodeAt(0));
-      source.buffer = await mix.decodeAudioData(bytes.buffer);
-      source.connect(mix.destination);
-      baseline.gain.setValueAtTime(0, at);
-      baseline.gain.setValueAtTime(1, at + duration);
-      source.start(at, 0, duration);
-    }
-    const result = await mix.startRendering();
-    const right = take.stereo ? result.getChannelData(1) : null;
-    const url = URL.createObjectURL(waveBlob(result.getChannelData(0), result.sampleRate, right));
+    const url = URL.createObjectURL(await performanceWave(take, length));
     const link = document.createElement('a');
     link.href = url;
     link.download = 'jammate-performance.wav';
@@ -1002,7 +1037,8 @@ async function recognizeMusic(live, voice, segment) {
   try {
     const audio = await encodeWave(segment.samples, segment.sampleRate);
     if (!current()) return;
-    const result = await post('capture', {session: live.id, mime_type: 'audio/wav', audio, mode}, 28000);
+    const result = await post('capture', {session: live.id, mime_type: 'audio/wav', audio, mode,
+      rhythm_timing: rhythmTiming.value}, 28000);
     if (!current()) return;
     if (result.event) {
       await sendToJam(live, null, result.event.source, voice, result.event);
@@ -1086,16 +1122,18 @@ post('status', {}).then(view => {
   speechStatus = view.speech_mode === 'browser' && SpeechRecognition && view.speech_ready ? 'ready' : 'unsupported';
   musicCaptureAvailable = Boolean(view.music_capture);
   hummingSeconds = view.humming_clip_seconds ?? 0;
-  openingReady = Boolean(view.llm_ready);
+  rhythmOpeningSeconds = view.rhythm_opening_seconds ?? 18;
+  openingReady = Boolean(view.llm_ready || view.local_scoped_opening);
   hummingCompletionReady = Boolean(view.opening_modes?.includes('humming'));
   coldAvailable = Boolean(view.opening_modes?.includes('cold'));
-  if (!openingReady && coldAvailable && !run) openingMode.value = 'cold';
+  if (!view.llm_ready && coldAvailable && !run) openingMode.value = 'cold';
   coldSettingsAvailable = view.cold_opening_settings === true;
   coldMrtReady = view.cold_mrt2_preview === true;
   mrtLiveState = view.mrt2_live_state === true;
   openingChecked = true;
   mrtReady = Boolean(view.mrt2);
   mrt2StreamReady = Boolean(view.mrt2_stream && window.ReadableStream);
+  mrt2DirectReady = Boolean(view.mrt2_direct && window.ReadableStream);
   voiceStatus.textContent = voiceAvailability();
   controls();
   if (run?.voice?.processor) startCaptions(run, run.voice);

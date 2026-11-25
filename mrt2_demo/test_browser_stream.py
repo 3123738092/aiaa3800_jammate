@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from jammate.browser_jam import BrowserJam
+from jammate.browser_jam import BrowserJam, BrowserJamService
 from jammate.music import Note
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.realtime import PlaybackBar
@@ -13,7 +13,7 @@ from jammate.render.clock import BarClock
 from jammate.render.synth import SR
 
 from . import browser_stream as stream
-from .inference import DRUM_KEY, FRAME_SAMPLES, PITCH_KEY, SAMPLE_RATE
+from .inference import DRUM_KEY, FRAME_SAMPLES, PITCH_KEY, SAMPLE_RATE, STYLE_KEY
 
 
 @pytest.fixture
@@ -107,3 +107,69 @@ def test_browser_stream_updates_conditions_at_the_scheduled_bar(model):
         assert jam.manager.state.layer("drums").density < 1
         assert model.frames[-1][1] == 124 and len(model.prompts) == 1
         jam.close()
+
+
+def test_direct_browser_stream_runs_bandplan_without_score_or_backing(model, monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail("MRT2 direct attempted to compile a score or render a backing track")
+
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    monkeypatch.setattr("jammate.orchestration.realtime.prepare_plan", unexpected)
+    monkeypatch.setattr("jammate.orchestration.realtime.prepare_bar", unexpected)
+    monkeypatch.setattr("jammate.browser_jam.render", unexpected)
+    monkeypatch.setattr("jammate.browser_jam.LLMBackendArranger", unexpected)
+    service = BrowserJamService()
+    try:
+        assert service.dispatch("status", {})["mrt2_direct"]
+        view = service.dispatch("start", {"renderer": "mrt2_direct", "opening_mode": "cold",
+                                         "arranger": "llm_all", "opening": {"text": "soft jazz", "key": "C 大调"}})
+        jam = service.sessions[view["session"]]
+        assert jam.arrangement_config is None
+        packet = view["next"]
+        assert packet["pcm_frames"] == 120000 and "wav" not in packet
+        assert jam.reserved.plan.plan_id == jam.opening["mrt2_plan"]["plan_id"]
+        assert np.any(consume(service.open_mrt2_bar(jam.id, 0)))
+        jam.poll(0, packet["start"], 0)
+        assert jam.opening["playback_receipt"]["plan_id"] == jam.opening["mrt2_plan"]["plan_id"]
+
+        for index, command in enumerate(("加入鼓", "停止"), start=1):
+            jam.submit(command)
+            jam.future.result(timeout=2)
+            queued = jam.poll(index - 1, packet["end"] - 1000, index - 1)
+            assert queued["feedback"]["status"] == "scheduled"
+            packet = queued["next"]
+            assert packet["bar"] == index and "wav" not in packet
+            assert jam.reserved.plan.plan_id == queued["feedback"]["plan"]
+            assert jam.reserved.notes == ()
+            pcm = consume(service.open_mrt2_bar(jam.id, index))
+            playing = jam.poll(index, packet["start"], index)
+            assert playing["feedback"]["status"] == "applied"
+            assert bool(np.any(pcm)) is (index == 1)
+            assert playing["preview_id"] is None and playing["auto_preview_id"] is None
+
+        assert model.prompts == ["soft jazz, C major", "soft jazz, C major, drum kit"]
+        assert all(set(conditioning) == {STYLE_KEY} for conditioning, _ in model.frames)
+        assert model.frames[-1][1] == 124
+    finally:
+        service.close()
+
+
+def test_direct_motif_plan_does_not_claim_generated_notes(model):
+    with ThreadPoolExecutor(1) as workers:
+        jam = BrowserJam(96, RuleAgent, workers, renderer="mrt2_direct")
+        try:
+            jam.reserve()
+            first = jam.snapshot()["next"]
+            consume(jam.open_mrt2_bar(0))
+            jam.poll(0, 0, 0)
+            jam.submit("来一段")
+            jam.future.result(timeout=2)
+            queued = jam.poll(0, first["end"] - 1000, 0)
+            assert queued["feedback"]["status"] == "scheduled"
+            assert np.any(consume(jam.open_mrt2_bar(1)))
+            playing = jam.poll(1, first["end"], 1)
+            assert playing["feedback"]["status"] == "applied"
+            assert "Introduce a new lead melody" in model.prompts[-1]
+            assert not jam.manager.state.last_ai_motif and not jam.manager.state.motifs
+        finally:
+            jam.close()

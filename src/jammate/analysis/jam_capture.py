@@ -69,7 +69,7 @@ def _likely_hum(audio, rate, regions):
     return len(stable) >= 2 and max(stable) - min(stable) >= 1.0
 
 
-def analyze_capture(audio, rate, *, mode, session_id, bpm):
+def analyze_capture(audio, rate, *, mode, session_id, bpm, allow_no_notes=False):
     """Return a local music event and whether a speech attempt is appropriate."""
     regions, hop = _activity(audio, rate)
     if not regions:
@@ -104,9 +104,9 @@ def analyze_capture(audio, rate, *, mode, session_id, bpm):
             identity = f"n{len(notes) + 1}"
             notes.append({"id": identity, "pitchMidi": timed.pitch, "startSec": timed.start_s,
                           "durationSec": end - timed.start_s, "velocity01": .7, "sourceNoteIds": [identity]})
-        if notes and (mode == "humming" or len({note["pitchMidi"] for note in notes}) >= 2):
+        if (mode == "humming" and (notes or allow_no_notes)) or len({note["pitchMidi"] for note in notes}) >= 2:
             source = uuid4().hex
-            document = {"schemaVersion": "1.0.0", "id": source, "status": "ready",
+            document = {"schemaVersion": "1.0.0", "id": source, "status": "ready" if notes else "no_notes",
                         "source": {"id": source, "durationSec": duration, "kind": "recording"},
                         "timebase": {"unit": "seconds", "origin": "original_audio_start"},
                         "tempo": {"bpm": None, "source": "unknown", "mode": "free", "quantized": False},

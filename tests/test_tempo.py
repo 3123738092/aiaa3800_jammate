@@ -13,8 +13,8 @@ def test_steady_claps_give_their_tempo():
 
 @pytest.mark.unit
 def test_slow_claps_are_folded_into_range():
-    # 1.5 s apart = 40 BPM; people often clap half-time, so read it as 80.
-    assert tempo_from_onsets([0.0, 1.5, 3.0, 4.5]) == pytest.approx(80.0)
+    assert tempo_from_onsets([0.0, 1.5, 3.0, 4.5]) == pytest.approx(40.0)
+    assert tempo_from_onsets([0.0, 2.5, 5.0, 7.5]) == pytest.approx(48.0)
 
 
 @pytest.mark.unit

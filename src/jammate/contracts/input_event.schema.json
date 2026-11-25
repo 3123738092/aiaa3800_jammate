@@ -98,13 +98,13 @@
         "status": {"enum": ["ready", "no_onsets"]},
         "audio_duration_s": {"type": "number", "exclusiveMinimum": 0},
         "tempo_source": {"enum": ["detected", "manual", "session"]},
-        "confidence_kind": {"enum": ["grid_alignment_heuristic", "manual", "unspecified"]},
+        "confidence_kind": {"enum": ["grid_alignment_heuristic", "feel_grid_heuristic", "manual", "unspecified"]},
         "rhythm": {
           "type": "object",
           "additionalProperties": false,
           "required": ["tempo_bpm", "onset_beats", "accents", "beat_origin_s", "beats_per_bar", "confidence"],
           "properties": {
-            "tempo_bpm": {"type": "number", "minimum": 60, "maximum": 180},
+            "tempo_bpm": {"type": "number", "minimum": 30, "maximum": 250},
             "onset_beats": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}},
             "accents": {"type": "array", "maxItems": 16, "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}},
             "beat_origin_s": {"type": "number", "minimum": 0},

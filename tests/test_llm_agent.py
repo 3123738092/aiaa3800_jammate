@@ -389,16 +389,16 @@ def test_provider_error_body_with_secret_is_not_logged_or_retried():
 
 
 def test_out_of_range_explicit_tempo_holds_without_model_call():
-    m = StateManager(JamState(session_id="jam_demo", tempo_bpm=176))
+    m = StateManager(JamState(session_id="jam_demo", tempo_bpm=246))
     events = m.ingest([from_text("再快 10 BPM", session_id="jam_demo")])
     fake = FakeProvider()
     agent = LLMAgent(LLMConfig(SECRET), provider=fake)
     plan = agent.decide(events, m.state)
     assert not fake.calls
     assert agent.last_trace["source"] == "request_gate"
-    assert "186" in plan.to_dict()["unresolved"][0]
+    assert "256" in plan.to_dict()["unresolved"][0]
     assert not should_execute(m.state, plan)
-    assert m.state.tempo_bpm == 176 and m.state.position.next_bar == 0
+    assert m.state.tempo_bpm == 246 and m.state.position.next_bar == 0
 
 
 def test_llm_repairs_wrong_exact_tempo_before_staging():

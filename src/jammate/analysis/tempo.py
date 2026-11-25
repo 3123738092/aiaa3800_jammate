@@ -7,7 +7,9 @@ from typing import Sequence
 import librosa
 import numpy as np
 
-MIN_BPM, MAX_BPM = 60.0, 180.0
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
+
+MIN_BPM, MAX_BPM = MIN_TEMPO_BPM, MAX_TEMPO_BPM
 MIN_IOI_S = 0.15  # anything closer is one clap detected twice
 MAX_IOI_CV = 0.2  # claps must be steady to be read as a count-in
 ONSET_HOP = 256

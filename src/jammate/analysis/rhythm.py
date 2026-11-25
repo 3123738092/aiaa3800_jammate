@@ -126,3 +126,14 @@ def analyze_rhythm_bar(y: np.ndarray, sr: int, tempo_bpm: float,
     """Analyze exactly one bar captured on an existing playback grid."""
     onsets, accents = _onsets_and_accents(y, sr)
     return rhythm_from_onsets(onsets + beat_origin_s, tempo_bpm, beat_origin_s, accents)
+
+
+def analyze_rhythm_feel(y: np.ndarray, sr: int, tempo_bpm: float) -> RhythmContext:
+    """Quantize a short rhythm sketch to the supplied session tempo."""
+    onsets, accents = _onsets_and_accents(y, sr)
+    if len(onsets) < 2:
+        raise ValueError("至少需要两个清晰的节奏起音。")
+    result = rhythm_from_onsets(onsets, tempo_bpm, float(onsets[0]), accents)
+    if len(result.onset_beats) < 2:
+        raise ValueError("当前速度的一个小节里没有足够的节奏起音。")
+    return result

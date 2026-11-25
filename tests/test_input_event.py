@@ -108,7 +108,7 @@ def test_legacy_phrase_keeps_leading_rest_overlaps_and_requested_session_tempo(m
         to_legacy_phrase(event, tempo_bpm=100, beat_origin_s=1)
 
 
-@pytest.mark.parametrize("tempo", [None, True, 0, 200, float("nan")])
+@pytest.mark.parametrize("tempo", [None, True, 0, 251, float("nan")])
 def test_legacy_phrase_requires_supported_explicit_tempo(melody, tempo):
     event = from_humming(melody, session_id="jam_test")
     with pytest.raises(InputEventError, match="tempo_bpm"):

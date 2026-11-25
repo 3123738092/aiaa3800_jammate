@@ -123,6 +123,18 @@
 .jam-debug-table tr th:first-child { padding-left: 0; }
 .jam-debug-swatch { display: inline-block; width: .66em; height: .66em; margin-inline-end: .55em; border-radius: 2px; border: 1px solid #466457; }
 .jam-debug-history { margin-top: 20px; }
+.jam-debug-pipeline { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr)); }
+.jam-debug-pipeline > li { min-width: 0; padding: 10px 12px; border: 1px solid #cfdbca;
+  border-radius: 8px; background: #fbfcf7; }
+.jam-debug-pipeline > li[data-stage="BandPlan"] { background: #eff6e9; border-color: #8da98e; }
+.jam-debug-pipeline h3 { margin: 0 0 6px; font-size: .92rem; }
+.jam-debug-pipeline dl, .jam-debug-output { margin: 0; font-size: .84rem; }
+.jam-debug-pipeline dl > div, .jam-debug-output > div { display: grid; grid-template-columns: minmax(4rem, auto) 1fr;
+  align-items: baseline; gap: 8px; padding: 3px 0; }
+.jam-debug-pipeline dt, .jam-debug-output dt { color: #4e6256; }
+.jam-debug-pipeline dd, .jam-debug-output dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.jam-debug-output { margin: 0 0 10px; }
 #jam-debug-turn-status { margin: 6px 0 10px; font-size: .9rem; overflow-wrap: anywhere; }
 .jam-debug-data { display: grid; gap: 6px; }
 .jam-debug-data details { border: 1px solid #cfdbca; border-radius: 8px; background: #fbfcf7; min-width: 0; }

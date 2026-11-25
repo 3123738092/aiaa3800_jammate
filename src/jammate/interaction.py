@@ -114,9 +114,12 @@ class Interaction:
     user_active: bool = False
     awaiting_user: bool = False
     last_feedback: str | None = None
+    allow_initiative: bool = True
 
     def __post_init__(self):
         object.__setattr__(self, "strategy", Strategy(self.strategy))
         unit(self.initiative, "initiative")
-        if self.current_lead not in {"user", "ai", None} or type(self.user_active) is not bool or type(self.awaiting_user) is not bool:
+        if self.current_lead not in {"user", "ai", None} or any(
+            type(flag) is not bool for flag in (self.user_active, self.awaiting_user, self.allow_initiative)
+        ):
             raise ValueError("invalid interaction state")

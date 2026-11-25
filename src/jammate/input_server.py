@@ -156,7 +156,8 @@ def main():
     args = parser.parse_args()
     if args.fluidsynth and not args.soundfont:
         import pretty_midi
-        args.soundfont = Path(pretty_midi.__file__).with_name("TimGM6mb.sf2")
+        bundled = ROOT.parent / "examples" / "backend_inputs" / "TimGM6mb.sf2"
+        args.soundfont = bundled if bundled.is_file() else Path(pretty_midi.__file__).with_name("TimGM6mb.sf2")
     if args.fluidsynth and not all(Path(p).is_file() for p in (args.fluidsynth, args.soundfont)):
         parser.error("FluidSynth and SoundFont must be existing files")
     if args.soundfont and not args.fluidsynth:

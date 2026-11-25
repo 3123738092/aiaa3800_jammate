@@ -16,7 +16,7 @@ from jammate.state import JamState
 from .decision_gate import should_execute
 from .llm import validate_plan
 from .manager import StateManager
-from .offline import PlannedPerformance, prepare_bar, prepare_plan
+from .offline import PlannedPerformance, apply_layer_settings, prepare_bar, prepare_plan
 from .transitions import project
 
 
@@ -64,7 +64,14 @@ class BoundDecision:
     def keeps_playing_material(self) -> bool:
         data = self.plan.to_dict()
         return (all(action["action"] == "PRESERVE" for action in data["actions"])
+                and data.get("style", self.state.style) == self.state.style
                 and all(getattr(self.state, field) == value for field, value in data["transport"].items()))
+
+    def updates_conditioning(self) -> bool:
+        return not self.keeps_playing_material() or any(
+            event.source == "humming" and event.to_dict()["provenance"].get("audio_ref")
+            for event in self.request.events
+        )
 
     def prepare(self, arrange=None) -> PreparedChange:
         """Worker-side note preparation using a frozen snapshot."""
@@ -95,6 +102,8 @@ class PlaybackBar:
     timing: BarTiming
     notes: tuple[Note, ...]
     started: PlaybackStarted | None = None
+    plan: BandPlan | None = None
+    state: JamState | None = None
 
 
 def _notes_in_bar(performance: PlannedPerformance, bar: int) -> tuple[Note, ...]:
@@ -102,12 +111,20 @@ def _notes_in_bar(performance: PlannedPerformance, bar: int) -> tuple[Note, ...]
     return tuple(note for note in performance.notes if start <= note.start < start + BEATS_PER_BAR)
 
 
+def prepare_conditioning(state, plan, _events):
+    """Validate plan intent and timing for a generator that owns its output."""
+    target = project(state, plan)
+    data = plan.to_dict()
+    return PlannedPerformance((), (), None, target.tempo_bpm,
+                              data["effective_at"]["bar"], data["valid_for_bars"])
+
+
 class RealtimeSession:
     """Virtual sample-driven host for the live scheduling contract."""
 
     def __init__(self, manager: StateManager, *, sample_rate: int = 22050,
                  timing: TimingPolicy = TimingPolicy(), opening_plan: BandPlan | None = None,
-                 opening_answer: tuple[Note, ...] = ()):
+                 opening_answer: tuple[Note, ...] = (), conditioning_only: bool = False):
         if type(sample_rate) is not int or sample_rate <= 0:
             raise ValueError("sample_rate must be a positive integer")
         initial = manager.state
@@ -124,10 +141,13 @@ class RealtimeSession:
         self._request: DecisionRequest | None = None
         self._queued: PreparedChange | None = None
         self._active: PlannedPerformance | None = None
+        self._active_plan: BandPlan | None = None
+        self.conditioning_only = conditioning_only
         if opening_plan is not None:
             request = DecisionRequest(manager.current_batch(), initial, (), 0, 0)
             decision = BoundDecision(request, ScheduleSlot(0, 0, 0, 0), opening_plan, initial)
-            performance = prepare_plan(initial, opening_plan, opening_answer=opening_answer)
+            performance = (prepare_conditioning(initial, opening_plan, request.events) if conditioning_only
+                           else prepare_plan(initial, opening_plan, opening_answer=opening_answer))
             if not manager.stage(opening_plan):
                 raise PlanError("opening plan has already been staged")
             self._queued = PreparedChange(decision, performance)
@@ -192,12 +212,14 @@ class RealtimeSession:
         source = state.with_updates(position=replace(state.position, next_bar=slot.bar))
         return BoundDecision(request, slot, BandPlan.from_dict(data), source)
 
-    def schedule(self, change: PreparedChange) -> bool:
+    def schedule(self, change: PreparedChange, *, reuse_local_score=False) -> bool:
         """Queue one prepared plan, rechecking request and deadline on the owner."""
         decision = change.decision
         self._require_current(decision.request)
+        if reuse_local_score and self._active is not None and not self.conditioning_only:
+            change = self._reuse_local_score(change)
         if self._queued is not None:
-            if self._queued is change:
+            if self._queued is change or (reuse_local_score and self._queued == change):
                 return False
             raise PlanError("a plan is already scheduled for this decision")
         if self.sample > decision.slot.enqueue_deadline_sample or decision.slot not in self.schedule_window():
@@ -207,6 +229,56 @@ class RealtimeSession:
             return False
         self._queued = change
         return True
+
+    def _reuse_local_score(self, change):
+        """Preserve queued musical material for deterministic browser edits."""
+        plan = change.decision.plan
+        data = plan.to_dict()
+        actions = [action for action in data["actions"] if action["action"] != "PRESERVE"]
+        mix_only = bool(actions) and all(
+            action["action"] == "SIMPLIFY" or
+            (action["action"] == "ADJUST_FEEL" and action["parameters"].get("level_delta"))
+            for action in actions
+        )
+        key_only = len(actions) == 1 and actions[0]["action"] == "SET_KEY"
+        motif_only = len(actions) == 1 and actions[0]["action"] in {"ECHO_MOTIF", "VARY_MOTIF", "INTRODUCE_MOTIF"}
+        tempo_only = not actions and set(data["transport"]) == {"tempo_bpm"}
+        if not (mix_only or key_only or motif_only or tempo_only) or data["transport"].get("playing") is False:
+            return change
+
+        source = change.decision.state
+        target = project(source, plan)
+        protected = {item[6:] for item in data["preserve"] if item.startswith("layer:")}
+        if tempo_only:
+            protected = {layer.name for layer in source.layers}
+        editable = {layer.name for layer in target.layers if mix_only and layer.name not in protected
+                    and layer != source.layer(layer.name)}
+        active, incoming = self._active, change.performance
+        first = max(active.start_bar, incoming.start_bar)
+        end = min(active.start_bar + active.bars, incoming.start_bar + incoming.bars)
+        if first >= end or not (protected or editable):
+            return change
+
+        notes = [note for note in incoming.notes if not first * BEATS_PER_BAR <= note.start < end * BEATS_PER_BAR]
+        for bar in range(first, end):
+            old, new = _notes_in_bar(active, bar), _notes_in_bar(incoming, bar)
+            reused = {note.instrument for note in old if note.instrument in editable}
+            notes.extend(note for note in new if note.instrument not in protected | reused)
+            notes.extend(note for note in old if note.instrument in protected)
+            for name in reused:
+                before, after = source.layer(name), target.layer(name)
+                part = tuple(note for note in old if note.instrument == name)
+                density = min(1., after.density / before.density) if before.density else 1.
+                filter_state = target.with_updates(layers=tuple(
+                    replace(layer, density=density, level=.5) if layer.name == name else layer
+                    for layer in target.layers
+                ))
+                gain = after.level / before.level if before.level else 1.
+                if after.active and gain:
+                    notes.extend(replace(note, velocity=max(1, min(127, round(note.velocity * gain))))
+                                 for note in apply_layer_settings(part, filter_state, bar=bar))
+        performance = replace(incoming, notes=tuple(sorted(notes, key=lambda n: (n.start, n.instrument, n.pitch))))
+        return replace(change, performance=performance)
 
     def _check_preserved_playback(self, change: PreparedChange):
         active = self._active
@@ -234,7 +306,7 @@ class RealtimeSession:
         """Read the next bar for buffering without confirming its playback."""
         clock = copy(self._clock)
         bar = clock.bar_index
-        state, performance = self.manager.state, self._active
+        state, performance, plan = self.manager.state, self._active, self._active_plan
         queued = self._queued
         if (queued is not None and queued.decision.slot.bar == bar
                 and queued.decision.slot.start_sample == clock.next_sample
@@ -242,8 +314,19 @@ class RealtimeSession:
             state = project(state, queued.decision.plan)
             if not queued.decision.keeps_playing_material():
                 performance = queued.performance
+            if self.conditioning_only and (plan is None or queued.decision.updates_conditioning()):
+                plan = queued.decision.plan
         timing = clock.reserve(state.tempo_bpm)
-        return PlaybackBar(timing, self._bar_notes(state, performance, bar))
+        return self._make_bar(timing, state, performance, plan)
+
+    def _make_bar(self, timing, state, performance, plan, receipt=None):
+        if self.conditioning_only:
+            if plan is not None:
+                data = plan.to_dict()
+                if timing.bar_index >= data["effective_at"]["bar"] + data["valid_for_bars"]:
+                    plan = None
+            return PlaybackBar(timing, (), receipt, plan=plan, state=state)
+        return PlaybackBar(timing, self._bar_notes(state, performance, timing.bar_index), receipt)
 
     @staticmethod
     def _bar_notes(state, performance, bar):
@@ -264,10 +347,13 @@ class RealtimeSession:
                 plan, performance = queued.decision.plan, queued.performance
                 if self.manager.playback_started(plan, bar=bar, start_sample=start,
                                                  lead_notes=performance.lead_notes,
-                                                 generated_motif=performance.generated_motif):
+                                                 generated_motif=performance.generated_motif,
+                                                 conditioning_only=self.conditioning_only):
                     receipt = PlaybackStarted(self.manager.state.session_id, plan.plan_id, bar, start)
                     if not queued.decision.keeps_playing_material():
                         self._active = performance
+                    if self.conditioning_only and (self._active_plan is None or queued.decision.updates_conditioning()):
+                        self._active_plan = plan
         state = self.manager.state
         timing = self._clock.reserve(state.tempo_bpm)
         self._playing_bar = timing
@@ -275,8 +361,7 @@ class RealtimeSession:
             self.manager.update_transport(bar=bar, beat=0., next_bar=bar + 1)
         if self._active is not None and bar >= self._active.start_bar + self._active.bars:
             self._active = None
-        notes = self._bar_notes(state, self._active, bar)
-        return PlaybackBar(timing, notes, receipt)
+        return self._make_bar(timing, state, self._active, self._active_plan, receipt)
 
     def advance_to(self, sample: int) -> tuple[PlaybackBar, ...]:
         """Stand in for the playback driver, reporting bars as they start."""

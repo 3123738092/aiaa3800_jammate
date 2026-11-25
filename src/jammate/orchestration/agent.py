@@ -9,11 +9,13 @@ import math
 import re
 import uuid
 
-from jammate.contracts.band_plan import BandPlan
+from jammate.contracts.band_plan import MAX_PLAN_BARS, BandPlan
 from jammate.instruments import ADDED_INSTRUMENTS, INSTRUMENT_ALIASES
 from jammate.interaction import CORE_LAYER_NAMES, LAYER_NAMES
-from jammate.state import JamState
+from jammate.state import MAX_TEMPO_BPM, MIN_TEMPO_BPM, JamState
 from .addition_intent import unspecified_instrument_plan
+from .explicit_request import explicit_mix_plan
+from .initiative import initiative_plan
 from .key_intent import explicit_key_plan
 from .progression_intent import explicit_progression_plan
 from .plans import make_plan
@@ -22,17 +24,17 @@ SCOPES = {"鼓": "drums", "贝斯": "bass", "键盘": "keys", "钢琴": "keys", 
           **{name: name for name in (*CORE_LAYER_NAMES, "band")},
           **dict(sorted(INSTRUMENT_ALIASES.items(), key=lambda item: -len(item[0])))}
 GRAMMAR = {
-    "keep": r"这个不错|不错|保持|保持这样|保留|刚才那句保留|就这样|就这个|keep(?: it)?|sounds good",
-    "build": r"再炸一点|再?猛一点|更猛(?:一点)?|更有力|渐强|推上去|build|more powerful",
-    "simplify": r"太满了|留点空间|留空间|收一点|少一点|简化(?:一点)?|simplify|less busy",
-    "stop": r"停|停止|结束|stop",
+    "keep": r"这个不错|不错|保持|保持这样|保持原样|保留|刚才那句保留|就这样|就这个|就这个感觉继续|nice|keep(?: it)?|sounds good",
+    "build": r"再炸一点|再?猛一点|再强一点|更猛(?:一点)?|更有力|渐强|推上去|build|more powerful",
+    "simplify": r"太满了|(?:给我)?留点空间|留空间|收一点|少一点|简化(?:一点)?|simplify|less busy",
+    "stop": r"停|停止|停止演奏|停止伴奏|结束|stop(?: playing)?",
     "start": r"继续|恢复|开始|start|resume|continue",
     "faster": r"加速|(?:稍微)?快一点|快点|faster",
-    "slower": r"减速|慢一点|慢点|slower",
+    "slower": r"减速|(?:速度)?慢一点|慢点|slower",
     "tempo": r"速度不变|速度保持|别变速度|keep tempo",
-    "groove": r"节奏保持|节奏别变|keep groove",
-    "vary": r"变奏|变化一下|vary",
-    "idea": r"你来|来一段|给个想法|new idea|your turn",
+    "groove": r"节奏保持|节奏别变|keep(?: the same)? groove",
+    "vary": r"变奏|变化一下|回应\s*ai\s*(?:刚才|刚刚)(?:提出|演奏)的\s*riff|vary",
+    "idea": r"你来|来一段|给个想法|你来一句新的\s*riff|new idea|your turn",
     "add": r"加|加上|加入|加回来|add",
     "add_new_instrument": r"加一个(?:其他|别的|新)乐器(?:进来)?|add another instrument",
     "remove": r"去掉|移除|remove",
@@ -40,6 +42,8 @@ GRAMMAR = {
 
 
 def _clauses(text):
+    text = re.sub(r"^\s*等一下[，,]\s*(?=保持原样|保持这样|就这样)", "", text)
+    text = re.sub(r"([，,])\s*我想自己唱[。.!！]?\s*$", "", text) if "留点空间" in text else text
     for clause in re.split(r"[，,。.!！?？;；\n]|\band\b", text.lower().strip()):
         clause = clause.strip()
         if not clause:
@@ -48,6 +52,9 @@ def _clauses(text):
         fixed = next((k for k in ("tempo", "groove") if re.fullmatch(GRAMMAR[k], clause)), None)
         if fixed:
             yield original, scope, fixed, False
+            continue
+        if re.fullmatch(r"(?:保持|保留)(?:这个|当前|这段)?(?:主)?旋律", clause):
+            yield original, "lead", "keep", False
             continue
         # Negation may precede a scope (不要鼓加上) or follow it (鼓不要加上).
         for _ in range(2):
@@ -82,7 +89,9 @@ class RuleAgent:
         if not events or any(e.session_id != state.session_id for e in events):
             raise ValueError("Agent requires an accepted, nonempty session batch")
         plan_id = plan_id or f"plan_{uuid.uuid4().hex}"
-        if plan := (explicit_key_plan(events, state, plan_id) or explicit_progression_plan(events, state, plan_id)
+        if plan := (initiative_plan(events, state, plan_id) or explicit_key_plan(events, state, plan_id)
+                    or explicit_progression_plan(events, state, plan_id)
+                    or explicit_mix_plan(events, state, plan_id)
                     or unspecified_instrument_plan(events, state, plan_id)):
             return plan
         actions, transport, unresolved, reasons = [], {}, [], []
@@ -144,7 +153,7 @@ class RuleAgent:
                         name = "INTRODUCE_LAYER"
                     actions.append(_action(name, scope))
             elif command in {"faster", "slower"}:
-                bpm = max(60., min(180., state.tempo_bpm + (8 if command == "faster" else -8)))
+                bpm = max(MIN_TEMPO_BPM, min(MAX_TEMPO_BPM, state.tempo_bpm + (8 if command == "faster" else -8)))
                 if "tempo_bpm" in transport and transport["tempo_bpm"] != bpm:
                     unresolved.append("Conflicting tempo requests")
                 transport["tempo_bpm"] = bpm
@@ -195,7 +204,8 @@ class RuleAgent:
                 else:
                     reasons.append("Rhythm is empty or below the 0.65 alignment threshold; retain groove")
             idle = any(c["command"] == "idle" and c["bars"] >= 2 for c in controls)
-            if idle and not actions and not commands and not state.interaction.awaiting_user:
+            if (idle and not actions and not commands and state.interaction.allow_initiative
+                    and not state.interaction.awaiting_user and state.key is not None and state.layer("lead").active):
                 actions.append(_action("INTRODUCE_MOTIF", "lead", motif_id=f"motif_{plan_id}"))
                 preserve = [p for p in preserve if not p.startswith("motif:")]
                 strategy = "INITIATE"
@@ -209,8 +219,8 @@ class RuleAgent:
             if a["action"] in {"ECHO_MOTIF", "VARY_MOTIF"}:
                 length = max(n.end for n in state.motif(a["parameters"]["motif_id"]).notes)
                 bars = max(bars, math.ceil(length / 4))
-        if bars > 16:
-            unresolved.append("Phrase exceeds the baseline 16-bar response limit")
+        if bars > MAX_PLAN_BARS:
+            unresolved.append(f"Phrase exceeds the {MAX_PLAN_BARS}-bar response limit")
         if sum(a["action"].endswith("MOTIF") for a in actions) > 1:
             unresolved.append("Conflicting motif requests")
         for left in actions:

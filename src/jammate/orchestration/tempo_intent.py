@@ -15,8 +15,9 @@ _CHINESE_TENS = rf"{_CHINESE_NONZERO}?十{_CHINESE_NONZERO}?"
 _CHINESE_HUNDREDS = rf"{_CHINESE_NONZERO}百(?:零{_CHINESE_NONZERO}|{_CHINESE_NONZERO}十{_CHINESE_NONZERO}?)?"
 _NUMBER = rf"(\d{{1,3}}(?:\.\d{{1,3}})?|零|{_CHINESE_NONZERO}|{_CHINESE_TENS}|{_CHINESE_HUNDREDS})"
 _UNIT = r"(?:bpm|拍每分钟)"
+_SET_VERBS = r"调整到|调到|调至|设成|设到|设为|改到|改为|改成|提高到|提高至|提到|升到|升至"
 _SET = re.compile(
-    rf"(?:(?:请|只)?\s*(?:把|将)?\s*(?:速度|bpm)\s*(?:调整到|调到|调至|设成|设到|设为|改到|改为|改成)\s*{_NUMBER}(?:\s*{_UNIT})?"
+    rf"(?:(?:请|只)?\s*(?:把|将)?\s*(?:速度|bpm)\s*(?:{_SET_VERBS})\s*{_NUMBER}(?:\s*{_UNIT})?"
     rf"|(?:请\s*)?(?:set(?:\s+the)?\s+(?:tempo|speed)(?:\s+to)?|设到|设为|改成)\s*{_NUMBER}\s*{_UNIT})"
 )
 _DOWN = re.compile(rf"(?:(?:从(?:当前速度|现在这个数))?\s*(?:再)?\s*(?:减(?:慢)?|降(?:低)?|慢)|(?:reduce|decrease)(?:\s+tempo)?\s+by)\s*{_NUMBER}\s*{_UNIT}")

@@ -94,6 +94,8 @@ def generate(prompt, *, output, duration, midi=None, conditions=None, backend="j
     """Run the official model. `system` injection is for labelled unit tests only."""
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("a nonempty style prompt is required")
+    from .mrt2_style import english_style
+    prompt = english_style(prompt)
     if not math.isfinite(duration) or not 0 < duration <= 120:
         raise ValueError("duration must be within (0,120] seconds")
     if backend not in {"jax", "mlx"} or model not in {"mrt2_small", "mrt2_base"}:

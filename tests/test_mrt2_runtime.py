@@ -296,6 +296,33 @@ def test_synth_llm_writes_concrete_notes_for_authorized_voices():
     assert any(n.instrument == "bass" for n in performance.notes)
 
 
+@pytest.mark.parametrize("backend", ["synth", "fluidsynth"])
+def test_arranger_accepts_a_borrowed_chord_tone_only_in_its_bar(backend):
+    from jammate.orchestration.backend_arrangement import LLMBackendArranger
+
+    manager, plan = staged()
+    state, events = manager.state, manager.current_batch()
+    context = {"target_key": "C major", "scale_pitch_classes": [0, 2, 4, 5, 7, 9, 11],
+               "chords_by_bar": ["F7", "C"], "chord_pitch_classes_by_bar": [[5, 9, 0, 3], [0, 4, 7]]}
+    provider = BackendProvider({})
+    arranger = LLMBackendArranger(LLMConfig(api_key="fixture-key"), backend, provider=provider)
+
+    def compile_at(beat):
+        if backend == "synth":
+            provider.output = {"notes": [{"instrument": "keys", "pitch": 63, "start": beat,
+                                          "duration": .5, "velocity": 60}]}
+            return arranger.score(events, state, plan, state, {"keys"}, 8, 0., context)
+        provider.output = {"events": [{"channel": 1, "pitch": 63, "tick": int(beat * 480),
+                                      "length_ticks": 240, "velocity": 60}]}
+        return arranger.midi(events, state, plan, state, {1: {"channel": 1, "layer": "keys"}}, 3840, 0., context)
+
+    assert compile_at(0)[0].pitch == 63
+    with pytest.raises(PlanError, match="outside the target scale and chord"):
+        compile_at(4)
+    assert arranger.last_trace["validation_context"]["chords_by_bar"] == ["F7", "C"]
+    assert arranger.last_trace["output"] == provider.output
+
+
 @pytest.mark.parametrize("empty_style", ["", "   "])
 def test_native_mrt2_shortens_tail_spans_and_keeps_their_onsets(tmp_path, empty_style):
     from jammate.orchestration.backend_arrangement import LLMBackendArranger

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from jammate.generate.arranger import arrange_bar, chord_for_bar, place_lead
@@ -37,3 +39,22 @@ def test_place_lead_splits_a_motif_across_bars():
     assert sorted(placed) == [2, 3]
     assert [n.start for n in placed[2]] == [0.0, 3.5]
     assert [n.start for n in placed[3]] == [1.0]
+
+
+@pytest.mark.parametrize("tempo", [30, 250])
+def test_rule_performance_repeats_deterministically_without_midi_note_overlaps(tempo):
+    state = JamState(tempo_bpm=tempo, energy=3)
+    prev_end = {}
+    lead = Note(70, .5, 1.)
+    for bar in range(8):
+        notes = arrange_bar(state, bar, (lead,))
+        assert notes == arrange_bar(state, bar, (lead,))
+        assert lead.shifted(bar * 4) in notes
+        for note in sorted(notes, key=lambda note: note.start):
+            assert bar * 4 <= note.start < note.end <= (bar + 1) * 4 + 1e-9
+            key = note.instrument, note.pitch
+            assert prev_end.get(key, 0.) <= note.start
+            prev_end[key] = note.end
+    groove = tuple(note for note in arrange_bar(state, 3) if note.instrument == "drums")
+    assert groove == tuple(note for note in arrange_bar(replace(state, tempo_bpm=100), 3) if note.instrument == "drums")
+    assert any(note.pitch == 38 and note.velocity < 45 for note in groove)

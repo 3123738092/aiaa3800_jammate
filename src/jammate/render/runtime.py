@@ -3,7 +3,8 @@ from pathlib import Path
 
 
 def create_runtime(output, *, backend="default", fluidsynth=None, soundfont=None,
-                   profile="electric", allow_preview=False, arranger=None, backend_arranger=None, generator=None):
+                   profile="electric", allow_preview=False, arranger=None, backend_arranger=None, generator=None,
+                   prompt=None):
     if backend == "mrt2":
         import os
         from jammate.render.mrt2 import configured_backend
@@ -13,7 +14,7 @@ def create_runtime(output, *, backend="default", fluidsynth=None, soundfont=None
         return MRT2Runtime(Path(output), allow_preview=allow_preview, arranger=arranger,
                            backend_arranger=backend_arranger, generator=generator,
                            engine=configured_backend(model), model=model,
-                           prompt=os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band"))
+                           prompt=prompt or os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band"))
     if backend not in {"default", "fluidsynth", "synth"}:
         raise ValueError("unknown audio backend")
     if backend == "fluidsynth" and (not fluidsynth or not soundfont):

@@ -18,7 +18,7 @@ def test_context_accepts_json_lists_but_keeps_immutable_tuples(tmp_path):
 
 
 @pytest.mark.parametrize("changes", [
-    {"tempo_bpm": float("nan")}, {"tempo_bpm": 0}, {"tempo_bpm": 200},
+    {"tempo_bpm": float("nan")}, {"tempo_bpm": 0}, {"tempo_bpm": 251},
     {"beat_origin_s": -1}, {"beat_origin_s": float("inf")},
     {"onset_beats": (1, 0)}, {"onset_beats": (0, 0)},
     {"onset_beats": (0, 4)}, {"onset_beats": (0, float("nan"))},

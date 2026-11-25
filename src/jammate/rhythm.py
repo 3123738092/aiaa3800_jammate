@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 
-from jammate.music import BEATS_PER_BAR
+from jammate.music import BEATS_PER_BAR, MAX_TEMPO_BPM, MIN_TEMPO_BPM
 
 
 class RhythmMode(str, Enum):
@@ -35,8 +35,8 @@ class RhythmContext:
         # Accept JSON lists but keep the shared state immutable.
         object.__setattr__(self, "onset_beats", tuple(self.onset_beats))
         object.__setattr__(self, "accents", tuple(self.accents))
-        if not math.isfinite(self.tempo_bpm) or not 60 <= self.tempo_bpm <= 180:
-            raise ValueError("rhythm tempo_bpm must be finite and within 60-180")
+        if not math.isfinite(self.tempo_bpm) or not MIN_TEMPO_BPM <= self.tempo_bpm <= MAX_TEMPO_BPM:
+            raise ValueError(f"rhythm tempo_bpm must be finite and within {MIN_TEMPO_BPM}-{MAX_TEMPO_BPM}")
         if not math.isfinite(self.beat_origin_s) or self.beat_origin_s < 0:
             raise ValueError("beat_origin_s must be finite and nonnegative")
         if self.beats_per_bar != BEATS_PER_BAR:

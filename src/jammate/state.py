@@ -7,7 +7,7 @@ import math
 import json
 from enum import Enum
 
-from jammate.music import ChordStep, Key, Note
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM, ChordStep, Key, Note
 from jammate.texture import ArrangementTexture
 from jammate.rhythm import RhythmContext, RhythmMode
 from jammate.interaction import (
@@ -15,8 +15,6 @@ from jammate.interaction import (
 )
 from jammate.instruments import MAX_JAM_LAYERS
 
-MIN_TEMPO_BPM = 60.0
-MAX_TEMPO_BPM = 180.0
 MAX_ENERGY = 3
 
 
@@ -61,6 +59,7 @@ class JamState:
     progression_start_bar: int = 0
     auto_harmony: bool = True
     accompaniment_motif: AccompanimentMotif | None = None
+    style: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
@@ -95,6 +94,8 @@ class JamState:
             raise ValueError("progression_start_bar must be a nonnegative integer")
         if type(self.auto_harmony) is not bool:
             raise ValueError("auto_harmony must be a boolean")
+        if self.style is not None and (not isinstance(self.style, str) or not 0 < len(self.style.strip()) <= 240):
+            raise ValueError("style must be a short musical description")
         if self.current_motif_id is not None and self.current_motif_id not in {m.motif_id for m in self.motifs}:
             raise ValueError("current_motif_id must reference a registered motif")
         if self.accompaniment_motif is not None and self.accompaniment_motif.motif_id not in {
@@ -136,6 +137,10 @@ class JamState:
             data["motifs"]["accompaniment"] = asdict(self.accompaniment_motif)
         if self.texture != ArrangementTexture():
             data["arrangement"]["texture"] = asdict(self.texture)
+        if self.style is not None:
+            data["arrangement"]["style"] = self.style
+        if self.interaction.allow_initiative:
+            data["interaction"].pop("allow_initiative")
         if self.chord_cycle:
             data["harmony"]["progression"] = {"start_bar": self.progression_start_bar,
                                              "chords": [asdict(step) for step in self.chord_cycle]}
@@ -161,6 +166,7 @@ class JamState:
             interaction=Interaction(**data["interaction"]), rhythm=RhythmContext(**data["rhythm"]) if data["rhythm"] else None,
             rhythm_mode=data["rhythm_mode"], rhythm_sources=tuple(RhythmSource(r["event_id"], RhythmContext(**r["context"])) for r in data["rhythm_sources"]),
             texture=ArrangementTexture(**data["arrangement"].get("texture", {})),
+            style=data["arrangement"].get("style"),
             chord_cycle=tuple(ChordStep(**step) for step in progression.get("chords", ())),
             progression_start_bar=progression.get("start_bar", 0),
             auto_harmony=harmony.get("auto_harmony", True),

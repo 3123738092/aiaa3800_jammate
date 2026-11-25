@@ -23,7 +23,7 @@
     "valid_for_bars": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 16
+      "maximum": 24
     },
     "preserve": {
       "type": "array",
@@ -713,8 +713,8 @@
             "number",
             "null"
           ],
-          "minimum": 60,
-          "maximum": 180
+          "minimum": 30,
+          "maximum": 250
         }
       }
     },

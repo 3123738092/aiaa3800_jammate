@@ -33,6 +33,65 @@ _KEEP_GROOVE = {"保留原有鼓点", "鼓点照旧", "保持鼓点", "节奏保
                 "鼓点保持不变", "鼓点别动", "保留原来的鼓点", "保持原有鼓点", "keep the drum pattern"}
 _KEEP_OTHERS = {"其他不变", "其他照旧", "其他都不动", "其他保持", "其他全部保持", "其他声部照旧",
                  "保持其他不变", "其余照旧", "keep everything else unchanged", "keep other layers unchanged"}
+_MIX_NAMES = rf"(?:其他)?(?:{_NAMES})"
+_MIX_TARGETS = rf"{_MIX_NAMES}(?:\s*(?:以及|和|与|及|、)\s*{_MIX_NAMES})*"
+_MIX_SPLIT = re.compile(r"\s*(?:以及|和|与|及|、)\s*")
+_MIX_DOWN = re.compile(
+    rf"(?:把|让)?(?P<layers>{_MIX_TARGETS})(?:的)?(?P<controls>声音以及密度|音量和密度|声音和密度|声音|音量|密度)?"
+    r"(?:都)?(?P<verb>压低|降低|小一点|少一点)(?:一点|一些)?")
+_MIX_UP = re.compile(rf"(?:突出|调高)(?P<layer>{_NAMES})(?:的?(?:音量|声音))?")
+_MIX_COMMENT = re.compile(rf"我(?:还是)?听不到(?P<layer>{_NAMES})")
+
+
+def explicit_mix_plan(events, state, plan_id):
+    if not all(event.event_type == "speech" for event in events):
+        return None
+    actions, explained, missing = {}, set(), set()
+    available = {layer.name for layer in state.layers}
+    for clause in speech_clauses(events):
+        if clause in _KEEP_OTHERS:
+            continue
+        if match := _MIX_DOWN.fullmatch(clause):
+            layers = [_LAYERS[label.removeprefix("其他")] for label in _MIX_SPLIT.split(match["layers"])]
+            controls = match["controls"] or ("密度" if match["verb"] == "少一点" else "音量")
+            for layer in layers:
+                if layer not in available or not state.layer(layer).active:
+                    missing.add(layer)
+                    continue
+                if controls != "密度":
+                    if actions.get((layer, "ADJUST_FEEL"), {}).get("level_delta", 0) > 0:
+                        return None
+                    actions[layer, "ADJUST_FEEL"] = {"level_delta": -.15}
+                if "密度" in controls and layer != "lead":
+                    actions[layer, "SIMPLIFY"] = {}
+        elif match := _MIX_UP.fullmatch(clause):
+            layer = _LAYERS[match["layer"]]
+            if layer not in available or not state.layer(layer).active:
+                missing.add(layer)
+                continue
+            if (layer, "ADJUST_FEEL") in actions:
+                return None
+            actions[layer, "ADJUST_FEEL"] = {"level_delta": .2}
+            explained.add(layer)
+        elif not ((match := _MIX_COMMENT.fullmatch(clause)) and _LAYERS[match["layer"]] in explained | missing):
+            return None
+    if not actions:
+        return None
+    if any(params.get("level_delta", 0) > 0 and (layer, "SIMPLIFY") in actions
+           for (layer, _), params in actions.items()):
+        return None
+    changed = {layer for layer, _ in actions}
+    preserve = ["tempo", "key", "progression", "playing",
+                *(f"layer:{layer.name}" for layer in state.layers if layer.name not in changed)]
+    if ("drums", "SIMPLIFY") not in actions:
+        preserve.append("groove")
+    if state.current_motif_id:
+        preserve.append(f"motif:{state.current_motif_id}")
+    data = [{"action": name, "scope": layer, "strength": .5, "parameters": params}
+            for (layer, name), params in actions.items()]
+    return make_plan(state, events, plan_id, "FOLLOW", data, preserve, {}, 4,
+                     "调整指定声部的音量或密度。",
+                     [f"当前会话没有可调整的声部：{layer}" for layer in sorted(missing)])
 _COUNTS = {"零": 0, "一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7,
            "八": 8, "九": 9, "十": 10, **{"十" + name: i for i, name in enumerate("一二三四五六七八九", 11)},
            "二十": 20}

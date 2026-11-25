@@ -10,6 +10,7 @@ import numpy as np
 import soundfile as sf
 
 from jammate.render.mrt2 import FRAME_RATE, OFFICIAL_SOURCE, generate as generate_upstream, midi_conditioning
+from jammate.render.mrt2_style import english_style
 
 from .inference import (
     DRUM_KEY, PITCH_KEY, SAMPLE_RATE, STYLE_KEY, create_mlxfn_model, encode_style, generate_frame,
@@ -33,6 +34,7 @@ def generate(prompt, *, output, duration, midi=None, conditions=None, backend='j
         raise ValueError('unsupported MRT2 backend/model')
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError('a nonempty style prompt is required')
+    prompt = english_style(prompt)
     if not math.isfinite(duration) or not 0 < duration <= 120:
         raise ValueError('duration must be within (0,120] seconds')
     if midi is not None and conditions is not None:
