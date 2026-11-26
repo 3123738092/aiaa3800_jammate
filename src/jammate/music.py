@@ -17,7 +17,8 @@ SCALE_STEPS = {
 CHORD_INTERVALS = {"maj": (0, 4, 7), "min": (0, 3, 7), "dim": (0, 3, 6),
                    "dom7": (0, 4, 7, 10), "maj7": (0, 4, 7, 11), "min7": (0, 3, 7, 10)}
 CHORD_SUFFIX = {"maj": "", "min": "m", "dim": "dim", "dom7": "7", "maj7": "maj7", "min7": "m7"}
-BEATS_PER_BAR = 4
+BEATS_PER_BAR = 4  # legacy default; sessions may carry a meter-specific bar length.
+MIN_TEMPO_BPM, MAX_TEMPO_BPM = 30, 250
 
 
 @dataclass(frozen=True)

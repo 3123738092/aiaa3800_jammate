@@ -97,7 +97,7 @@ def route_capture(audio, rate, *, mode, session_id, bpm):
     return None, "speech" if mode in {"speech", "auto"} and speech_like else None
 
 
-def analyze_capture(audio, rate, *, mode, session_id, bpm):
+def analyze_capture(audio, rate, *, mode, session_id, bpm, allow_no_notes=False):
     """Analyze audio-only requests, including those from older Jam clients."""
     event, route = route_capture(audio, rate, mode=mode, session_id=session_id, bpm=bpm)
     if event is not None or route != "humming":
@@ -115,9 +115,9 @@ def analyze_capture(audio, rate, *, mode, session_id, bpm):
         identity = f"n{len(notes) + 1}"
         notes.append({"id": identity, "pitchMidi": timed.pitch, "startSec": timed.start_s,
                       "durationSec": end - timed.start_s, "velocity01": .7, "sourceNoteIds": [identity]})
-    if notes and (mode == "humming" or len({note["pitchMidi"] for note in notes}) >= 2):
+    if (mode == "humming" and (notes or allow_no_notes)) or len({note["pitchMidi"] for note in notes}) >= 2:
         source = uuid4().hex
-        document = {"schemaVersion": "1.0.0", "id": source, "status": "ready",
+        document = {"schemaVersion": "1.0.0", "id": source, "status": "ready" if notes else "no_notes",
                     "source": {"id": source, "durationSec": duration, "kind": "recording"},
                     "timebase": {"unit": "seconds", "origin": "original_audio_start"},
                     "tempo": {"bpm": None, "source": "unknown", "mode": "free", "quantized": False},

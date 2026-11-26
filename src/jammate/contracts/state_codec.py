@@ -6,7 +6,7 @@ from functools import lru_cache
 from jsonschema import Draft202012Validator
 from jammate.interaction import CORE_LAYER_NAMES, LAYER_NAMES
 from jammate.instruments import GM_SCOPE_PATTERN, MAX_JAM_LAYERS
-from jammate.music import CHORD_INTERVALS
+from jammate.music import CHORD_INTERVALS, MAX_TEMPO_BPM, MIN_TEMPO_BPM
 from jammate.texture import TEXTURE_CHOICES
 from .input_event import _json_values, input_event_schema
 
@@ -28,8 +28,9 @@ def state_schema():
     rhythm = json.loads(json.dumps(rhythm).replace('"#/$defs/score"', '"#/$defs/unit"'))
     result = obj({
         "schema_version": {"const": "1.0.0"}, "session_id": text, "state_version": integer,
-        "transport": obj({"tempo_bpm": {"type": "number", "minimum": 60, "maximum": 180}, "playing": boolean,
-                          "bar": integer, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}, "next_bar": integer}),
+        "transport": obj({"tempo_bpm": {"type": "number", "minimum": MIN_TEMPO_BPM, "maximum": MAX_TEMPO_BPM}, "playing": boolean,
+                          "bar": integer, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 16}, "next_bar": integer,
+                          "beats_per_bar": {"type": "integer", "minimum": 1, "maximum": 16}}),
         "harmony": obj({"key": {"anyOf": [{"type": "null"}, obj({"tonic": {"type": "integer", "minimum": 0, "maximum": 11}, "mode": {"enum": ["major", "minor"]}})]}, "progression_variant": integer}),
         "form": obj({"section": text, "bars_elapsed": integer}),
         "feel": obj({"energy": {"type": "integer", "minimum": 0, "maximum": 3}, "density": score, "brightness": score, "tension": score, "tags": {"type": "array", "items": text}}),
@@ -49,6 +50,8 @@ def state_schema():
     result["properties"]["arrangement"]["properties"]["texture"] = obj(
         {name: {"enum": list(values)} for name, values in TEXTURE_CHOICES.items()}
     )
+    result["properties"]["arrangement"]["properties"]["style"] = {"type": "string", "minLength": 1, "maxLength": 240}
+    result["properties"]["interaction"]["properties"]["allow_initiative"] = boolean
     result["properties"]["harmony"]["properties"]["auto_harmony"] = boolean
     result["properties"]["harmony"]["properties"]["progression"] = obj({
         "start_bar": integer,

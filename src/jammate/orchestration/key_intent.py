@@ -8,10 +8,10 @@ from .tempo_intent import speech_clauses
 
 
 _TARGET = re.compile(
-    r"(?:请\s*|please\s+)?"
-    r"(?:(?:把(?:调性|曲子)\s*)?(?:换成|换到|换为|转成|转到|改成|改为|切换到|切换成)"
+    r"(?:接下来\s*)?(?:请\s*|please\s+)?"
+    r"(?:(?:把(?:调性|曲子|它|这段音乐)\s*)?(?:换成|换到|换为|转成|转到|改成|改为|切换到|切换成)"
     r"|(?:调性|曲调)(?:设为|调到|改为|换到)"
-    r"|(?:change|switch|transpose|modulate)(?:\s+(?:the\s+)?key)?\s+to)\s*"
+    r"|(?:change|switch|transpose|modulate)(?:\s+(?:(?:the\s+)?key|it))?\s+to)\s*"
     r"([a-g])\s*([#♯b♭]?)\s*(大调|小调|major|minor)(?:\s*吧)?"
 )
 _UNSPECIFIED = re.compile(
@@ -20,6 +20,8 @@ _UNSPECIFIED = re.compile(
 )
 _TONICS = {name.lower(): pc for pc, name in enumerate(PITCH_CLASS_NAMES) if len(name) == 1}
 _ACCIDENTALS = {"": 0, "#": 1, "♯": 1, "b": -1, "♭": -1}
+_KEEP = {"其他保持", "其他不变", "其他照旧", "其余保持不变", "保持原来的风格和节奏",
+         "keep everything else", "keep everything else unchanged", "keep the style and rhythm"}
 
 
 def named_key(root, accidental, mode):
@@ -28,7 +30,7 @@ def named_key(root, accidental, mode):
 
 
 def explicit_key_plan(events, state, plan_id):
-    clauses = speech_clauses(events)
+    clauses = [clause for clause in speech_clauses(events) if clause not in _KEEP]
     if len(clauses) != 1:
         return None
     text = clauses[0]

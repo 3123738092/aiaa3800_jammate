@@ -5,7 +5,6 @@ import math
 import numpy as np
 import soundfile as sf
 
-from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.backend_arrangement import audible_layers
 from jammate.orchestration.offline import PlannedPerformance
 from jammate.render.capabilities import BackendCapabilityError, capability_report
@@ -52,11 +51,11 @@ class MRT2Runtime(KevinRuntime):
         target = self.validate(state, plan)
         data = plan.to_dict()
         performance = PlannedPerformance((), (), None, target.tempo_bpm,
-                                         data["effective_at"]["bar"], data["valid_for_bars"])
+                                         data["effective_at"]["bar"], data["valid_for_bars"], beats_per_bar=target.beats_per_bar)
         if not audible_layers(target, plan):
             self.backend_arranger.skip(plan, "host_silence")
             return performance, None
-        duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+        duration = performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm
         conditioning = self.backend_arranger.mrt(events, state, plan, target, duration, self.prompt)
         check_pending()
         return performance, conditioning
@@ -67,7 +66,7 @@ class MRT2Runtime(KevinRuntime):
         if conditioning is None:
             return self.render_audio(folder, performance)
         _write(folder / "conditioning.json", conditioning.to_dict())
-        duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+        duration = performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm
         return self.generator(conditioning.style, output=folder / "band.wav", duration=duration,
                               conditions=conditioning.tokens(math.ceil(duration * FRAME_RATE)),
                               backend=self.engine, model=self.model)

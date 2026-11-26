@@ -82,6 +82,6 @@ def test_silence_input_still_grooves_and_invites():
 def test_out_of_range_tempo_hint_is_clamped_before_quantizing():
     no_count_in = synth_hum(DEMO_MELODY, tempo_bpm=TEMPO, count_in=0)
     fast = analyze_phrase(no_count_in, SR, tempo_hint=300.0)
-    assert fast.tempo_source == "hint" and fast.tempo_bpm == 180.0
+    assert fast.tempo_source == "hint" and fast.tempo_bpm == 250.0
     result = jam_offline(no_count_in, SR, bars=4, tempo_hint=300.0)
     assert result.decisions[0].state.tempo_bpm == result.analysis.tempo_bpm

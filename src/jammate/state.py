@@ -7,7 +7,7 @@ import math
 import json
 from enum import Enum
 
-from jammate.music import ChordStep, Key, Note
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM, ChordStep, Key, Note
 from jammate.texture import ArrangementTexture
 from jammate.rhythm import RhythmContext, RhythmMode
 from jammate.interaction import (
@@ -15,8 +15,6 @@ from jammate.interaction import (
 )
 from jammate.instruments import MAX_JAM_LAYERS
 
-MIN_TEMPO_BPM = 60.0
-MAX_TEMPO_BPM = 180.0
 MAX_ENERGY = 3
 
 
@@ -34,6 +32,7 @@ class Action(str, Enum):
 @dataclass(frozen=True)
 class JamState:
     tempo_bpm: float = 96.0
+    beats_per_bar: int = 4
     key: Key | None = Key(0, "major")
     energy: int = 1
     progression_variant: int = 0
@@ -61,9 +60,12 @@ class JamState:
     progression_start_bar: int = 0
     auto_harmony: bool = True
     accompaniment_motif: AccompanimentMotif | None = None
+    style: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
+        if type(self.beats_per_bar) is not int or not 1 <= self.beats_per_bar <= 16:
+            raise ValueError("beats_per_bar must be an integer within 1..16")
         for name in ("last_user_motif", "last_ai_motif", "tags", "layers", "motifs", "rhythm_sources", "chord_cycle"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         if not isinstance(self.session_id, str) or not self.session_id.strip() or type(self.state_version) is not int or self.state_version < 0:
@@ -95,6 +97,8 @@ class JamState:
             raise ValueError("progression_start_bar must be a nonnegative integer")
         if type(self.auto_harmony) is not bool:
             raise ValueError("auto_harmony must be a boolean")
+        if self.style is not None and (not isinstance(self.style, str) or not 0 < len(self.style.strip()) <= 240):
+            raise ValueError("style must be a short musical description")
         if self.current_motif_id is not None and self.current_motif_id not in {m.motif_id for m in self.motifs}:
             raise ValueError("current_motif_id must reference a registered motif")
         if self.accompaniment_motif is not None and self.accompaniment_motif.motif_id not in {
@@ -120,7 +124,7 @@ class JamState:
         """SPEC wire view of the same state, not a second writable state."""
         data = {
             "schema_version": "1.0.0", "session_id": self.session_id, "state_version": self.state_version,
-            "transport": {**asdict(self.position), "tempo_bpm": self.tempo_bpm, "playing": self.playing},
+            "transport": {**{**asdict(self.position), "beats_per_bar": self.beats_per_bar}, "tempo_bpm": self.tempo_bpm, "playing": self.playing},
             "harmony": {"key": asdict(self.key) if self.key else None, "progression_variant": self.progression_variant},
             "form": {"section": self.section, "bars_elapsed": self.section_bars},
             "feel": {"energy": self.energy, "density": self.density, "brightness": self.brightness, "tension": self.tension, "tags": list(self.tags)},
@@ -136,6 +140,10 @@ class JamState:
             data["motifs"]["accompaniment"] = asdict(self.accompaniment_motif)
         if self.texture != ArrangementTexture():
             data["arrangement"]["texture"] = asdict(self.texture)
+        if self.style is not None:
+            data["arrangement"]["style"] = self.style
+        if self.interaction.allow_initiative:
+            data["interaction"].pop("allow_initiative")
         if self.chord_cycle:
             data["harmony"]["progression"] = {"start_bar": self.progression_start_bar,
                                              "chords": [asdict(step) for step in self.chord_cycle]}
@@ -152,7 +160,9 @@ class JamState:
         return cls(
             session_id=data["session_id"], state_version=data["state_version"],
             tempo_bpm=transport["tempo_bpm"], playing=transport["playing"],
-            position=TransportPosition(**{k: transport[k] for k in ("bar", "beat", "next_bar")}),
+            beats_per_bar=transport["beats_per_bar"],
+            position=TransportPosition(**{k: transport[k] for k in ("bar", "beat", "next_bar")},
+                                        beats_per_bar=transport["beats_per_bar"]),
             key=Key(**harmony["key"]) if harmony["key"] else None, progression_variant=harmony["progression_variant"],
             section=form["section"], section_bars=form["bars_elapsed"], **feel,
             last_user_motif=tuple(Note(**n) for n in motifs["last_user"]), last_ai_motif=tuple(Note(**n) for n in motifs["last_ai"]),
@@ -161,6 +171,7 @@ class JamState:
             interaction=Interaction(**data["interaction"]), rhythm=RhythmContext(**data["rhythm"]) if data["rhythm"] else None,
             rhythm_mode=data["rhythm_mode"], rhythm_sources=tuple(RhythmSource(r["event_id"], RhythmContext(**r["context"])) for r in data["rhythm_sources"]),
             texture=ArrangementTexture(**data["arrangement"].get("texture", {})),
+            style=data["arrangement"].get("style"),
             chord_cycle=tuple(ChordStep(**step) for step in progression.get("chords", ())),
             progression_start_bar=progression.get("start_bar", 0),
             auto_harmony=harmony.get("auto_harmony", True),

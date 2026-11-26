@@ -17,13 +17,20 @@ def test_context_accepts_json_lists_but_keeps_immutable_tuples(tmp_path):
     assert RhythmContext(**json.loads(json.dumps(rhythm.to_dict()))) == rhythm
 
 
+def test_context_accepts_meter_specific_bar_length():
+    rhythm = RhythmContext(100, (0, 1, 2.5), (1, .7, .8), beats_per_bar=3)
+    assert rhythm.beats_per_bar == 3
+    with pytest.raises(ValueError, match=r"within \[0, 3\)"):
+        RhythmContext(100, (0, 3), (1, .7), beats_per_bar=3)
+
+
 @pytest.mark.parametrize("changes", [
-    {"tempo_bpm": float("nan")}, {"tempo_bpm": 0}, {"tempo_bpm": 200},
+    {"tempo_bpm": float("nan")}, {"tempo_bpm": 0}, {"tempo_bpm": 251},
     {"beat_origin_s": -1}, {"beat_origin_s": float("inf")},
     {"onset_beats": (1, 0)}, {"onset_beats": (0, 0)},
     {"onset_beats": (0, 4)}, {"onset_beats": (0, float("nan"))},
     {"accents": (1,)}, {"accents": (0, 1)}, {"accents": (1, float("inf"))},
-    {"beats_per_bar": 3}, {"confidence": -1}, {"confidence": float("nan")},
+    {"beats_per_bar": 0}, {"confidence": -1}, {"confidence": float("nan")},
 ])
 def test_invalid_rhythm_cannot_enter_the_music_state(changes):
     data = dict(tempo_bpm=100, onset_beats=(0, 1), accents=(1, .7))

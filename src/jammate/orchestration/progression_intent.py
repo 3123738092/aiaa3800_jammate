@@ -18,6 +18,7 @@ _EXPLICIT = re.compile(
     r"(?:请\s*)?(?:把)?(?:和弦进行|和弦走向|和弦)\s*(?:改成|改为|换成|换为|设为|设置为)\s*(.+)"
     r"|(?:please\s+)?(?:change|switch|set)\s+(?:the\s+)?(?:chord\s+)?progression\s+to\s+(.+)"
 )
+_REPLACE = re.compile(r"(?:请\s*)?(?:把|将)?第([1-8一二三四五六七八])个和弦\s*(?:换成|改成|改为)\s*(\S+)")
 _CHORD = re.compile(r"([a-g])([#♯b♭]?)(maj7|min7|m7|maj|min|dim|m|7)?")
 _NATURALS = {name.lower(): pc for pc, name in enumerate(PITCH_CLASS_NAMES) if len(name) == 1}
 _ACCIDENTALS = {"": 0, "#": 1, "♯": 1, "b": -1, "♭": -1}
@@ -46,8 +47,23 @@ def named_chords(clause):
 
 def explicit_progression_plan(events, state, plan_id):
     clauses = speech_clauses(events)
-    if len(clauses) != 1 or not (chords := named_chords(clauses[0])):
+    if len(clauses) != 1:
         return None
+    chord_request = _REPLACE.fullmatch(clauses[0])
+    if chord_request:
+        cycle = harmony_cycle(state)
+        ordinal, symbol = chord_request.groups()
+        index = int(ordinal) - 1 if ordinal.isdigit() else "一二三四五六七八".index(ordinal)
+        match = _CHORD.fullmatch(symbol)
+        if not match or index >= len(cycle):
+            return request_hold(events, state, plan_id, "请确认当前和弦进行的序号和要替换的和弦。")
+        root, accidental, quality = match.groups()
+        chord = Chord((_NATURALS[root] + _ACCIDENTALS[accidental]) % 12, _QUALITIES[quality])
+        chords = (*cycle[:index], chord, *cycle[index + 1:])
+    else:
+        chords = named_chords(clauses[0])
+        if not chords:
+            return None
     if state.key is None:
         return request_hold(events, state, plan_id, "请先设置当前调性，再切换和弦进行。")
     label = " → ".join(chord.name for chord in chords)

@@ -8,7 +8,7 @@ strongest, separated anchors. Tempo is applied only by the renderer.
 from __future__ import annotations
 
 from jammate.generate.patterns import BASS_LOW, CLOSED_HAT, COMP_LOW, KICK, OPEN_HAT, SNARE
-from jammate.music import BEATS_PER_BAR, Chord, Note
+from jammate.music import Chord, Note
 from jammate.rhythm import RhythmContext, RhythmMode
 
 
@@ -29,7 +29,7 @@ def rhythmic_hits(context: RhythmContext, mode: RhythmMode,
         return tuple(sorted(selected))
     if mode is RhythmMode.VARY and energy > 0:
         occupied = {b for b, _ in hits}
-        candidates = [i * 0.25 for i in range(1, 16)
+        candidates = [i * 0.25 for i in range(1, context.beats_per_bar * 4)
                       if all(abs(i * 0.25 - b) >= 0.25 - 1e-9 for b in occupied)]
         # The last bar of each phrase gets a short fill; other bars rotate
         # their ornament positions deterministically, preserving reproducibility.
@@ -45,7 +45,7 @@ def rhythm_parts(chord: Chord | None, context: RhythmContext, mode: RhythmMode,
                  energy: int, bar_index: int) -> tuple[Note, ...]:
     """Generate a coordinated bar. Energy zero remains the existing pad break."""
     if energy <= 0:
-        return () if chord is None else tuple(Note(p, 0, BEATS_PER_BAR, 45, "keys") for p in chord.voicing(COMP_LOW))
+        return () if chord is None else tuple(Note(p, 0, context.beats_per_bar, 45, "keys") for p in chord.voicing(COMP_LOW))
     hits = rhythmic_hits(context, mode, bar_index, energy)
     if not hits:
         return ()
@@ -57,8 +57,8 @@ def rhythm_parts(chord: Chord | None, context: RhythmContext, mode: RhythmMode,
     color_ending = mode == RhythmMode.VARY and len(hits) == len(context.onset_beats) and bar_index % 4 == 3
     notes: list[Note] = []
     for i, (beat, accent) in enumerate(hits):
-        next_beat = hits[i + 1][0] if i + 1 < len(hits) else float(BEATS_PER_BAR)
-        duration = min(next_beat - beat, 0.75)
+        next_beat = hits[i + 1][0] if i + 1 < len(hits) else float(context.beats_per_bar)
+        duration = min(next_beat - beat, .75 if i + 1 < len(hits) else context.beats_per_bar - beat)
         velocity = min(127, round((55 + 15 * energy) * (0.45 + 0.55 * accent)))
         drum = KICK if i % 2 == 0 else SNARE
         notes.append(Note(drum, beat, min(0.125, duration), velocity, "drums"))

@@ -15,6 +15,8 @@ def project(state: JamState, plan: BandPlan) -> JamState:
     if data["session_id"] != state.session_id or data["based_on_state_version"] != state.state_version:
         raise PlanError("plan is based on a different session/state version")
     target = state.with_updates(**{("tempo_bpm" if k == "tempo_bpm" else "playing"): v for k, v in data["transport"].items()})
+    if "style" in data:
+        target = target.with_updates(style=data["style"])
     for action in data["actions"]:
         name, scope, strength, params = (action[k] for k in ("action", "scope", "strength", "parameters"))
         if name == "FILL":
@@ -117,4 +119,5 @@ def project(state: JamState, plan: BandPlan) -> JamState:
                 raise PlanError("plan violates preserved layer")
     strategy = Strategy(data["strategy"])
     return target.with_updates(interaction=replace(target.interaction, strategy=strategy,
+                               allow_initiative=data.get("allow_initiative", target.interaction.allow_initiative),
                                initiative=1.0 if strategy is Strategy.INITIATE else 0.0))

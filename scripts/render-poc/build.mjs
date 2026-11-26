@@ -1,0 +1,14 @@
+import {writeFile,copyFile,mkdir} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {build} from 'esbuild';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {microphone} from './model.mjs';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+globalThis.FileReader=class{readAsArrayBuffer(blob){blob.arrayBuffer().then(result=>{this.result=result;this.onloadend?.();});}readAsDataURL(blob){blob.arrayBuffer().then(result=>{this.result='data:application/octet-stream;base64,'+Buffer.from(result).toString('base64');this.onloadend?.();});}};
+await mkdir(path.join(root,'web/assets/studio'),{recursive:true});
+const glb=await new GLTFExporter().parseAsync(microphone(),{binary:true,onlyVisible:true});
+await writeFile(path.join(root,'web/assets/studio/jm-m1.glb'),Buffer.from(glb));
+await build({entryPoints:[path.join(root,'web/rendering/microphone-scene.js')],outfile:path.join(root,'web/vendor/microphone-scene.js'),bundle:true,minify:true,format:'esm',target:'es2022',nodePaths:[path.join(root,'scripts/render-poc/node_modules')],legalComments:'eof'});
+await copyFile(path.join(root,'scripts/render-poc/node_modules/three/LICENSE'),path.join(root,'web/vendor/THREE-LICENSE.txt'));
+console.log('JM-M1 GLB bytes:',glb.byteLength);

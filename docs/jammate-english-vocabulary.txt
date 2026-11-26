@@ -1,0 +1,131 @@
+JamMate
+solo
+duet
+trio
+ensemble
+accompaniment
+arrangement
+improvisation
+melody
+harmony
+chord
+chord progression
+voicing
+voice leading
+arpeggio
+root note
+passing note
+approach note
+octave
+pitch
+register
+major
+minor
+key change
+tempo
+BPM
+beat
+downbeat
+upbeat
+backbeat
+offbeat
+syncopation
+swing
+groove
+rhythm
+fill
+break
+phrase
+verse
+chorus
+bridge
+intro
+outro
+fade in
+fade out
+dynamics
+velocity
+articulation
+staccato
+legato
+accent
+crescendo
+decrescendo
+density
+timbre
+reverb
+delay
+pan
+drums
+drum kit
+kick
+kick drum
+snare
+snare drum
+hi-hat
+closed hi-hat
+open hi-hat
+ride
+crash
+tom
+clap
+percussion
+tambourine
+shaker
+bass
+bassline
+fingered bass
+upright bass
+keyboard
+piano
+electric piano
+synthesizer
+synth
+pad
+organ
+clavinet
+guitar
+acoustic guitar
+electric guitar
+strings
+violin
+cello
+brass
+flute
+clarinet
+saxophone
+accordion
+marimba
+funk
+jazz
+rock
+indie rock
+hip hop
+lo-fi
+electronic
+ambient
+folk
+blues
+reggae
+Latin
+bossa nova
+warm
+bright
+soft
+dreamy
+groovy
+spacious
+tight
+energetic
+mellow
+add bass
+remove bass
+mute drums
+keep the groove
+follow my rhythm
+make it faster
+make it slower
+play softer
+play louder
+more sparse
+more dense

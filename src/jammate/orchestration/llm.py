@@ -19,7 +19,8 @@ from .llm_config import LLMConfig, LLMConfigurationError
 from .transitions import project
 from .context import select_state
 from .tempo_intent import explicit_tempo, speech_clauses, tempo_hold, validate_tempo_plan
-from .explicit_request import explicit_request, request_hold, validate_request_plan
+from .explicit_request import explicit_mix_plan, explicit_request, request_hold, validate_request_plan
+from .initiative import initiative_plan
 from .key_intent import explicit_key_plan
 from .addition_intent import asks_for_instruments
 from .progression_intent import asks_for_new_progression, explicit_progression_plan
@@ -37,6 +38,30 @@ class ModelReply:
     text: str
     model: str
     usage: dict
+
+
+def _load_decision_json(content):
+    """Parse a model reply, recovering one outer markdown-fence wrap.
+
+    Weaker models often wrap a valid object in ```json fences. Recover the inner
+    JSON once; the decision schema still validates every field afterwards.
+    """
+    try:
+        decision = json.loads(content, object_pairs_hook=_unique_object)
+        _json_values(decision)
+        return decision
+    except (ValueError, RecursionError):
+        start, end = content.find("{"), content.rfind("}")
+        if start == -1 or end <= start:
+            raise PlanError("invalid JSON: no markdown fences, "
+                            "duplicate keys or nonfinite numbers") from None
+        try:
+            decision = json.loads(content[start:end + 1], object_pairs_hook=_unique_object)
+            _json_values(decision)
+            return decision
+        except (ValueError, RecursionError):
+            raise PlanError("invalid JSON: no markdown fences, "
+                            "duplicate keys or nonfinite numbers") from None
 
 
 def available_instruments(state, soundfont_programs):
@@ -88,6 +113,8 @@ def event_context(event):
     """Select music/text, never dereference/upload local files or opaque provenance."""
     data = event.to_dict() if hasattr(event, "to_dict") else event
     result = {k: data[k] for k in ("event_id", "source", "event_type", "started_at", "ended_at", "confidence")}
+    if target := data.get("provenance", {}).get("target"):
+        result["target"] = target
     if data["event_type"] == "musical_phrase":
         melody = data["payload"]["melody"]
         result["payload"] = {k: melody[k] for k in ("status", "notes", "tempo", "key", "selectedResult", "timebase")}
@@ -108,7 +135,14 @@ def build_context(events, state, plan_id, history=(), *, selection=None, soundfo
     active_names = {layer.name: soundfont_programs[program] for layer in state.layers
                     if (program := gm_program(layer.name)) is not None and program in (soundfont_programs or {})}
     current_chords = [chord.name for chord in harmony_cycle(state)] if state.key is not None else []
-    return {"recent_turns": recent, "state": state.to_dict(), "context_selection": selection, "new_motif_id": f"motif_{plan_id}",
+    state_data = state.to_dict()
+    current_texts = {event.payload.get("text") for event in events
+                     if event.event_type == "speech" and isinstance(event.payload.get("text"), str)}
+    if state_data.get("interaction", {}).get("last_feedback") in current_texts:
+        # The current trigger's text repeats in last_feedback. Hide the duplicate
+        # so models cannot misread a new request as historical feedback.
+        state_data["interaction"]["last_feedback"] = None
+    return {"recent_turns": recent, "state": state_data, "context_selection": selection, "new_motif_id": f"motif_{plan_id}",
             "available_instruments": available_instruments(state, soundfont_programs),
             "soundfont_layer_labels": active_names,
             "current_chord_cycle": current_chords,
@@ -181,6 +215,7 @@ def validate_plan(plan, events, state):
         for event in events for clause in speech_clauses((event,))
     )
     if (has_style_clause and data["transport"].get("playing") is not False
+            and "style" not in data
             and not any(a["action"] == "SET_TEXTURE" for a in data["actions"])
             and not any(re.search(r"风情|风格|氛围|style", item, re.I) for item in data["unresolved"])):
         raise PlanError("the request includes a style direction; use SET_TEXTURE or explain that request explicitly")
@@ -202,6 +237,9 @@ def validate_plan(plan, events, state):
     if state.interaction.user_active and motifs:
         raise PlanError("user_active: do not issue a lead response while the user is performing")
     idle_only = all(e.event_type == "session_control" and e.payload["command"] == "idle" for e in events)
+    if idle_only and not state.interaction.allow_initiative and (data["transport"] or "style" in data
+            or any(action["action"] != "PRESERVE" for action in data["actions"])):
+        raise PlanError("automatic changes are disabled for this session")
     if idle_only and state.interaction.awaiting_user and motifs:
         raise PlanError("awaiting_user: an idle-only turn cannot produce another motif")
     can_request_start = any(e.event_type == "speech" or (e.event_type == "session_control" and e.payload["command"] == "start") for e in events)
@@ -229,7 +267,7 @@ def validate_plan(plan, events, state):
         name, params = action["action"], action["parameters"]
         if name == "ADJUST_FEEL" and not params:
             raise PlanError("ADJUST_FEEL requires level_delta or rhythm_event_id")
-        prop = "level" if name == "BUILD" or "level_delta" in params else "density" if name == "SIMPLIFY" else "active" if name in {"INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER"} else None
+        prop = "level" if name == "BUILD" or params.get("level_delta") else "density" if name == "SIMPLIFY" else "active" if name in {"INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER"} else None
         if prop:
             names = tuple(layer.name for layer in target.layers) if action["scope"] == "band" else (action["scope"],)
             for layer in names:
@@ -260,11 +298,14 @@ class LLMAgent:
     def _compile(self, content, events, state, plan_id, *, schema=None):
         if not isinstance(content, str) or len(content) > 64000:
             raise PlanError("response must be a bounded JSON object")
-        try:
-            decision = json.loads(content, object_pairs_hook=_unique_object)
-            _json_values(decision)
-        except (ValueError, RecursionError):
-            raise PlanError("invalid JSON: no markdown fences, duplicate keys or nonfinite numbers") from None
+        decision = _load_decision_json(content)
+        if isinstance(decision, dict):
+            # The host binds session/plan IDs. A model-echoed plan_id is ignored,
+            # never trusted: a forged ID cannot name this plan anyway.
+            decision.pop("plan_id", None)
+            if "reason" not in decision and isinstance(decision.get("explanation"), str):
+                decision["reason"] = decision["explanation"]
+            decision.pop("explanation", None)
         schema = schema if schema is not None else decision_schema(state, plan_id, soundfont_programs=self.soundfont_programs)
         error = next(Draft202012Validator(schema).iter_errors(decision), None)
         if error:
@@ -304,7 +345,9 @@ class LLMAgent:
             self.last_trace.update(source="system_control", elapsed_ms=0.)
             return make_plan(state, events, plan_id, "LISTEN", [], ["tempo", "key"], {"playing": False}, 1,
                                    "Runtime requested stop", [])
-        if plan := (explicit_key_plan(events, state, plan_id) or explicit_progression_plan(events, state, plan_id)):
+        if plan := (initiative_plan(events, state, plan_id) or explicit_key_plan(events, state, plan_id)
+                    or explicit_progression_plan(events, state, plan_id)
+                    or explicit_mix_plan(events, state, plan_id)):
             unresolved = plan.to_dict()["unresolved"]
             if unresolved:
                 self.last_trace.update(source="request_gate", status="held", reason=unresolved[0])
@@ -351,7 +394,8 @@ class LLMAgent:
                 "For explicit local timing, articulation, accent placement or hit-removal requests, use scoped "
                 "ADJUST_FEEL on drums, bass or keys and set level_delta to 0 if the overall level should stay the same. "
                 "That grants permission to edit the existing onset groups without changing the state-level setting. "
-                "For a local edit combined with an overall level change, use the actual signed level_delta in that same action. "
+                "Use a nonzero level_delta for a deterministic volume change. If both timing and level change, "
+                "include a separate scoped ADJUST_FEEL with level_delta set to 0 to authorize the timing edit. "
                 "Keep tempo, key, motif and unrequested layers preserved. Keep groove when compatible with the request. "
                 "Never choose timing or hit-removal edits against a user rhythm anchor, never change lead or invent notes. "
                 "Describe the requested local edit as delegated; only the arranger result establishes what changed."

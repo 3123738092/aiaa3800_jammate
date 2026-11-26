@@ -1,4 +1,4 @@
-"""Renderer-independent decisions. No MIDI programs, prompts or generated notes."""
+"""Renderer-independent decisions, including optional musical style intent."""
 from __future__ import annotations
 
 import json
@@ -11,6 +11,8 @@ from jsonschema import Draft202012Validator
 
 from jammate.instruments import added_program
 from .input_event import _json_values, read_json
+
+MAX_PLAN_BARS = 24
 
 
 class PlanError(ValueError):
@@ -60,7 +62,7 @@ class BandPlan:
         for action in ("SET_KEY", "SET_PROGRESSION", "SET_TEXTURE"):
             if sum(a["action"] == action for a in data["actions"]) > 1:
                 raise PlanError(f"a plan can specify {action} only once")
-        if data["transport"].get("playing") is False and data["actions"]:
+        if data["transport"].get("playing") is False and (data["actions"] or "style" in data):
             raise PlanError("stop control cannot also request musical actions")
         object.__setattr__(self, "_json", json.dumps(data, ensure_ascii=False, sort_keys=True))
 

@@ -6,6 +6,7 @@ import math
 from typing import Any
 from uuid import uuid4
 
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
 from jammate.rhythm import RhythmContext
 
 from .input_event import FRAME_EVENT_VERSION, VERSION, InputEvent, InputEventError
@@ -139,8 +140,9 @@ def to_legacy_phrase(event: InputEvent, *, tempo_bpm: float, beat_origin_s: floa
 
     if event.event_type != "musical_phrase":
         raise InputEventError("expected a musical_phrase event")
-    if isinstance(tempo_bpm, bool) or not isinstance(tempo_bpm, (int, float)) or not math.isfinite(tempo_bpm) or not 60 <= tempo_bpm <= 180:
-        raise InputEventError("tempo_bpm: provide an explicit session tempo within 60-180")
+    if (isinstance(tempo_bpm, bool) or not isinstance(tempo_bpm, (int, float)) or not math.isfinite(tempo_bpm)
+            or not MIN_TEMPO_BPM <= tempo_bpm <= MAX_TEMPO_BPM):
+        raise InputEventError(f"tempo_bpm: provide an explicit session tempo within {MIN_TEMPO_BPM}-{MAX_TEMPO_BPM}")
     if isinstance(beat_origin_s, bool) or not isinstance(beat_origin_s, (int, float)) or not math.isfinite(beat_origin_s) or beat_origin_s < 0:
         raise InputEventError("beat_origin_s: expected a finite nonnegative recording time")
     notes = []

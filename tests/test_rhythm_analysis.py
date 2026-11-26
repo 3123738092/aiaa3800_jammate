@@ -43,6 +43,19 @@ def test_count_in_plus_syncopated_claps_recovers_the_pattern_and_accents(tempo):
 
 
 @pytest.mark.integration
+def test_count_in_supports_user_selected_three_beat_bar():
+    tempo = 100
+    period = 60 / tempo
+    origin = .3 + 4 * period
+    beats = (0, 1, 2.5)
+    times = [.3 + i * period for i in range(4)] + [origin + beat * period for beat in beats]
+    audio = claps(times, origin + 3 * period + .05)
+    context = analyze_rhythm_audio(audio, SR, beats_per_bar=3)
+    assert context.beats_per_bar == 3
+    assert context.onset_beats == beats
+
+
+@pytest.mark.integration
 def test_known_tempo_and_explicit_origin_preserve_a_leading_rest():
     audio = claps([.5, .75, 1.5], 2.1)
     context = analyze_rhythm_audio(audio, SR, tempo_hint=120, count_in=0, beat_origin_s=0)

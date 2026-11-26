@@ -8,7 +8,7 @@ class JamVoiceProcessor extends AudioWorkletProcessor {
     this.loud = 0;
     this.barFrames = Math.ceil(4 * 60 / 96 / .02);
     this.port.onmessage = ({data}) => {
-      if (Number.isFinite(data.bpm) && data.bpm >= 60 && data.bpm <= 180) {
+      if (Number.isFinite(data.bpm) && data.bpm >= 30 && data.bpm <= 250) {
         this.barFrames = Math.ceil(4 * 60 / data.bpm / .02);
       }
     };

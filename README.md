@@ -32,16 +32,21 @@ pnpm --dir web/optimized run build
 
 ## 一起 Jam 的总麦克风
 
-总麦克风用 Gemini 3.5 Flash-Lite 听开场录音。演奏中的语音每次停顿后也用同一配置转写这一段。完成上面的环境安装和前端构建后，在仓库根目录运行：
+总麦克风使用讯飞语音听写大模型（中英）V2.0 把录音转成文字；Gemini 3.5 Flash-Lite 只接收转写文字，负责理解用户意图，不再接收音频。完成上面的环境安装和前端构建后，在仓库根目录运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[llm]"
 Copy-Item audio-router.example.json audio-router.secrets.json
+Copy-Item xfyun-asr.example.json xfyun-asr.secrets.json
 ```
 
-首次配置时，在 `audio-router.secrets.json` 填写自己的 `api_key` 和 `base_url`。该地址需要支持以 OpenAI Chat Completions 格式提交 WAV 音频，并返回 JSON Schema 结果。也可将 `JAMMATE_AUDIO_ROUTER_CONFIG` 指向仓库外的私有配置文件。
+首次配置时，在 `xfyun-asr.secrets.json` 填写讯飞控制台中的 `app_id`、`api_key` 和 `api_secret`。该接口使用 `wss://iat-api.xfyun.cn/v2/iat`，三项凭据缺一不可。也可用 `JAMMATE_XFYUN_ASR_CONFIG` 指向仓库外的私有配置文件。
 
-运行 `.\start-jam-mic.cmd`，打开 [一起 Jam](http://127.0.0.1:4221/jam.html)。点「总麦克风」，说「我来哼一段」或「我来拍几个拍子」，再点「结束录音」。对应卡片会高亮并自动开始录，点「停止录制」收尾。直接说「鼓轻一点」会把原话放进文字框，可以修改后点「确认文字」。音频识别和下方的编排 Agent 分别配置。
+在 `audio-router.secrets.json` 填写 Gemini 网关的 `api_key` 和 `base_url`。该地址只需支持 OpenAI Chat Completions 兼容的文字请求和 JSON Schema 结果，不再需要音频输入能力。也可将 `JAMMATE_AUDIO_ROUTER_CONFIG` 指向仓库外的私有配置文件。两个 `*.secrets.json` 均被 Git 忽略。
+
+如果讯飞因额度、授权或网络错误不可用，服务会读取已有的 `DASHSCOPE_API_KEY`，自动使用百炼 `qwen-audio-3.1-asr-flash` 转写同一段 WAV。可用 `JAMMATE_QWEN_ASR_MODEL` 覆盖模型；配置 `DASHSCOPE_WORKSPACE_ID` 后会优先使用北京地域的 workspace 专属域名。备用链路只在讯飞失败后调用，不会为同一段成功录音同时消耗两家额度。
+
+运行 `.\start-jam-mic.cmd`，打开 [JamMate Studio](http://127.0.0.1:4221/jam.html)。从输入栏选择说话、哼唱或拍手，再点击麦克风录制。原版设备工作台可从设置打开。[Studio 操作说明](docs/JAM_STUDIO_UI.md)
 
 ## 文字入口的大模型选项
 

@@ -123,7 +123,7 @@ SET_TEXTURE 使用 band 范围，参数为 scale、drums、bass、keys。每项�
 
 浏览器 Jam 配置 FluidSynth 和 SoundFont 后，从当前 SoundFont 的 bank 0 读取音色，使用 gm_<program> 作为声部 ID。模型可从该集合选择，渲染器按实际音色生成音轨。TimGM6mb 提供 128 种音色。缺少 SoundFont 时使用本地的木吉他、长笛、弦乐和竖琴合成声部。会话同时最多容纳 16 个声部，包含鼓。
 
-本版全部节奏输入都沿用会话 BPM；输入分析的 tempo_source 和 BPM 保留作证据。改变会话速度需要显式“加速/减速”指令（±8 BPM，限制在 60–180）。节奏 confidence≥0.65 且非空才采用；这个门槛只用于规则防抖，不是识别准确率保证。低分/空输入保留原 groove。
+本版全部节奏输入都沿用会话 BPM；输入分析的 tempo_source 和 BPM 保留作证据。改变会话速度需要显式“加速/减速”指令（±8 BPM，限制在 30–250）。节奏 confidence≥0.65 且非空才采用；这个门槛只用于规则防抖，不是识别准确率保证。低分/空输入保留原 groove。
 
 ECHO 的 canonical motif 记录完整；实际演奏仍受 lead 的音量设置影响。若 lead 被关闭或静音，参考端拒绝 motif 响应，避免产生“已经回应”的假回执。
 

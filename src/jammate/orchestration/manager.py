@@ -117,7 +117,7 @@ class StateManager:
                     accepted.append(event)
             state = self._state
             for event in accepted:
-                if event.source != "system":
+                if event.source != "system" or event.payload.get("command") == "accept_suggestion":
                     state = state.with_updates(interaction=replace(state.interaction, awaiting_user=False))
                 if event.event_type == "speech":
                     state = state.with_updates(interaction=replace(state.interaction, last_feedback=event.payload["text"]))
@@ -126,7 +126,7 @@ class StateManager:
                     if phrase.notes:
                         motif = Motif(f"motif_{event.event_id}", "user", (event.event_id,), phrase.notes)
                         accompaniment = state.accompaniment_motif
-                        if self._follow_humming and event.source == "humming" and has_melodic_contour(phrase.notes):
+                        if self._follow_humming and event.source in {"humming", "midi"} and has_melodic_contour(phrase.notes):
                             accompaniment = AccompanimentMotif(motif.motif_id, state.position.next_bar)
                         state = state.with_updates(motifs=state.motifs + (motif,), last_user_motif=phrase.notes,
                                                    accompaniment_motif=accompaniment)
@@ -209,8 +209,8 @@ class StateManager:
 
     def update_transport(self, *, bar: int, beat: float, next_bar: int, completed_previous_bar: bool = False):
         """Runtime-owned position updates do not increment semantic state_version."""
-        position = TransportPosition(bar, beat, next_bar)
         with self._lock:
+            position = TransportPosition(bar, beat, next_bar, self._state.beats_per_bar)
             old = self._state.position
             if (bar, beat) < (old.bar, old.beat) or next_bar < old.next_bar:
                 raise ValueError("transport cannot move backwards")
@@ -253,7 +253,8 @@ class StateManager:
             return True
 
     def playback_started(self, plan: BandPlan, *, bar: int, start_sample: int,
-                         lead_notes: tuple[Note, ...] = (), generated_motif: Motif | None = None) -> bool:
+                         lead_notes: tuple[Note, ...] = (), generated_motif: Motif | None = None,
+                         conditioning_only: bool = False) -> bool:
         """Commit the selected plan at its first live bar without jumping to its end."""
         with self._lock:
             if (type(bar) is not int or bar != plan.to_dict()["effective_at"]["bar"]
@@ -268,15 +269,16 @@ class StateManager:
                 raise PlanError("playback start is ahead of the transport")
             self._apply_plan(state, plan, lead_notes=lead_notes, generated_motif=generated_motif,
                              position=TransportPosition(bar, 0., bar + 1), completed_bars=0,
-                             receipt="playback_started", receipt_data={"bar": bar, "start_sample": start_sample})
+                             receipt="playback_started", receipt_data={"bar": bar, "start_sample": start_sample},
+                             conditioning_only=conditioning_only)
             return True
 
     def _apply_plan(self, state, plan, *, lead_notes, generated_motif, position, completed_bars,
-                    receipt, receipt_data):
+                    receipt, receipt_data, conditioning_only=False):
         data = plan.to_dict()
         target = project(state, plan)
         motif_actions = [a for a in data["actions"] if a["action"] in {"INTRODUCE_MOTIF", "ECHO_MOTIF", "VARY_MOTIF"}]
-        if motif_actions:
+        if motif_actions and not conditioning_only:
             action = motif_actions[0]
             if not lead_notes:
                 raise PlanError("motif execution receipt needs actual lead notes")
@@ -295,6 +297,8 @@ class StateManager:
                      awaiting_user=action["action"] == "INTRODUCE_MOTIF"))
         elif lead_notes or generated_motif is not None:
             raise PlanError("receipt supplied unsolicited musical material")
+        if conditioning_only:
+            receipt_data = {**receipt_data, "conditioning_only": True}
         section = "build" if any(a["action"] == "BUILD" for a in data["actions"]) else "space" if any(a["action"] == "SIMPLIFY" for a in data["actions"]) else target.section
         committed = target.with_updates(state_version=state.state_version + 1, section=section,
             section_bars=(state.section_bars if section == state.section else 0) + completed_bars,

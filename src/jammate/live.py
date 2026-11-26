@@ -67,7 +67,7 @@ class LiveJam:
         self._leads: dict[int, tuple[Note, ...]] = {}
         self._next_bar = 0
         self._next_bar_sample = PRE_ROLL_SAMPLES
-        self._clock = BarClock(SR, PRE_ROLL_SAMPLES)
+        self._clock = BarClock(SR, PRE_ROLL_SAMPLES, state.beats_per_bar)
         self._bar_timings: deque[BarTiming] = deque(maxlen=64)
         self._playback_pending: deque[BarTiming] = deque()
         self._playback_ticks: queue.Queue[tuple[int, int, float, int]] = queue.Queue(maxsize=128)
@@ -116,7 +116,7 @@ class LiveJam:
                 invitation = self._decide_locked(Silence(self._quiet_bars))
             bar, state = self._next_bar, self._state
             lead = self._leads.pop(bar, ())
-            notes = tuple(n.shifted(-bar * BEATS_PER_BAR) for n in arrange_bar(state, bar, lead))
+            notes = tuple(n.shifted(-bar * state.beats_per_bar) for n in arrange_bar(state, bar, lead))
             timing = self._clock.reserve(state.tempo_bpm)
             start = timing.start_sample
             self._next_bar_sample = self._clock.next_sample
@@ -157,7 +157,7 @@ class LiveJam:
                 self._log_playback()
                 with self._lock:
                     ahead = self._next_bar_sample - self._timeline.read_position
-                    bar_samples = BEATS_PER_BAR * 60.0 / self._state.tempo_bpm * SR
+                    bar_samples = self._state.beats_per_bar * 60.0 / self._state.tempo_bpm * SR
                 if ahead < bar_samples:
                     self._render_next_bar()
             except Exception:  # keep the band playing; log and try again next tick
@@ -206,7 +206,8 @@ class LiveJam:
             for timing, audio in capture.feed(start, block, timings):
                 try:
                     context = analyze_rhythm_bar(audio, SR, timing.tempo_bpm,
-                                                  beat_origin_s=timing.start_sample / SR)
+                                                 beat_origin_s=timing.start_sample / SR,
+                                                 beats_per_bar=self._state.beats_per_bar)
                     self._log.write("rhythm_input", captured_bar=timing.bar_index,
                                     input_end_sample=timing.end_sample, context=context.to_dict())
                     # These onsets were measured against a known playback

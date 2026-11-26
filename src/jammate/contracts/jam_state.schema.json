@@ -36,13 +36,14 @@
         "playing",
         "bar",
         "beat",
-        "next_bar"
+        "next_bar",
+        "beats_per_bar"
       ],
       "properties": {
         "tempo_bpm": {
           "type": "number",
-          "minimum": 60,
-          "maximum": 180
+          "minimum": 30,
+          "maximum": 250
         },
         "playing": {
           "type": "boolean"
@@ -54,11 +55,16 @@
         "beat": {
           "type": "number",
           "minimum": 0,
-          "exclusiveMaximum": 4
+          "exclusiveMaximum": 16
         },
         "next_bar": {
           "type": "integer",
           "minimum": 0
+        },
+        "beats_per_bar": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
         }
       }
     },
@@ -496,6 +502,11 @@
               ]
             }
           }
+        },
+        "style": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
         }
       }
     },
@@ -542,6 +553,9 @@
             "string",
             "null"
           ]
+        },
+        "allow_initiative": {
+          "type": "boolean"
         }
       }
     },
@@ -564,22 +578,22 @@
           "properties": {
             "tempo_bpm": {
               "type": "number",
-              "minimum": 60,
-              "maximum": 180
+              "minimum": 30,
+              "maximum": 250
             },
             "onset_beats": {
               "type": "array",
-              "maxItems": 16,
+              "maxItems": 64,
               "uniqueItems": true,
               "items": {
                 "type": "number",
                 "minimum": 0,
-                "exclusiveMaximum": 4
+                "exclusiveMaximum": 16
               }
             },
             "accents": {
               "type": "array",
-              "maxItems": 16,
+              "maxItems": 64,
               "items": {
                 "type": "number",
                 "exclusiveMinimum": 0,
@@ -591,7 +605,9 @@
               "minimum": 0
             },
             "beats_per_bar": {
-              "const": 4
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
             },
             "confidence": {
               "$ref": "#/$defs/unit"
@@ -635,22 +651,22 @@
             "properties": {
               "tempo_bpm": {
                 "type": "number",
-                "minimum": 60,
-                "maximum": 180
+                "minimum": 30,
+                "maximum": 250
               },
               "onset_beats": {
                 "type": "array",
-                "maxItems": 16,
+                "maxItems": 64,
                 "uniqueItems": true,
                 "items": {
                   "type": "number",
                   "minimum": 0,
-                  "exclusiveMaximum": 4
+                  "exclusiveMaximum": 16
                 }
               },
               "accents": {
                 "type": "array",
-                "maxItems": 16,
+                "maxItems": 64,
                 "items": {
                   "type": "number",
                   "exclusiveMinimum": 0,
@@ -662,7 +678,9 @@
                 "minimum": 0
               },
               "beats_per_bar": {
-                "const": 4
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
               },
               "confidence": {
                 "$ref": "#/$defs/unit"

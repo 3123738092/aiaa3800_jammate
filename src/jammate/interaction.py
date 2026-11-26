@@ -48,12 +48,15 @@ class TransportPosition:
     bar: int = 0
     beat: float = 0.0
     next_bar: int = 0  # first bar not yet rendered; published by Runtime
+    beats_per_bar: int = 4
 
     def __post_init__(self):
         if type(self.bar) is not int or self.bar < 0 or type(self.next_bar) is not int or self.next_bar < self.bar:
             raise ValueError("transport bars must be nonnegative integers with next_bar >= bar")
-        if isinstance(self.beat, bool) or not math.isfinite(self.beat) or not 0 <= self.beat < 4:
-            raise ValueError("beat must be within [0,4)")
+        if type(self.beats_per_bar) is not int or not 1 <= self.beats_per_bar <= 16:
+            raise ValueError("beats_per_bar must be an integer within 1..16")
+        if isinstance(self.beat, bool) or not math.isfinite(self.beat) or not 0 <= self.beat < self.beats_per_bar:
+            raise ValueError("beat must be within the current bar")
 
 
 @dataclass(frozen=True)
@@ -114,9 +117,12 @@ class Interaction:
     user_active: bool = False
     awaiting_user: bool = False
     last_feedback: str | None = None
+    allow_initiative: bool = True
 
     def __post_init__(self):
         object.__setattr__(self, "strategy", Strategy(self.strategy))
         unit(self.initiative, "initiative")
-        if self.current_lead not in {"user", "ai", None} or type(self.user_active) is not bool or type(self.awaiting_user) is not bool:
+        if self.current_lead not in {"user", "ai", None} or any(
+            type(flag) is not bool for flag in (self.user_active, self.awaiting_user, self.allow_initiative)
+        ):
             raise ValueError("invalid interaction state")
