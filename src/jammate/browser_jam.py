@@ -1092,12 +1092,8 @@ class BrowserJamService:
 
     def dispatch(self, operation, body):
         if operation == "status":
-            try:
-                self.config()
-            except LLMConfigurationError:
-                llm_ready = False
-            else:
-                llm_ready = True
+            llm = self.optional_config()
+            llm_ready = llm is not None
             catalog = None
             if self.soundfont and self.soundfont.programs:
                 catalog = {
@@ -1107,7 +1103,8 @@ class BrowserJamService:
                 }
             stream_ready = self.mrt2_stream_available()
             speech_ready = bool(getattr(self.audio_router, "dictation_ready", False))
-            return {"studio_v4": True, "llm_ready": llm_ready, "local_scoped_opening": True,
+            return {"studio_v4": True, "llm_ready": llm_ready, "llm_model": llm.model if llm else None,
+                    "local_scoped_opening": True, "voice_wake": speech_ready,
                     "speech_ready": speech_ready, "speech_mode": "server" if speech_ready else "browser",
                     "humming_correction_ready": bool(self.humming_provider()) or llm_ready,
                     "music_capture": True, "humming_clip_seconds": MAX_HUMMING_SECONDS,

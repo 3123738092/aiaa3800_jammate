@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import unicodedata
 from itertools import groupby
 from pathlib import Path
 from threading import Condition
@@ -82,6 +83,26 @@ def spoken_intent(words):
     return "SEND_TEXT"
 
 
+_WAKE = re.compile(
+    r"^(?:hey\b|hey(?=[\u4e00-\u9fff])|嗨|嘿|黑|喂)[\s,，、。.!！:：·-]*"
+    r"(?:(?P<band>jam[\s-]*mate\b|jam[\s-]*mate(?=[\u4e00-\u9fff])|全乐队|乐队)"
+    r"|(?P<drums>节奏组|鼓组)|(?P<keys>旋律组|键盘组))"
+    r"[\s,，、。.!！?？:：·-]*", re.IGNORECASE)
+
+
+def wake_command(words, target=None):
+    """Route only an explicitly addressed or previously awakened utterance."""
+    words = unicodedata.normalize("NFKC", words).strip()
+    if not words:
+        return {}
+    match = _WAKE.match(words)
+    if match is not None:
+        target, words = match.lastgroup, words[match.end():].strip()
+    if target is None:
+        return {}
+    return {"target": target, "instruction": words}
+
+
 class OpeningMic:
     """Own the shared audio provider for the lifetime of one Jam server."""
 
@@ -118,7 +139,11 @@ class OpeningMic:
     def _create_transcriber():
         config_path = (os.getenv("JAMMATE_XFYUN_ASR_CONFIG")
                        or Path(__file__).resolve().parents[2] / "xfyun-asr.secrets.json")
-        return XfyunTranscriber(XfyunConfig.load(config_path))
+        try:
+            from websocket import create_connection
+        except ImportError as exc:
+            raise XfyunConfigurationError("请安装 websocket-client 以启用讯飞语音识别。") from exc
+        return XfyunTranscriber(XfyunConfig.load(config_path), websocket_factory=create_connection)
 
     @staticmethod
     def _create_fallback_transcriber():
@@ -201,7 +226,10 @@ class OpeningMic:
     def recognize(self, body):
         mode = body.get("mode")
         encoded = body.get("audio")
-        if mode not in ("intent", "dictation") or not isinstance(encoded, str) or len(encoded) > 1_300_000:
+        target = body.get("wake_target") if mode == "wake" else None
+        if target is not None and target not in ("band", "drums", "keys"):
+            raise ValueError("未知的语音唤醒目标。")
+        if mode not in ("intent", "dictation", "wake") or not isinstance(encoded, str) or len(encoded) > 1_300_000:
             raise ValueError("请提交 30 秒以内的麦克风录音。")
         try:
             raw = base64.b64decode(encoded, validate=True)
@@ -217,7 +245,7 @@ class OpeningMic:
         except (EOFError, wave.Error) as exc:
             raise ValueError("无法读取录音，请重录。") from exc
         if not any(pcm):
-            return {"route": "KEEP_LISTENING"}
+            return {} if mode == "wake" else {"route": "KEEP_LISTENING"}
 
         try:
             words = self._transcribe(pcm).strip()
@@ -225,6 +253,8 @@ class OpeningMic:
                 QwenRecognitionError) as exc:
             raise ValueError(str(exc)) from exc
 
+        if mode == "wake":
+            return wake_command(words, target)
         if mode == "dictation":
             return {"route": "SEND_TEXT", "instruction": words} if words else {"route": "KEEP_LISTENING"}
         if not words:

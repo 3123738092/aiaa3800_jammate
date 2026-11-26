@@ -191,3 +191,25 @@ def test_xfyun_failure_uses_qwen_fallback(monkeypatch):
         assert mic.recognize({"audio": recording(), "mode": "intent"}) == {
             "route": "SEND_TEXT", "instruction": "鼓轻一点"}
     fallback.transcribe.assert_called_once()
+
+
+def test_wake_dictation_routes_only_addressed_speech(monkeypatch):
+    speech = Mock()
+    speech.transcribe.side_effect = [
+        "今天要把鼓关掉。", "嘿，节奏组，把声音放轻一些。",
+        "黑旋律组。", "改成钢琴", "嗨，Jam Mate，把速度设成96。",
+        "Hey JamMatey，速度减半", "Hey JamMate 给我一个节奏",
+    ]
+    monkeypatch.setattr(opening_mic.OpeningMic, "_create_transcriber", Mock(return_value=speech))
+    body = {"mode": "wake", "audio": recording()}
+    with closing(opening_mic.OpeningMic()) as mic:
+        assert mic.dictation_ready
+        assert mic.recognize(body) == {}
+        assert mic.recognize(body) == {"target": "drums", "instruction": "把声音放轻一些。"}
+        assert mic.recognize(body) == {"target": "keys", "instruction": ""}
+        assert mic.recognize({**body, "wake_target": "keys"}) == {"target": "keys", "instruction": "改成钢琴"}
+        assert mic.recognize(body) == {"target": "band", "instruction": "把速度设成96。"}
+        assert mic.recognize(body) == {}
+        assert mic.recognize({**body, "wake_target": "keys"}) == {"target": "band", "instruction": "给我一个节奏"}
+        with pytest.raises(ValueError, match="唤醒目标"):
+            mic.recognize({**body, "wake_target": "anything"})

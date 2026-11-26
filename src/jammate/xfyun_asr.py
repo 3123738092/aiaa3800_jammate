@@ -13,6 +13,13 @@ from time import sleep
 from urllib.parse import urlencode
 from urllib.parse import urlparse
 
+try:
+    from websocket import WebSocketException
+except ImportError:
+    _TRANSPORT_ERRORS = (OSError,)
+else:
+    _TRANSPORT_ERRORS = (OSError, WebSocketException)
+
 
 class XfyunConfigurationError(ValueError):
     pass
@@ -110,8 +117,9 @@ class XfyunTranscriber:
     def transcribe(self, pcm: bytes) -> str:
         if not pcm or len(pcm) % 2:
             raise ValueError("讯飞输入必须是非空 PCM16 音频。")
-        socket = self._connect()
+        socket = None
         try:
+            socket = self._connect()
             chunks = [pcm[i:i + self.FRAME_BYTES] for i in range(0, len(pcm), self.FRAME_BYTES)]
             for index, chunk in enumerate(chunks):
                 status = 0 if index == 0 else 1
@@ -144,7 +152,12 @@ class XfyunTranscriber:
                 if data.get("status") == 2:
                     break
             return "".join(segments[key] for key in sorted(segments)).strip()
-        except (KeyError, ValueError, json.JSONDecodeError) as exc:
+        except XfyunConfigurationError:
+            raise
+        except _TRANSPORT_ERRORS as exc:
+            raise XfyunRecognitionError("讯飞听写连接中断或超时。") from exc
+        except (KeyError, ValueError) as exc:
             raise XfyunRecognitionError("讯飞返回了无法解析的识别结果。") from exc
         finally:
-            socket.close()
+            if socket is not None:
+                socket.close()

@@ -1,6 +1,8 @@
 class JamVoiceProcessor extends AudioWorkletProcessor {
-  constructor() {
+  constructor(options) {
     super();
+    this.speechOnly = options?.processorOptions?.speechOnly === true;
+    this.maxFrames = this.speechOnly ? 600 : 400;
     this.frame = new Float32Array(Math.round(sampleRate * .02));
     this.used = 0;
     this.noise = .004;
@@ -55,7 +57,7 @@ class JamVoiceProcessor extends AudioWorkletProcessor {
       return;
     }
     this.frames += 1;
-    if (this.frames <= 400) this.chunks.push(this.frame.slice());
+    if (this.frames <= this.maxFrames) this.chunks.push(this.frame.slice());
     else this.chunks.length = 0;
     if (audible) {
       this.voiced += 1;
@@ -68,12 +70,13 @@ class JamVoiceProcessor extends AudioWorkletProcessor {
       this.port.postMessage({type: 'start'});
     }
     this.quiet = audible ? 0 : this.quiet + 1;
-    if (this.hasSustain ? this.quiet < 34 :
-        this.quiet < 60 || this.frames - this.firstAttack < this.barFrames + 2) return;
-    if (this.frames > 400) {
+    const waitingForSilence = this.speechOnly || this.hasSustain ? this.quiet < (this.speechOnly ? 32 : 34) :
+      this.quiet < 60 || this.frames - this.firstAttack < this.barFrames + 2;
+    if (waitingForSilence) return;
+    if (this.frames > this.maxFrames) {
       this.port.postMessage({type: 'end', tooLong: true});
     } else if (this.voiced >= 8 || this.attacks >= 2) {
-      const chunks = this.hasSustain ?
+      const chunks = this.speechOnly || this.hasSustain ?
         this.chunks.slice(0, this.chunks.length - this.quiet + 10) : this.chunks;
       const samples = new Float32Array(chunks.length * this.frame.length);
       for (const [i, chunk] of chunks.entries()) samples.set(chunk, i * this.frame.length);

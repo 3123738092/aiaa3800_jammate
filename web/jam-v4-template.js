@@ -538,6 +538,7 @@ function mergeJMMusicState(previous, patch) {
     else if(commandTarget==='harmony'&&inputMode==='rhythm')hint('拍手只提供和声变化的节奏参考，不自动补充和弦');
     else if(commandTarget==='harmony'&&inputMode==='humming')hint('哼唱提供音高素材，和声调整由乐队理解你的意图');
     else if(!online())hint('本地试听 · 指令与素材将在接入后处理');
+    else if(inputMode==='speech')hint(capabilities.voiceWake?'打开麦克风后，说「Hey JamMate」或叫声部名字':'当前服务未启用语音唤醒');
     else hint(commandTarget==='band'?'对全乐队输入，由乐队理解你的意图':'本次输入给'+names[commandTarget]);
   }
   function setTheme(name,remember=true){
@@ -562,7 +563,7 @@ function mergeJMMusicState(previous, patch) {
     if(!modes[mode]||micSession||micPending)return;
     inputMode=mode;
     $('inputModes').querySelectorAll('button').forEach(b=>{const chosen=b.dataset.mode===mode;b.classList.toggle('selected',chosen);b.setAttribute('aria-pressed',String(chosen))});
-    updateHint();log('input_mode',{mode});
+    updateRecording();updateHint();log('input_mode',{mode});
   }
   function phase(){return online()?(state.phase||'unknown'):(audio.getPreviewState().playing?'playing':previewStarted?'paused':'ready')}
   function updateTransport(){
@@ -607,20 +608,25 @@ function mergeJMMusicState(previous, patch) {
   }
   async function dispatch(action){
     const request={...action,requestId:action.requestId||uid(),timestamp:new Date().toISOString()};
-    log('action_requested',summarize(request),{requestId:request.requestId});
+    const voice = request.type === 'voice.turn';
+    const details = voice ? {type: request.type, wakeTarget: request.wakeTarget,
+      durationMs: Math.round(request.samples.length * 1000 / request.sampleRate)} : summarize(request);
+    log('action_requested',details,{requestId:request.requestId});
     const active=backend,epoch=backendEpoch;
     if(!active){log('action_not_sent',{requestId:request.requestId,type:request.type,reason:'backend_not_connected'});return false}
     try{
-      await (active.dispatch||active.send).call(active,request);
+      const result = await (active.dispatch||active.send).call(active,request);
       if(backend!==active||backendEpoch!==epoch){log('stale_response',{requestId:request.requestId});return false}
-      log('adapter_accepted',{requestId:request.requestId,type:request.type});return true;
+      log('adapter_accepted',{requestId:request.requestId,type:request.type});return voice ? result : true;
     }catch(error){
       if(backend!==active||backendEpoch!==epoch)return false;
       log('request_error',{requestId:request.requestId,message:String(error.message||error)},{level:'error'});
       if(transportPending?.requestId===request.requestId)transportPending=null;
       if(tempoPending?.requestId===request.requestId)tempoPending=null;
       if(meterPending?.requestId===request.requestId)meterPending=null;
-      updateTransport();toast('发送失败，输入已保留：'+String(error.message||error));return false;
+      updateTransport();
+      if (!voice || request.current()) toast((voice ? '语音指令未提交：' : '发送失败，输入已保留：')+String(error.message||error));
+      return false;
     }
   }
   function receive(event){
@@ -677,6 +683,7 @@ function mergeJMMusicState(previous, patch) {
     return()=>{if(backend===adapter&&backendEpoch===epoch)disconnect()};
   }
   function disconnect(announce=true){
+    if (micSession?.wake) closeWakeMic(micSession);
     const connected=online(),dispose=unsubscribe;clearTimeout(wheelTempoTimer);wheelTempoDraft=null;backendEpoch++;backend=null;unsubscribe=null;
     try{dispose?.()}catch{}state={};capabilities={};mixPending.clear();transportPending=null;tempoPending=null;meterPending=null;sending=false;sendTicket++;syncComposer();clearClarification();audio.setMeter(localMeter);audio.setTempo(localBpm);
     inspector.connection({connected:false,status:'后端未连接'});agentMessages.length=0;$('agentReplies').hidden=true;$('agentLatest').replaceChildren();$('agentHistoryList').replaceChildren();$('agentHistory').hidden=true;updateTransport();updateHint();
@@ -685,7 +692,8 @@ function mergeJMMusicState(previous, patch) {
   const api={connect,disconnect,receive,send:dispatch,get connected(){return online()},
     getState(){return{source:online()?'backend':'local-preview',focusedInstrument:focused(),target:commandTarget,inputMode,...(online()?state:audio.getPreviewState()),bpm:online()?state.bpm:localBpm,meter:online()?state.meter:localMeter,tempoUnit:online()?(state.tempoUnit||(meterValid(state.meter)?tempoUnit(state.meter):undefined)):tempoUnit(localMeter),tempoPending:tempoPending?.bpm??null,meterPending:meterPending?.meter??null}},
     getConfig(){return{bpm:localBpm,meter:localMeter,tempoUnit:tempoUnit(localMeter),target:commandTarget,focusedInstrument:focused(),inputMode,theme:document.documentElement.dataset.theme,volumes:{...volumes}}},
-    isPerforming(){return Boolean(micSession||micPending||melodyCapture||sounding.size||importing||sending||previewDraftId)},
+    isPerforming(){return Boolean((micSession && (!micSession.wake || micSession.busy || micSession.hearing || micSession.target))
+      ||micPending||melodyCapture||sounding.size||importing||sending||previewDraftId)},
     getRecordedMelody(){return melodyEvents.map(e=>({...e}))},
     getDrafts(){return drafts.map(d=>({id:d.id,name:d.name,kind:d.kind,target:d.target,mode:d.mode,size:d.size,durationMs:d.durationMs}))}};
   window.JamMate=api;window.JamAdapter=api;
@@ -1082,10 +1090,19 @@ function mergeJMMusicState(previous, patch) {
   function updateRecording(){
     const active=!!micSession;
     document.body.classList.toggle('rec',active);$('mic').disabled=micPending;$('mic').setAttribute('aria-pressed',String(active));$('mic').innerHTML=icon(active?'stop':'mic');
-    $('mic').setAttribute('aria-label',micPending?(active?'正在保存录音':'等待麦克风权限'):active?'停止录音':'开始录音');
+    const speech = inputMode === 'speech';
+    const label = active && micSession.wake ? '关闭语音唤醒' :
+      micPending ? (active ? '正在保存录音' : '等待麦克风权限') : active ? '停止录音' :
+        speech ? '开启语音唤醒' : '开始录音';
+    $('mic').setAttribute('aria-label',label);
+    $('mic').title=label;
     $('inputModes').querySelectorAll('button').forEach(b=>b.disabled=active||micPending);
     $('recordingCaption').hidden=!active;
-    if(active){$('recordingCaption').textContent='录给'+names[micSession.target]+' · '+modes[micSession.mode]+' · '+seconds(performance.now()-micSession.started);$('inputHint').textContent=''}
+    if(active){
+      $('recordingCaption').textContent=micSession.wake ? micSession.caption :
+        '录给'+names[micSession.target]+' · '+modes[micSession.mode]+' · '+seconds(performance.now()-micSession.started);
+      $('inputHint').textContent='';
+    }
     syncComposer();
   }
   function drawWave(){
@@ -1102,8 +1119,94 @@ function mergeJMMusicState(previous, patch) {
     s.stopTime=performance.now();micPending=true;updateRecording();
     try{s.recorder.stop()}catch(error){s.failed=true;cleanupMic(s);toast('录音中断，请重试')}
   }
+  const waitingForWake = '在听 · Hey JamMate / Hey 节奏组 / Hey 旋律组';
+  function closeWakeMic(session) {
+    clearTimeout(session.wakeTimer);
+    session.close();
+    if (micSession === session) {
+      cancelAnimationFrame(waveId);
+      micSession = null;
+      updateRecording();
+      updateHint();
+      log('mic_stop', {mode: 'wake'});
+    }
+  }
+
+  async function recognizeWakePhrase(session, phrase) {
+    if (micSession !== session) return;
+    session.hearing = false;
+    if (session.busy) return;
+    if (!phrase.samples) {
+      if (phrase.tooLong || session.hearingStartedArmed) session.target = null;
+      session.caption = phrase.tooLong ? '这句太长了，请重新唤醒并说一句短指令' : waitingForWake;
+      updateRecording();
+      return;
+    }
+    const wakeTarget = session.target;
+    session.target = null;
+    clearTimeout(session.wakeTimer);
+    session.busy = true;
+    session.caption = '正在识别语音…';
+    updateRecording();
+    const result = await dispatch({type:'voice.turn', samples:phrase.samples, sampleRate:phrase.sampleRate,
+      wakeTarget, current:() => micSession === session});
+    if (micSession !== session) return;
+    session.busy = false;
+    if (result?.target) {
+      session.target = result.target;
+      session.caption = names[result.target] + '在听，请说指令';
+      session.wakeTimer = setTimeout(() => {
+        session.target = null;
+        if (!session.hearing && !session.busy) {
+          session.caption = waitingForWake;
+          updateRecording();
+        }
+      }, 10_000);
+    } else {
+      session.caption = result?.sent ? '指令已提交 · 继续说唤醒词' : waitingForWake;
+    }
+    updateRecording();
+  }
+
+  async function startWakeMic() {
+    if (!capabilities.voiceWake) { toast('语音服务尚未配置'); return; }
+    if (document.hidden || sending || importing) return;
+    micPending = true;
+    updateRecording();
+    let capture;
+    try {
+      const context = await audio.ensure();
+      const {openWakeInput} = await import('./jam-v4-voice.js');
+      const session = {wake:true, target:null, busy:false, hearing:false, caption:waitingForWake};
+      capture = await openWakeInput(context, phrase => void recognizeWakePhrase(session, phrase), () => {
+        if (micSession !== session || session.busy) return;
+        session.hearing = true;
+        session.hearingStartedArmed = Boolean(session.target);
+        if (session.target) clearTimeout(session.wakeTimer);
+        session.caption = session.target ? names[session.target] + '在听…' : '在听这一句…';
+        updateRecording();
+      });
+      if (document.hidden || !online()) { capture.close(); return; }
+      Object.assign(session, capture, {samples: new Uint8Array(capture.analyser.fftSize)});
+      for (const track of capture.stream.getAudioTracks()) track.addEventListener('ended', () => closeWakeMic(session), {once:true});
+      micSession = session;
+      log('mic_start', {mode:'wake'});
+      drawWave();
+    } catch (error) {
+      capture?.close();
+      toast('无法启动语音唤醒，请检查麦克风权限');
+      log('mic_error', {message:error.message}, {level:'error'});
+    } finally {
+      micPending = false;
+      updateRecording();
+    }
+  }
+
   async function toggleMic(){
-    if(micPending)return;if(micSession){stopRecording();return}
+    if(micPending)return;
+    if(micSession?.wake){closeWakeMic(micSession);return}
+    if(micSession){stopRecording();return}
+    if(inputMode==='speech'){await startWakeMic();return}
     if(importing){toast('文件正在读取，完成后即可录音');return}
     if(drafts.length>=4){toast('请先提交或移除一份素材');return}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){toast('当前环境无法录音，请用 HTTPS 或 localhost 打开，也可导入音频文件');log('mic_unavailable',{});return}
@@ -1169,11 +1272,11 @@ function mergeJMMusicState(previous, patch) {
   });
   document.addEventListener('keyup',e=>{const key=e.key.toLowerCase(),note=typingHeld.get(key);if(note!==undefined){noteOff(note,'typing:'+key);typingHeld.delete(key)}});
   window.addEventListener('blur',()=>{releaseAllNotes();swipe=null});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});stopRecording()}}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});if(micSession.wake)closeWakeMic(micSession);else stopRecording()}}});
   const resize=()=>{const n=$('stage').clientWidth<560?7:14;if(n!==whiteCount){releaseScreenNotes();whiteCount=n;keyboardMarkup()}renderStage()};
   window.addEventListener('resize',resize);
   if(window.ResizeObserver)new ResizeObserver(resize).observe($('stage'));
-  window.addEventListener('pagehide',()=>{releaseAllNotes();if(micSession){const s=micSession;s.failed=true;try{s.recorder.stop()}catch{}cleanupMic(s)}audio.dispose();for(const d of drafts)if(d.url)URL.revokeObjectURL(d.url);try{unsubscribe?.()}catch{}});
+  window.addEventListener('pagehide',()=>{releaseAllNotes();if(micSession?.wake)closeWakeMic(micSession);else if(micSession){const s=micSession;s.failed=true;try{s.recorder.stop()}catch{}cleanupMic(s)}audio.dispose();for(const d of drafts)if(d.url)URL.revokeObjectURL(d.url);try{unsubscribe?.()}catch{}});
   let theme='burgundy';try{const saved=localStorage.getItem('jammate-theme');if(themes[saved])theme=saved}catch{}
   setTheme(theme,false);buildStage();setTarget('band');setMode('auto');updateMelody();updateTransport();syncComposer();
   if(release)document.body.classList.add('release');

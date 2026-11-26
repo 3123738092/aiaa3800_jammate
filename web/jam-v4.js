@@ -108,7 +108,8 @@ function renderConnection() {
   }
   $('backend-stop').disabled = !live?.id;
   const features = [
-    service?.llm_ready ? '大模型可用' : '大模型未配置',
+    service?.llm_ready ? (service.llm_model || '大模型') + ' 可用' : '大模型未配置',
+    service?.speech_ready ? '语音可用' : '语音未配置',
     service?.mrt2 ? 'MRT2 试听可用' : 'MRT2 环境不可用',
   ];
   $('backend-note').textContent = !ready ? '尚未连上支持 Studio v4 的 JamMate 服务。'
@@ -120,9 +121,11 @@ async function connect() {
   try {
     service = await post('status', {});
     if (!service.studio_v4) throw new Error('Studio v4 API 未启用。');
+    if (service.llm_ready) settings[0].value = 'llm';
     studio.connect({
       label: 'JamMate',
-      capabilities: {pause: true, tempo: true, meter: true, batchInput: true, independentMix: false},
+      capabilities: {pause: true, tempo: true, meter: true, batchInput: true, independentMix: false,
+        voiceWake: service.voice_wake === true},
       dispatch,
       subscribe(receive) {
         publish = receive;
@@ -378,6 +381,7 @@ async function audioWave(blob, seconds) {
 async function prepareInput(action) {
   const input = {target: action.contextTarget ?? action.target ?? 'band',
     text: action.text ?? action.instruction ?? '', rhythm_timing: 'feel'};
+  if (action.type === 'input.text' && action.source === 'speech') input.source = 'speech';
   const materials = action.type === 'input.bundle' ? action.inputs : action.type === 'input.text' ? [] : [action];
   for (const item of materials) {
     if (item.type === 'input.midi') {
@@ -412,7 +416,24 @@ async function prepareInput(action) {
   return input;
 }
 
+async function voiceTurn(action) {
+  const previous = live;
+  const pcm = new Int16Array(action.samples.length);
+  for (let i = 0; i < pcm.length; i++) {
+    pcm[i] = Math.round(Math.max(-1, Math.min(1, action.samples[i])) * 32767);
+  }
+  const recording = await audioWave(wave(pcm, action.sampleRate), 13);
+  const result = await post('opening-mic', {...recording, mode: 'wake', wake_target: action.wakeTarget}, 52_000);
+  if (!action.current() || live !== previous) return {};
+  if (!result.instruction) return result;
+  send({type: 'transcript', requestId: action.requestId, text: result.instruction});
+  trace(action.requestId, 'recognition', 'completed', result, action.requestId);
+  await dispatch({...action, type: 'input.text', target: result.target, text: result.instruction, source: 'speech'});
+  return {sent: true};
+}
+
 async function dispatch(action) {
+  if (action.type === 'voice.turn') return voiceTurn(action);
   const requestId = action.requestId;
   activity();
   switch (action.type) {
