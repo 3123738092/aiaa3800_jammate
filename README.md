@@ -1,63 +1,93 @@
 # JamMate
 
-AIAA 3800 课程项目。JamMate 是一个本地音乐创作工作台，你可以哼一段旋律、拍一段节奏，或用一句话开始创作。三个入口都能单独生成乐队片段，支持浏览器试听、下载 WAV 和导出 MIDI。
+JamMate 是 AIAA 3800 的浏览器音乐工作台。你可以用一句话、哼唱、拍手或 MIDI 开场，之后边听边调整乐队。工作台显示每次指令的处理结果，也能导出这场演奏的 WAV。
 
-## 三种创作方式
+## 在 Windows 上启动
 
-| 入口 | 怎么试 | 生成结果 |
-| --- | --- | --- |
-| **从旋律出发** | 哼一句或载入示例，点「转成 MIDI」。比较原始识别和连贯哼唱，选好后点「生成音乐」。 | 在识别出的旋律上做变奏，加入鼓、贝斯和键盘。[原录音](examples/creation/humming-source.wav) · [变奏试听](examples/creation/humming.wav) |
-| **从律动出发** | 载入示例，或均匀拍四下定速后再拍一小节。点「识别节拍」，选跟随、加花或简化，再生成。 | 用拍点和重音编排乐队，可调力度和小节数。[跟随](examples/reference-creation/rhythm-follow.wav) · [加花](examples/reference-creation/rhythm-vary.wav) · [简化](examples/reference-creation/rhythm-simplify.wav) |
-| **从一句话出发** | 输入「来一段，慢一点」，生成后再输入「去掉贝斯」。 | 根据要求生成第一段，并沿用作品状态编排下一段。[第一段](examples/reference-creation/text-first.wav) · [调整后](examples/reference-creation/text-adjusted.wav) |
-
-首页也提供独立的风格样段。[Lo-fi](examples/reference-creation/lofi.wav) · [Funk](examples/reference-creation/warm_funk.wav) · [Indie Rock](examples/reference-creation/indie_rock.wav)
-
-## 在 Windows 上运行
-
-已在 Python 3.12、Node.js 24 和 pnpm 11 上验证。装好 Git 和这些工具后，在 PowerShell 运行以下命令。工作台从 Git 历史读取固定版本，请完整克隆。评审 PR 时，把第一行替换为 PR 描述里的分支克隆命令。
+用 Python 3.12 在 PowerShell 里运行。首次试用只需要本地规则和内置合成器。
 
 ```powershell
 git clone https://github.com/3123738092/aiaa3800_jammate.git
 cd aiaa3800_jammate
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]" -c requirements-input.lock.txt
-pnpm --dir web/baseline install --frozen-lockfile
-pnpm --dir web/baseline run build
-pnpm --dir web/optimized install --frozen-lockfile
-pnpm --dir web/optimized run build
-.\start-input-lab.cmd
+.\.venv\Scripts\python.exe -m jammate.input_server --port 4188
 ```
 
-启动后在本机打开 [创作工作台](http://127.0.0.1:4188/)。以后可直接双击 `start-input-lab.cmd`。如果要在页面现生成风格样段，或使用 FluidSynth 音色，请先配置 FluidSynth。[音源配置与运行说明](docs/integration/RUN.md#音源与验收)
+打开 [Studio](http://127.0.0.1:4188/jam.html)，先确认唱机屏幕显示「已连接乐队」。如果端口已经被旧版本占用，可以改用 `--port 4199`，再打开 [4199 上的 Studio](http://127.0.0.1:4199/jam.html)。
 
-## 一起 Jam 的总麦克风
+## 试一轮 Jam
 
-总麦克风使用讯飞语音听写大模型（中英）V2.0 把录音转成文字；Gemini 3.5 Flash-Lite 只接收转写文字，负责理解用户意图，不再接收音频。完成上面的环境安装和前端构建后，在仓库根目录运行：
+1. **开场。** 在输入栏发送「来个鼓点」，或者点唱机的播放键开始全乐队伴奏。也可以空等约 8 秒，看看乐队是否提议一个短鼓点或旋律。点「试试」才会采用提议。
+2. **边听边改。** 演奏时发送「鼓少一点」。如果只想对一个声部说话，先左右切换到对应乐器，再点乐器名称，把它设为输入目标。
+3. **看结果。** 输入栏上方显示乐队回应。右上角「运行日志」可以查看输入、编排、渲染和播放回执。实际应用后，唱机与和声屏才更新相应的演奏状态。
+4. **保留演奏。** 播放后可点「导出演奏 WAV」。唱机键负责暂停或继续。在「设置」里点「结束会话」，就能换音频后端或重新开场。
+
+### 还可以怎么输入
+
+| 输入 | 在 Studio 里怎么用 |
+| --- | --- |
+| **说话** | 选「说话」，点一次麦克风。说「Hey JamMate，速度调到 108」，或叫「Hey 节奏组」「Hey 旋律组」再说指令。停顿后自动转写并提交。 |
+| **哼唱、拍手** | 选对应模式，点麦克风开始，再点一次结束。音频作为素材放进输入栏，可先试听，再单独发送或附上一句说明。 |
+| **键盘、MIDI** | 在旋律组点「录入旋律」，用屏幕琴键或通过「连接 MIDI」接上的外部键盘演奏。点「完成」和「加入输入」，再提交。已有 `.mid` / `.midi` 文件可通过附件导入。 |
+
+文字和 MIDI 可以直接试。哼唱、拍手录音需要浏览器麦克风权限。说话模式另外需要听写服务。开启唤醒后，有声音的片段会发送给听写服务来判断是否叫了乐队。没有唤醒词的普通讲话不会作为乐队指令提交。关闭麦克风或切出页面会停止收音。
+
+## 接语音和大模型
+
+第一次接云服务时，在仓库根目录安装依赖。以下命令请在启动 Studio 服务的同一个 PowerShell 窗口执行。
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[llm]"
-Copy-Item audio-router.example.json audio-router.secrets.json
-Copy-Item xfyun-asr.example.json xfyun-asr.secrets.json
+if (-not (Test-Path xfyun-asr.secrets.json)) { Copy-Item xfyun-asr.example.json xfyun-asr.secrets.json }
 ```
 
-首次配置时，在 `xfyun-asr.secrets.json` 填写讯飞控制台中的 `app_id`、`api_key` 和 `api_secret`。该接口使用 `wss://iat-api.xfyun.cn/v2/iat`，三项凭据缺一不可。也可用 `JAMMATE_XFYUN_ASR_CONFIG` 指向仓库外的私有配置文件。
+- **讯飞听写。** 在 `xfyun-asr.secrets.json` 中填写流式听写服务的 `app_id`、`api_key` 和 `api_secret`。如果已有文件，直接检查现有配置即可。也可用 `JAMMATE_XFYUN_ASR_CONFIG` 指向其他位置。讯飞调用失败时，有 `DASHSCOPE_API_KEY` 才会尝试百炼备用。
+- **ChatAnywhere Agent。** 创建 `chatanywhere-llm.secrets.json`，填写自己的密钥和有权限的模型。当前联调使用 `gpt-5.4-mini`。在启动前设定 `$env:JAMMATE_LLM_CONFIG = (Resolve-Path .\chatanywhere-llm.secrets.json).Path`。
 
-在 `audio-router.secrets.json` 填写 Gemini 网关的 `api_key` 和 `base_url`。该地址只需支持 OpenAI Chat Completions 兼容的文字请求和 JSON Schema 结果，不再需要音频输入能力。也可将 `JAMMATE_AUDIO_ROUTER_CONFIG` 指向仓库外的私有配置文件。两个 `*.secrets.json` 均被 Git 忽略。
+```json
+{
+  "api_key": "填写你自己的密钥",
+  "base_url": "https://api.chatanywhere.tech/v1",
+  "api": "chat_completions",
+  "model": "gpt-5.4-mini",
+  "reasoning_effort": "none",
+  "timeout_s": 28
+}
+```
 
-如果讯飞因额度、授权或网络错误不可用，服务会读取已有的 `DASHSCOPE_API_KEY`，自动使用百炼 `qwen-audio-3.1-asr-flash` 转写同一段 WAV。可用 `JAMMATE_QWEN_ASR_MODEL` 覆盖模型；配置 `DASHSCOPE_WORKSPACE_ID` 后会优先使用北京地域的 workspace 专属域名。备用链路只在讯飞失败后调用，不会为同一段成功录音同时消耗两家额度。
+`*.secrets.json` 已被 Git 忽略。填好配置后启动或重启服务，在「设置」查看语音和模型状态。Studio 检测到模型配置时默认使用「大模型 Agent」。要只试本地规则，可以切回「本地规则」。语音用户的音频由听写服务处理，大模型收到的是转写后的指令。
 
-运行 `.\start-jam-mic.cmd`，打开 [JamMate Studio](http://127.0.0.1:4221/jam.html)。从输入栏选择说话、哼唱或拍手，再点击麦克风录制。原版设备工作台可从设置打开。[Studio 操作说明](docs/JAM_STUDIO_UI.md)
+### 设置里的三个选项
 
-## 文字入口的大模型选项
+| 选项 | 负责什么 |
+| --- | --- |
+| **指令处理** | 根据用户输入和当前演奏，决定改什么。可选本地规则或大模型 Agent。 |
+| **音符编排** | 把通过校验的计划写成具体音符。默认本地规则，也可单独选大模型编排。 |
+| **音频后端** | 把音符变成声音。内置合成器可直接用，FluidSynth 需要 SF2 音色库。MRT2 独立试听和实时伴奏各有运行环境要求。 |
 
-本分支新增 FluidSynth / MRT2 执行适配与规则/LLM 共用入口。MRT2 生成试听会明确报告无法保证的保留约束，不提交未经验证的音乐状态；独立输入文件、运行命令和官方接口说明见 [MRT2 后端](docs/MRT2_BACKEND.md)。服务默认加载当前工作目录代码，使用 `--implementation pinned` 可复现历史版本。
+MRT2 可从「内置伴奏 + MRT2 试听」试起，生成的音频在工作台底部单独播放。流式和独立生成选项是否可用，以当前服务的设置页为准。本地配置和后端限制见 [MRT2 与 FluidSynth 文档](docs/MRT2_BACKEND.md)。
 
-文字页默认用本地规则，装好环境后，三个入口都能在本地试用。开启「队友大模型 Agent」后，模型根据文字和作品状态给出编排动作，例如「移除贝斯」。JamMate 校验动作，再生成具体音符和音频。
+## 交互与联调
 
-要启用大模型，在项目目录运行 `.\.venv\Scripts\python.exe -m pip install -e ".[llm]"`，配置自己的 `OPENAI_API_KEY`，或让 `JAMMATE_LLM_CONFIG` 指向仓库外的私有配置。重启服务后，在文字页选择「队友大模型 Agent」。[配置与验证说明](docs/integration/REFERENCE_WORKBENCH.md#大模型配置)
+```text
+文字 / 听写 / 音频 / MIDI → InputEvent
+InputEvent + 当前 JamState → 指令处理 → BandPlan
+BandPlan → 音符编排 → 音频渲染 → 小节播放回执
+```
 
-「高级设置 → 音符编排」可单独启用 LLM，调整计划授权声部的实际音符。网页可查看编排摘要，模型请求、原始回复与采纳结果写入本地日志。[操作与日志说明](docs/LLM_ARRANGEMENT.md)
+- 「已提交」表示服务收到输入。处理中的计划可能要等到可用的小节才生效。以「已完成」和日志中的播放回执核实实际变更。
+- 空闲时的乐队提议由用户决定是否采用。开场只给一个短鼓点或旋律，演奏中接受的建议由后端安排到可用小节。
+- 要查看原键盘和旧版日志，从「设置」打开经典工作台。更多交互细节见 [Studio 操作说明](docs/JAM_STUDIO_UI.md)。
 
-## 实现与来源
+## 独立创作页面与试听样例
 
-哼唱由 Spotify Basic Pitch 提取音符，接上我们的单声部整理和变奏。拍手与文字调用队友 `a63a0f5` 版本的节拍编排和文字 Agent。三种入口都按小节生成乐器音符，拍手使用原版内置合成器，哼唱和文字可以用 Kevin 渲染器及 FluidSynth 发声。[实现与验收](docs/integration/REFERENCE_WORKBENCH.md) · [团队原版命令行和研发记录](https://github.com/3123738092/aiaa3800_jammate/blob/a63a0f5f579cbc36ed0dfa31874c8888e4873cbd/README.md)
+首页的「从旋律出发」「从律动出发」「从一句话出发」仍可单独试用。运行这几条流程需要额外构建 `web/baseline` 和 `web/optimized`，完成后可用 `start-input-lab.cmd` 打开首页。两套前端的构建命令、历史基线与验收步骤见 [输入工作台运行说明](docs/integration/RUN.md)。
+
+| 示例 | 试听 |
+| --- | --- |
+| 哼唱与变奏 | [原录音](examples/creation/humming-source.wav) · [变奏](examples/creation/humming.wav) |
+| 拍手与节奏编排 | [跟随](examples/reference-creation/rhythm-follow.wav) · [加花](examples/reference-creation/rhythm-vary.wav) · [简化](examples/reference-creation/rhythm-simplify.wav) |
+| 文字开场与调整 | [第一段](examples/reference-creation/text-first.wav) · [调整后](examples/reference-creation/text-adjusted.wav) |
+
+经典工作台的总麦克风还可配置单独的意图分类器，模板见 [audio-router.example.json](audio-router.example.json)。团队原版命令行与研发记录见 [历史 README](https://github.com/3123738092/aiaa3800_jammate/blob/a63a0f5f579cbc36ed0dfa31874c8888e4873cbd/README.md)。
