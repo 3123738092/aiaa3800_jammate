@@ -29,7 +29,8 @@ def state_schema():
     result = obj({
         "schema_version": {"const": "1.0.0"}, "session_id": text, "state_version": integer,
         "transport": obj({"tempo_bpm": {"type": "number", "minimum": MIN_TEMPO_BPM, "maximum": MAX_TEMPO_BPM}, "playing": boolean,
-                          "bar": integer, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}, "next_bar": integer}),
+                          "bar": integer, "beat": {"type": "number", "minimum": 0, "exclusiveMaximum": 16}, "next_bar": integer,
+                          "beats_per_bar": {"type": "integer", "minimum": 1, "maximum": 16}}),
         "harmony": obj({"key": {"anyOf": [{"type": "null"}, obj({"tonic": {"type": "integer", "minimum": 0, "maximum": 11}, "mode": {"enum": ["major", "minor"]}})]}, "progression_variant": integer}),
         "form": obj({"section": text, "bars_elapsed": integer}),
         "feel": obj({"energy": {"type": "integer", "minimum": 0, "maximum": 3}, "density": score, "brightness": score, "tension": score, "tags": {"type": "array", "items": text}}),

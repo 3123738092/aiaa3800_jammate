@@ -1,0 +1,7 @@
+{
+  "app_id": "",
+  "api_key": "",
+  "api_secret": "",
+  "url": "wss://iat-api.xfyun.cn/v2/iat",
+  "timeout_s": 45
+}

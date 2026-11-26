@@ -113,6 +113,8 @@ def event_context(event):
     """Select music/text, never dereference/upload local files or opaque provenance."""
     data = event.to_dict() if hasattr(event, "to_dict") else event
     result = {k: data[k] for k in ("event_id", "source", "event_type", "started_at", "ended_at", "confidence")}
+    if target := data.get("provenance", {}).get("target"):
+        result["target"] = target
     if data["event_type"] == "musical_phrase":
         melody = data["payload"]["melody"]
         result["payload"] = {k: melody[k] for k in ("status", "notes", "tempo", "key", "selectedResult", "timebase")}

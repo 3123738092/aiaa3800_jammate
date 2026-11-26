@@ -187,6 +187,8 @@ class RuleAgent:
                 motif_id = f"motif_{phrases[-1].event_id}"
                 found = next((m for m in state.motifs if m.motif_id == motif_id), None)
                 if found is not None:
+                    if phrases[-1].source == "midi" and not state.layer("lead").active:
+                        actions.append(_action("ADD_LAYER", "lead"))
                     action = "VARY_MOTIF" if vary_input else "ECHO_MOTIF"
                     actions.append(_action(action, "lead", motif_id=motif_id))
                     preserve = [p for p in preserve if not p.startswith("motif:")]
@@ -218,7 +220,7 @@ class RuleAgent:
         for a in actions:
             if a["action"] in {"ECHO_MOTIF", "VARY_MOTIF"}:
                 length = max(n.end for n in state.motif(a["parameters"]["motif_id"]).notes)
-                bars = max(bars, math.ceil(length / 4))
+                bars = max(bars, math.ceil(length / state.beats_per_bar))
         if bars > MAX_PLAN_BARS:
             unresolved.append(f"Phrase exceeds the {MAX_PLAN_BARS}-bar response limit")
         if sum(a["action"].endswith("MOTIF") for a in actions) > 1:

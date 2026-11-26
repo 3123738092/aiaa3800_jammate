@@ -102,6 +102,8 @@ def _cross_validate(data: dict[str, Any]) -> None:
     if data["event_type"] == "rhythm_seed":
         rhythm = payload["rhythm"]
         beats, accents = rhythm["onset_beats"], rhythm["accents"]
+        if any(not 0 <= beat < rhythm["beats_per_bar"] for beat in beats):
+            raise InputEventError("payload.rhythm.onset_beats: outside beats_per_bar")
         if len(beats) != len(accents):
             raise InputEventError("payload.rhythm: onset_beats and accents lengths differ")
         if any(a >= b for a, b in zip(beats, beats[1:])):

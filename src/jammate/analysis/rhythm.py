@@ -19,13 +19,13 @@ from jammate.rhythm import RhythmContext
 
 def rhythm_from_onsets(onset_times: Sequence[float], tempo_bpm: float,
                        beat_origin_s: float, accents: Sequence[float] | None = None,
-                       confidence: float = 1.0) -> RhythmContext:
-    """Quantize one explicit 4/4 bar onto a sixteenth-note grid.
+                       confidence: float = 1.0, beats_per_bar: int = 4) -> RhythmContext:
+    """Quantize one explicit bar onto a sixteenth-note grid.
 
 Times are absolute seconds on the input clock; onsets outside this bar are
 ignored. Multiple detections in one grid cell keep their strongest accent.
 """
-    RhythmContext(tempo_bpm, (), (), beat_origin_s, confidence=confidence)
+    RhythmContext(tempo_bpm, (), (), beat_origin_s, beats_per_bar=beats_per_bar, confidence=confidence)
     times = tuple(onset_times)
     strengths = tuple(accents) if accents is not None else (1.0,) * len(times)
     if len(strengths) != len(times):
@@ -36,17 +36,17 @@ ignored. Multiple detections in one grid cell keep their strongest accent.
         if not math.isfinite(time_s) or not math.isfinite(accent) or not 0 < accent <= 1:
             raise ValueError("onset times must be finite; accents must be within (0, 1]")
         beat = (time_s - beat_origin_s) * tempo_bpm / 60.0
-        if not 0 <= beat < 4:
+        if not 0 <= beat < beats_per_bar:
             continue
         snapped = round(beat * 4) / 4
-        if snapped >= 4:
+        if snapped >= beats_per_bar:
             continue  # a late event must not wrap around to the beginning
         cells[snapped] = max(cells.get(snapped, 0), accent)
         errors.append(abs(beat - snapped))
     fit = max(0.0, 1.0 - float(np.mean(errors)) / 0.25) if errors else 0.0
     beats = tuple(sorted(cells))
     return RhythmContext(tempo_bpm, beats, tuple(cells[b] for b in beats),
-                         beat_origin_s, confidence=confidence * fit)
+                         beat_origin_s, beats_per_bar=beats_per_bar, confidence=confidence * fit)
 
 
 def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
@@ -74,7 +74,8 @@ def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
 
 
 def analyze_rhythm_audio(y: np.ndarray, sr: int, tempo_hint: float | None = None,
-                         count_in: int = 4, beat_origin_s: float | None = None) -> RhythmContext:
+                         count_in: int = 4, beat_origin_s: float | None = None,
+                         beats_per_bar: int = 4) -> RhythmContext:
     """Read steady count-in claps, then the first full bar of a rhythm recording.
 
 With count_in=0, tempo_hint is required and beat zero defaults to the first
@@ -111,29 +112,30 @@ An incomplete bar is rejected rather than inventing its missing contents.
         origin = float(onsets[0]) if onsets.size else 0.0
     if beat_origin_s is not None:
         origin = beat_origin_s
-    RhythmContext(tempo, (), (), origin)
+    RhythmContext(tempo, (), (), origin, beats_per_bar=beats_per_bar)
     # One hop of tolerance covers count-in timestamp quantization.
-    if len(y) / sr + ONSET_HOP / sr < origin + 4 * 60.0 / tempo:
+    if len(y) / sr + ONSET_HOP / sr < origin + beats_per_bar * 60.0 / tempo:
         raise ValueError("recording must contain a complete rhythm bar after the count-in/origin")
     # Backtracked attacks can be a frame early at the downbeat.
     near_origin = np.abs(onsets - origin) <= ONSET_HOP / sr
     onsets[near_origin] = origin
-    return rhythm_from_onsets(onsets, tempo, origin, accents)
+    return rhythm_from_onsets(onsets, tempo, origin, accents, beats_per_bar=beats_per_bar)
 
 
 def analyze_rhythm_bar(y: np.ndarray, sr: int, tempo_bpm: float,
-                       beat_origin_s: float = 0.0) -> RhythmContext:
+                       beat_origin_s: float = 0.0, beats_per_bar: int = 4) -> RhythmContext:
     """Analyze exactly one bar captured on an existing playback grid."""
     onsets, accents = _onsets_and_accents(y, sr)
-    return rhythm_from_onsets(onsets + beat_origin_s, tempo_bpm, beat_origin_s, accents)
+    return rhythm_from_onsets(onsets + beat_origin_s, tempo_bpm, beat_origin_s, accents,
+                              beats_per_bar=beats_per_bar)
 
 
-def analyze_rhythm_feel(y: np.ndarray, sr: int, tempo_bpm: float) -> RhythmContext:
+def analyze_rhythm_feel(y: np.ndarray, sr: int, tempo_bpm: float, beats_per_bar: int = 4) -> RhythmContext:
     """Quantize a short rhythm sketch to the supplied session tempo."""
     onsets, accents = _onsets_and_accents(y, sr)
     if len(onsets) < 2:
         raise ValueError("至少需要两个清晰的节奏起音。")
-    result = rhythm_from_onsets(onsets, tempo_bpm, float(onsets[0]), accents)
+    result = rhythm_from_onsets(onsets, tempo_bpm, float(onsets[0]), accents, beats_per_bar=beats_per_bar)
     if len(result.onset_beats) < 2:
         raise ValueError("当前速度的一个小节里没有足够的节奏起音。")
     return result

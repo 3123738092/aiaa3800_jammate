@@ -1,4 +1,4 @@
-"""Classify a completed opening take or transcribe dictated words using the audio router."""
+"""Transcribe with iFlytek, then classify recognized text with the LLM."""
 import base64
 import io
 import json
@@ -14,25 +14,25 @@ import numpy as np
 from jammate.analysis.jam_capture import isolated_attack_times
 from jammate.orchestration.llm import OpenAIProvider, ProviderFailure
 from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
+from jammate.qwen_asr import (QwenASRConfig, QwenASRTranscriber, QwenConfigurationError,
+                              QwenRecognitionError)
+from jammate.xfyun_asr import (XfyunConfig, XfyunConfigurationError, XfyunRecognitionError,
+                               XfyunTranscriber)
 
 SAMPLE_RATE = 16000
 MAX_SECONDS = 30
 ROUTES = ("WAIT_HUMMING", "WAIT_RHYTHM", "WAIT_TEXT", "USE_HUMMING", "USE_RHYTHM", "SEND_TEXT", "KEEP_LISTENING")
-INTENT = """听这段音乐工作台开场录音，判断用户下一步想做什么。
+INTENT = """根据语音识别得到的文字，判断音乐工作台用户下一步想做什么。
 WAIT_HUMMING：只预告自己要哼唱。WAIT_RHYTHM：只预告自己要拍打节奏。
 WAIT_TEXT：只预告接下来想说几句、口述或提要求，还没有说出具体内容。
 USE_HUMMING：已经有一串可以跟着哼的无词音高，哼声、口哨或电子音色的单旋律都可以作为素材。
 USE_RHYTHM：已经听到一组短促的拍手、敲击或点击声，可以跟着它们打拍子。
-录音可以从表演直接开始。即使没有人说话，只要旋律或拍点清楚，就使用这段录音。
 SEND_TEXT：已经说出给乐队的要求（包括让乐队哼或拍）。instruction 填用户说的原话，
 保留语言、数字和否定，不总结、不执行。预告后跟着具体要求时保留具体要求。
 例如“我想拍几个拍子给你听”是 WAIT_RHYTHM，“你给我拍几个拍子”是 SEND_TEXT；
 “我想跟你说几句话”是 WAIT_TEXT，“我想说，鼓轻一点”已给具体内容，是 SEND_TEXT。
-噪音、沉默或无法判断时 KEEP_LISTENING。只有 SEND_TEXT 填 instruction，其余留空。"""
-DICTATE = """你在给音乐工作台做听写。逐字转写用户口述，保留原语言、数字、否定、口语和约束，合理断句，不解释和执行。
-同音字按音乐语境选择，例如调整快慢、加鼓、贝斯、钢琴，不添加录音没说的乐器或指令。
-有可辨认的话就返回 SEND_TEXT 和转写原文，即使用户说的是录音指令。
-没有可辨认的话时返回 KEEP_LISTENING 和空字符串。"""
+噪音、沉默或无法判断时 KEEP_LISTENING。只有 SEND_TEXT 填 instruction，其余留空。
+输入文字已经由讯飞语音识别产生；不要声称听过音频，不改写、不补充原话。"""
 
 
 def tonal_peaks(pcm):
@@ -89,10 +89,20 @@ class OpeningMic:
         self._active = 0
         self._closed = False
         self._provider = None
+        self._transcriber = None
+        self._fallback_transcriber = None
         try:
             self._provider = self._create_provider()
         except (LLMConfigurationError, OSError):
             # Offline Jam still works. A later recording can pick up a repaired config.
+            pass
+        try:
+            self._transcriber = self._create_transcriber()
+        except (XfyunConfigurationError, OSError):
+            pass
+        try:
+            self._fallback_transcriber = self._create_fallback_transcriber()
+        except (QwenConfigurationError, OSError):
             pass
 
     @staticmethod
@@ -102,6 +112,31 @@ class OpeningMic:
         if config.api != "chat_completions":
             raise LLMConfigurationError("音频入口需要 chat_completions。")
         return OpenAIProvider(config, schema_name="jammate_opening_mic")
+
+    @staticmethod
+    def _create_transcriber():
+        config_path = (os.getenv("JAMMATE_XFYUN_ASR_CONFIG")
+                       or Path(__file__).resolve().parents[2] / "xfyun-asr.secrets.json")
+        return XfyunTranscriber(XfyunConfig.load(config_path))
+
+    @staticmethod
+    def _create_fallback_transcriber():
+        return QwenASRTranscriber(QwenASRConfig.from_environment())
+
+    def _transcribe(self, pcm):
+        primary_error = None
+        try:
+            if self._transcriber is None:
+                self._transcriber = self._create_transcriber()
+            return self._transcriber.transcribe(pcm)
+        except (XfyunConfigurationError, XfyunRecognitionError) as exc:
+            primary_error = exc
+        try:
+            if self._fallback_transcriber is None:
+                self._fallback_transcriber = self._create_fallback_transcriber()
+            return self._fallback_transcriber.transcribe(pcm)
+        except (QwenConfigurationError, QwenRecognitionError) as exc:
+            raise QwenRecognitionError(f"讯飞不可用：{primary_error}；百炼备用不可用：{exc}") from exc
 
     def _complete(self, messages, schema):
         with self._requests:
@@ -126,6 +161,12 @@ class OpeningMic:
             if self._provider is not None:
                 self._provider.client.close()
                 self._provider = None
+            self._transcriber = None
+            if self._fallback_transcriber is not None:
+                close = getattr(self._fallback_transcriber.session, "close", None)
+                if close:
+                    close()
+                self._fallback_transcriber = None
 
     def recognize(self, body):
         mode = body.get("mode")
@@ -148,26 +189,39 @@ class OpeningMic:
         if not any(pcm):
             return {"route": "KEEP_LISTENING"}
 
-        allowed = ROUTES if mode == "intent" else ("SEND_TEXT", "KEEP_LISTENING")
+        try:
+            words = self._transcribe(pcm).strip()
+        except (XfyunConfigurationError, XfyunRecognitionError, QwenConfigurationError,
+                QwenRecognitionError) as exc:
+            raise ValueError(str(exc)) from exc
+
+        if mode == "dictation":
+            return {"route": "SEND_TEXT", "instruction": words} if words else {"route": "KEEP_LISTENING"}
+        if not words:
+            cue = listening_cue(pcm)
+            if cue and cue.startswith("持续变化的频率"):
+                return {"route": "USE_HUMMING"}
+            if cue and cue.startswith("录音中测得多个"):
+                return {"route": "USE_RHYTHM"}
+            return {"route": "KEEP_LISTENING"}
+
+        allowed = ROUTES
         schema = {"type": "object", "properties": {"route": {"type": "string", "enum": list(allowed)},
                   "instruction": {"type": "string"}}, "required": ["route", "instruction"], "additionalProperties": False}
-        parts = [{"type": "input_audio", "input_audio": {"format": "wav", "data": encoded}}]
-        if mode == "intent" and (cue := listening_cue(pcm)):
-            parts.append({"type": "text", "text": cue})
         try:
-            reply = self._complete([{"role": "system", "content": INTENT if mode == "intent" else DICTATE},
-                                    {"role": "user", "content": parts}], schema)
+            reply = self._complete([{"role": "system", "content": INTENT},
+                                    {"role": "user", "content": words}], schema)
         except LLMConfigurationError as exc:
             raise ValueError("总麦克风服务配置不可用。") from exc
         except ProviderFailure as exc:
             raise ValueError(f"录音识别服务暂不可用（{exc.kind}），请重试。") from exc
         try:
             decision = json.loads(reply.text)
-            route, words = decision["route"], decision["instruction"].strip()
-            if route not in allowed or bool(words) != (route == "SEND_TEXT"):
+            route, instruction = decision["route"], decision["instruction"].strip()
+            if route not in allowed or bool(instruction) != (route == "SEND_TEXT"):
                 raise ValueError()
         except (TypeError, ValueError, AttributeError, KeyError) as exc:
             raise ValueError("录音识别结果无效，请再试一次。") from exc
-        if mode == "intent" and route == "SEND_TEXT":
+        if route == "SEND_TEXT":
             route = spoken_intent(words)
         return {"route": route, "instruction": words} if route == "SEND_TEXT" else {"route": route}

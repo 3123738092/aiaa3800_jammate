@@ -98,10 +98,10 @@ export function initJamDebug(post, label) {
     canvas.width = Math.round(width * pixelRatio);
     canvas.height = Math.round(height * pixelRatio);
     context.scale(pixelRatio, pixelRatio);
-    context.fillStyle = '#11251f';
+    context.fillStyle = '#202c39';
     context.fillRect(0, 0, width, height);
     if (!notes.length) {
-      context.fillStyle = '#b9cbbd';
+      context.fillStyle = '#b9c9dc';
       context.font = '13px system-ui';
       context.fillText(visibleBar ? '这组声部没有音符' : '暂无小节', 16, 29);
       canvas.setAttribute('aria-label', visibleBar ? '所选声部在此小节没有音符' : '暂无可显示的小节');
@@ -118,10 +118,10 @@ export function initJamDebug(post, label) {
       const drum = i >= pitchRows;
       const pitch = drum ? drums[i - pitchRows] : midi;
       const octave = !drum && midi % 12 === 0;
-      context.fillStyle = octave || drum ? '#273f34' : i % 2 ? '#1a3027' : '#1d362b';
+      context.fillStyle = octave || drum ? '#3c4b5d' : i % 2 ? '#263443' : '#2c3a4a';
       context.fillRect(left, yFor(i), gridWidth, rowHeight);
       if (drum || octave || rowHeight >= 12) {
-        context.fillStyle = '#d4e2d5';
+        context.fillStyle = '#d4e0ed';
         const name = drum ? drumNames[pitch] ?? String(pitch) : pitches[midi % 12] + (Math.floor(midi / 12) - 1);
         context.fillText(name, 9, yFor(i) + rowHeight / 2);
       }
@@ -129,10 +129,10 @@ export function initJamDebug(post, label) {
     for (let beat = 0; beat <= beats; beat += .25) {
       const x = left + beat / beats * gridWidth;
       const whole = Number.isInteger(beat);
-      context.fillStyle = whole ? '#749384' : '#345246';
+      context.fillStyle = whole ? '#71879e' : '#45596e';
       context.fillRect(x, top, 1, height - top - 9);
       if (whole && beat < beats) {
-        context.fillStyle = '#d4e2d5';
+        context.fillStyle = '#d4e0ed';
         context.fillText('第 ' + (beat + 1) + ' 拍', x + 4, 13);
       }
     }

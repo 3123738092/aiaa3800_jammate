@@ -117,7 +117,7 @@ class StateManager:
                     accepted.append(event)
             state = self._state
             for event in accepted:
-                if event.source != "system":
+                if event.source != "system" or event.payload.get("command") == "accept_suggestion":
                     state = state.with_updates(interaction=replace(state.interaction, awaiting_user=False))
                 if event.event_type == "speech":
                     state = state.with_updates(interaction=replace(state.interaction, last_feedback=event.payload["text"]))
@@ -126,7 +126,7 @@ class StateManager:
                     if phrase.notes:
                         motif = Motif(f"motif_{event.event_id}", "user", (event.event_id,), phrase.notes)
                         accompaniment = state.accompaniment_motif
-                        if self._follow_humming and event.source == "humming" and has_melodic_contour(phrase.notes):
+                        if self._follow_humming and event.source in {"humming", "midi"} and has_melodic_contour(phrase.notes):
                             accompaniment = AccompanimentMotif(motif.motif_id, state.position.next_bar)
                         state = state.with_updates(motifs=state.motifs + (motif,), last_user_motif=phrase.notes,
                                                    accompaniment_motif=accompaniment)
@@ -209,8 +209,8 @@ class StateManager:
 
     def update_transport(self, *, bar: int, beat: float, next_bar: int, completed_previous_bar: bool = False):
         """Runtime-owned position updates do not increment semantic state_version."""
-        position = TransportPosition(bar, beat, next_bar)
         with self._lock:
+            position = TransportPosition(bar, beat, next_bar, self._state.beats_per_bar)
             old = self._state.position
             if (bar, beat) < (old.bar, old.beat) or next_bar < old.next_bar:
                 raise ValueError("transport cannot move backwards")

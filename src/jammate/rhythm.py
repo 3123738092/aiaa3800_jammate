@@ -1,6 +1,6 @@
 """Validated one-bar rhythm exchanged by input, director and generator.
 
-Only 4/4 is supported. ``beat_origin_s`` belongs to the input audio clock;
+``beat_origin_s`` belongs to the input audio clock;
 it is not a request to restart an already playing band. Live updates take
 effect at the next unrendered bar on the output clock.
 """
@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 
-from jammate.music import BEATS_PER_BAR, MAX_TEMPO_BPM, MIN_TEMPO_BPM
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
 
 
 class RhythmMode(str, Enum):
@@ -28,7 +28,7 @@ class RhythmContext:
     onset_beats: tuple[float, ...]
     accents: tuple[float, ...]
     beat_origin_s: float = 0.0
-    beats_per_bar: int = BEATS_PER_BAR
+    beats_per_bar: int = 4
     confidence: float = 1.0
 
     def __post_init__(self) -> None:
@@ -39,16 +39,16 @@ class RhythmContext:
             raise ValueError(f"rhythm tempo_bpm must be finite and within {MIN_TEMPO_BPM}-{MAX_TEMPO_BPM}")
         if not math.isfinite(self.beat_origin_s) or self.beat_origin_s < 0:
             raise ValueError("beat_origin_s must be finite and nonnegative")
-        if self.beats_per_bar != BEATS_PER_BAR:
-            raise ValueError("only 4/4 rhythms (beats_per_bar=4) are supported")
+        if type(self.beats_per_bar) is not int or not 1 <= self.beats_per_bar <= 16:
+            raise ValueError("beats_per_bar must be an integer within 1..16")
         if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
             raise ValueError("confidence must be within 0-1")
         if len(self.onset_beats) != len(self.accents):
             raise ValueError("onset_beats and accents must have the same length")
-        if len(self.onset_beats) > 16:
-            raise ValueError("at most 16 onsets per bar are supported")
-        if any(not math.isfinite(b) or not 0 <= b < BEATS_PER_BAR for b in self.onset_beats):
-            raise ValueError("onset_beats must be finite and within [0, 4)")
+        if len(self.onset_beats) > 64:
+            raise ValueError("at most 64 onsets per bar are supported")
+        if any(not math.isfinite(b) or not 0 <= b < self.beats_per_bar for b in self.onset_beats):
+            raise ValueError(f"onset_beats must be finite and within [0, {self.beats_per_bar})")
         if any(a >= b for a, b in zip(self.onset_beats, self.onset_beats[1:])):
             raise ValueError("onset_beats must be strictly increasing without duplicates")
         if any(not math.isfinite(a) or not 0 < a <= 1 for a in self.accents):

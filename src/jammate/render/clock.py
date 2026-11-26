@@ -19,10 +19,11 @@ class BarTiming:
 class BarClock:
     """Accumulate fractional samples so rounding error does not grow per bar."""
 
-    def __init__(self, sr: int, start_sample: int = 0) -> None:
+    def __init__(self, sr: int, start_sample: int = 0, beats_per_bar: int = BEATS_PER_BAR) -> None:
         if sr <= 0 or start_sample < 0:
             raise ValueError("sample rate must be positive and start_sample nonnegative")
         self.sr = sr
+        self.beats_per_bar = beats_per_bar
         self._next_sample = float(start_sample)
         self.bar_index = 0
         self._last_tempo: float | None = None
@@ -35,7 +36,7 @@ class BarClock:
         if not math.isfinite(tempo_bpm) or tempo_bpm <= 0:
             raise ValueError("tempo must be finite and positive")
         start = self.next_sample
-        self._next_sample += BEATS_PER_BAR * 60.0 / tempo_bpm * self.sr
+        self._next_sample += self.beats_per_bar * 60.0 / tempo_bpm * self.sr
         timing = BarTiming(self.bar_index, start, self.next_sample, tempo_bpm)
         self.bar_index += 1
         self._last_tempo = tempo_bpm

@@ -33,11 +33,12 @@ locked fields in the input. Use the text to resolve the other requested musical
 parameters. Use humming to inform harmony when present. Choose missing musical
 parameters only within the explicitly requested ensemble. Solo and percussion-only
 requests must not get unrelated parts. Leave tonic/mode null and chords empty when
-harmony is unnecessary. Leave rhythm_steps empty when a rhythm grid is unnecessary.
-A chord offset is the number of
+harmony is unnecessary. Choose a key for a pitched ensemble that needs accompaniment, even
+if the user left the key unspecified. Leave rhythm_steps empty when a rhythm grid is unnecessary.
+    A chord offset is the number of
 semitones above the tonic. The groove lists sorted, distinct sixteenth-note steps
-in one 4/4 bar (step 0 = beat 1, step 2 = 1-and, step 12 = beat 4). For an offbeat
-pattern, use 2, 6, 10 and 14 unless the user specified other attacks. Do not
+within the requested meter (step 0 = beat 1). For an offbeat
+pattern, use half-beat positions across the requested bar unless the user specified other attacks. Do not
 invent a replayable humming melody. Lead is available only with real humming
 and replays the actual recording's pitches and timing. Choose only instruments
 in the catalogue. Core drums, bass and keys are optional. Explain the musical
@@ -90,9 +91,7 @@ def text_settings(event):
     if event is None:
         return None, None, None
     text = normalize("NFKC", event.payload["text"])
-    meters = re.findall(r"(?<!\d)(\d+)\s*/\s*(\d+)\s*(?:拍|time\b|(?=[，,。；;]|$))", text, re.I)
-    if any(meter != ("4", "4") for meter in meters) or re.search(r"四[二三五六七]拍|八[三五六七]拍", text):
-        raise ValueError("当前实时伴奏支持 4/4 拍，请将开场节奏改为 4/4。")
+    # Accept meter text and let the live session carry the requested numerator.
     clauses = speech_clauses((event,))
     candidates = set()
     for clause in clauses:
@@ -105,19 +104,40 @@ def text_settings(event):
     keys = {named_key(*match.groups()) for clause in clauses
             if not re.search(r"不要|不用|别|\b(?:not|without)\b", clause)
             for match in _KEY.finditer(clause)}
+    beats_per_bar = text_beats_per_bar(event)
     beats = []
     for match in _BEATS.finditer(text):
         if any(mark in text[max(0, match.start() - 6):match.start()] for mark in ("不要", "别", "不打", "休止")):
             continue
         beats.extend(float(value) - 1 for value in re.findall(_BEAT, match.group(1)))
-    if beats and any(not 0 <= beat < 4 or not (beat * 4).is_integer() for beat in beats):
-        raise ValueError("开场文字拍点需在第 1–4 拍及其十六分音符网格上。")
+    if beats and any(beat < 0 or beat >= text_beats_per_bar(event) or not (beat * 4).is_integer() for beat in beats):
+        raise ValueError("开场文字拍点需为非负十六分音符网格位置。")
     if not beats and any(re.search(r"反拍|\boff[- ]?beats?\b", clause)
                          and not re.search(r"不要|不用|别|不打|\b(?:not|without)\b", clause) for clause in clauses):
-        beats = [.5, 1.5, 2.5, 3.5]
+        beats = tuple(beat + .5 for beat in range(beats_per_bar))
     return (next(iter(candidates)) if len(candidates) == 1 else None,
             next(iter(keys)) if len(keys) == 1 else None,
             tuple(sorted(set(beats))) or None)
+
+
+def text_beats_per_bar(event):
+    """Read an explicit numerator from natural-language meter, default to 4."""
+    if event is None:
+        return 4
+    text = normalize("NFKC", event.payload["text"])
+    meters = re.findall(r"(?<!\d)(\d+)\s*/\s*(\d+)\s*(?:拍|time\b|(?=[，,。；;]|$))", text, re.I)
+    if meters:
+        valid = {int(numerator) for numerator, denominator in meters
+                 if int(denominator) in (2, 4, 8, 16) and 1 <= int(numerator) <= 16}
+        if len(valid) == 1:
+            return next(iter(valid))
+    named = re.search(r"([一二三四五六七八九十]+)\s*拍子", text)
+    if named:
+        values = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+                  "七": 7, "八": 8, "九": 9, "十": 10}
+        if named.group(1) in values:
+            return values[named.group(1)]
+    return 4
 
 
 def _object(properties):
@@ -128,7 +148,9 @@ def _object(properties):
 def _cold_opening(events, sources, tempo, tempo_source, key, key_source, beats, claps):
     bpm = tempo if tempo is not None else JamState.tempo_bpm
     if beats:
-        rhythm = RhythmContext(bpm, beats, (1.,) * len(beats))
+        rhythm = RhythmContext(bpm, beats, (1.,) * len(beats), beats_per_bar=next(
+            (source.payload["rhythm"]["beats_per_bar"] for source in events if source.source == "rhythm"),
+            text_beats_per_bar(next((source for source in events if source.event_type == "speech"), None))))
     else:
         rhythm = replace(claps, tempo_bpm=bpm) if claps else None
     clauses = speech_clauses((sources["text"],)) if "text" in sources else ()
@@ -146,11 +168,15 @@ def _cold_opening(events, sources, tempo, tempo_source, key, key_source, beats, 
     labels = {}
     if rhythm is not None:
         labels["drums"] = "鼓组"
-    if "humming" in sources and sources["humming"].payload["melody"]["notes"]:
-        labels["lead"] = "主奏 · 默认音色复奏哼唱"
+    if phrase := sources.get("midi", sources.get("humming")):
+        if phrase.payload["melody"]["notes"]:
+            labels["lead"] = "主奏 · 复奏录入旋律" if phrase.source == "midi" else "主奏 · 默认音色复奏哼唱"
     if steps:
         labels["keys"] = "键盘 · 回放指定和弦"
-    base = JamState(tempo_bpm=bpm, session_id=events[0].session_id, auto_harmony=False)
+    bar_length = rhythm.beats_per_bar if rhythm is not None else text_beats_per_bar(next(
+        (source for source in events if source.event_type == "speech"), None))
+    base = JamState(tempo_bpm=bpm, session_id=events[0].session_id, auto_harmony=False,
+                    beats_per_bar=bar_length)
     state = base.with_updates(key=key, rhythm=rhythm, chord_cycle=steps,
                               layers=tuple(replace(layer, active=layer.name in labels) for layer in base.layers))
     return state, {
@@ -195,12 +221,14 @@ def _humming_opening(events, event, text, tempo, tempo_source, key, key_source, 
                        for bar in range(int(note.start // BEATS_PER_BAR), ceil(note.end / BEATS_PER_BAR))
                        if note.pitch % 12 in cycle[bar % len(cycle)].pcs)
         chords = max(choices, key=fit)
-    rhythm = RhythmContext(tempo, beats, (1.,) * len(beats)) if beats else (
+    bar_length = claps.beats_per_bar if claps is not None and not beats else text_beats_per_bar(
+        next((source for source in events if source.event_type == "speech"), None))
+    rhythm = RhythmContext(tempo, beats, (1.,) * len(beats), beats_per_bar=bar_length) if beats else (
         replace(claps, tempo_bpm=tempo) if claps else None)
     labels = {"lead": "主奏 · 哼唱与接续", "keys": "键盘", "bass": "贝斯"}
     if rhythm is not None:
         labels["drums"] = "鼓组"
-    base = JamState(tempo_bpm=tempo, session_id=events[0].session_id)
+    base = JamState(tempo_bpm=tempo, session_id=events[0].session_id, beats_per_bar=bar_length)
     state = base.with_updates(key=key, rhythm=rhythm,
         chord_cycle=tuple(ChordStep((chord.root - key.tonic) % 12, chord.quality) for chord in chords),
         layers=tuple(replace(layer, active=layer.name in labels) for layer in base.layers))
@@ -216,7 +244,7 @@ def _humming_opening(events, event, text, tempo, tempo_source, key, key_source, 
 
 def cold_audio_plan(request):
     state, events = request.state, request.events
-    if state.auto_harmony or not state.playing or any(event.source not in {"rhythm", "humming"} for event in events):
+    if state.auto_harmony or not state.playing or any(event.source not in {"rhythm", "humming", "midi"} for event in events):
         return None
     actions, bars = [], 1
     for event in events:
@@ -227,7 +255,7 @@ def cold_audio_plan(request):
                 actions.append({"action": "ADD_LAYER", "scope": "drums", "strength": .5, "parameters": {}})
             actions.append({"action": "ADJUST_FEEL", "scope": "band", "strength": .5,
                             "parameters": {"rhythm_event_id": event.event_id}})
-        elif event.source == "humming":
+        elif event.event_type == "musical_phrase":
             motif_id = f"motif_{event.event_id}"
             motif = next((item for item in state.motifs if item.motif_id == motif_id), None)
             if motif and (state.layer("lead").active or state.interaction.allow_initiative):
@@ -235,7 +263,7 @@ def cold_audio_plan(request):
                     actions.append({"action": "ADD_LAYER", "scope": "lead", "strength": .5, "parameters": {}})
                 actions.append({"action": "ECHO_MOTIF", "scope": "lead", "strength": .5,
                                 "parameters": {"motif_id": motif_id}})
-                bars = max(bars, ceil(max(note.end for note in motif.notes) / 4))
+                bars = max(bars, ceil(max(note.end for note in motif.notes) / state.beats_per_bar))
     if not actions:
         return None
     return make_plan(state, events, f"cold_{uuid4().hex}", "RESPOND", actions,
@@ -244,11 +272,14 @@ def cold_audio_plan(request):
 
 
 def prepare_opening(events, config, programs, *, tempo_override=None, key_override=None, provider=None,
-                    mode="warm", renderer="synth"):
+                    mode="warm", renderer="synth", beats_override=None):
     by_source = {event.source: event for event in events}
-    rhythm_event, humming_event = by_source.get("rhythm"), by_source.get("humming")
-    text_event = by_source.get("text")
+    rhythm_event, humming_event = by_source.get("rhythm"), by_source.get("midi", by_source.get("humming"))
+    text_event = by_source.get("text", by_source.get("speech"))
+    if text_event:
+        by_source["text"] = text_event
     text_bpm, text_key, text_beats = text_settings(text_event)
+    beats_per_bar = beats_override or text_beats_per_bar(text_event)
     tempo = tempo_override if tempo_override is not None else text_bpm
     if tempo is not None and not MIN_TEMPO_BPM <= tempo <= MAX_TEMPO_BPM:
         raise ValueError(f"开场速度需在 {MIN_TEMPO_BPM:g}–{MAX_TEMPO_BPM:g} BPM 之间。")
@@ -281,7 +312,10 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
             voice = "drums" if layer == "drums" else "lead"
             rhythm = state.rhythm if voice == "drums" else None
             if voice == "drums" and rhythm is None:
-                rhythm = RhythmContext(state.tempo_bpm, (0., 1., 2., 3.), (1., .55, .85, .55))
+                rhythm = RhythmContext(state.tempo_bpm,
+                    tuple(float(beat) for beat in range(state.beats_per_bar)),
+                    tuple(1. if beat == 0 else .65 for beat in range(state.beats_per_bar)),
+                    beats_per_bar=state.beats_per_bar)
                 selection["settings"].update(rhythm_source="requested_groove", rhythm_beats_zero_based=[0, 1, 2, 3])
             key = state.key
             if voice == "drums":
@@ -307,7 +341,7 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
                                          text_key or Key(0), "text" if text_key else "band_default", text_beats, claps)
         labels = {"drums": "鼓组", "bass": "贝斯", "keys": "键盘"}
         if humming_event:
-            labels["lead"] = "主奏 · 复奏哼唱"
+            labels["lead"] = "主奏 · 复奏录入旋律"
         selection.update(mode=mode, instruments=[{"name": name, "label": label} for name, label in labels.items()],
                          reason="根据所要求的完整伴奏，启用鼓、贝斯和键盘。")
         return state.with_updates(auto_harmony=True, layers=tuple(
@@ -341,8 +375,8 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
     offset = {"type": "integer", "minimum": 0, "maximum": 11}
     schema = _object({
         "tempo_bpm": {"type": "number", "minimum": MIN_TEMPO_BPM, "maximum": MAX_TEMPO_BPM},
-        "rhythm_steps": {"type": "array", "minItems": 0, "maxItems": 16,
-                         "items": {"type": "integer", "minimum": 0, "maximum": 15}},
+        "rhythm_steps": {"type": "array", "minItems": 0, "maxItems": 64,
+                         "items": {"type": "integer", "minimum": 0, "maximum": beats_per_bar * 4 - 1}},
         "tonic": {"anyOf": [offset, {"type": "null"}]},
         "mode": {"enum": ["major", "minor", None]},
         "chords": {"type": "array", "minItems": 0, "maxItems": 8, "items": _object({
@@ -357,11 +391,13 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
                    "key": {"tonic": text_key.tonic, "mode": text_key.mode} if text_key else None,
                    "rhythm_steps": [int(beat * 4) for beat in text_beats or (claps.onset_beats if claps else ())]},
         "tempo_bpm": locked_tempo,
+        "beats_per_bar": beats_per_bar,
         "rhythm": claps.to_dict() if claps else None,
         "humming": [{"pitch": note["pitchMidi"], "start_seconds": note["startSec"],
                      "duration_seconds": note["durationSec"]}
                     for note in humming_event.payload["melody"]["notes"]] if humming_event else [],
         "text": text_event.payload["text"] if text_event else "",
+        "target": text_event.to_dict().get("provenance", {}).get("target") if text_event else None,
         "instruments": instruments,
     }
     provider = provider or OpenAIProvider(config, schema_name="jammate_live_opening")
@@ -396,14 +432,16 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
         rhythm_source = "claps"
     else:
         beats = text_beats or tuple(step / 4 for step in sorted(data["rhythm_steps"]))
-        rhythm = RhythmContext(bpm, beats, (1.0,) * len(beats)) if beats else None
+        rhythm = RhythmContext(bpm, beats, (1.0,) * len(beats), beats_per_bar=beats_per_bar) if beats else None
         rhythm_source = ("text" if text_beats else "text_interpreted" if text_event else "model") if rhythm else None
     base = JamState(tempo_bpm=bpm, session_id=events[0].session_id)
     layers = tuple(Layer(layer.name, active=layer.name in selected, role=layer.role) for layer in base.layers)
     core = {layer.name for layer in layers}
     layers += tuple(Layer(name) for name in selected if name not in core)
+    bar_length = rhythm.beats_per_bar if rhythm is not None else text_beats_per_bar(next(
+        (source for source in events if source.event_type == "speech"), None))
     state = base.with_updates(
-        rhythm=rhythm, key=key,
+        rhythm=rhythm, key=key, beats_per_bar=bar_length,
         chord_cycle=tuple(ChordStep(**step) for step in data["chords"]), layers=layers,
         auto_harmony=key is not None and any(name not in {"drums", "lead"} for name in selected),
         interaction=replace(base.interaction, allow_initiative=len(selected) > 1),

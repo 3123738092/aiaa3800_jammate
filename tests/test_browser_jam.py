@@ -291,6 +291,7 @@ def test_cold_mrt2_opening_sends_only_drum_frames_and_keeps_realtime_audio(monke
 
 def test_mrt2_live_turns_commit_key_and_publish_only_the_current_audio(monkeypatch):
     from jammate.contracts.adapters import from_text
+    from jammate.music import Key
     from jammate.orchestration.jam_opening import prepare_opening
 
     rendering_key, release_key = Event(), Event()
@@ -343,7 +344,8 @@ def test_text_can_supply_exact_opening_bpm_key_and_beats_without_audio():
     import json
     import pytest
     from jammate.contracts.adapters import from_text
-    from jammate.orchestration.jam_opening import prepare_opening, text_settings
+    from jammate.music import Key
+    from jammate.orchestration.jam_opening import prepare_opening, text_beats_per_bar, text_settings
     from jammate.orchestration.llm import ModelReply
     from jammate.orchestration.llm_config import LLMConfig
 
@@ -363,6 +365,7 @@ def test_text_can_supply_exact_opening_bpm_key_and_beats_without_audio():
     event = from_text("92 BPM，D 大调，4/4，每小节在第 1、2.5、4 拍起音", session_id="text-opening")
     state, selection = prepare_opening((event,), LLMConfig("test"), {}, provider=OpeningModel())
     assert state.tempo_bpm == 92 and state.key.name == "D major"
+    assert state.beats_per_bar == 4
     assert selection["settings"]["rhythm_source"] == "text"
     with ThreadPoolExecutor(1) as workers:
         jam = BrowserJam(92, RuleAgent, workers, opening=(state, (event,), selection))
@@ -371,8 +374,12 @@ def test_text_can_supply_exact_opening_bpm_key_and_beats_without_audio():
         assert [event["source"] for event in debug["opening"]["input_events"]] == ["text"]
         assert {note["instrument"] for note in debug["queued"]["notes"]} == {"drums", "harp"}
         assert {note["start"] for note in debug["queued"]["notes"]} == {0, 1.5, 3}
-    with pytest.raises(ValueError, match="4/4"):
-        text_settings(from_text("92 BPM，3/4，A 小调", session_id="text-opening"))
+    # Meter text must not reject an otherwise valid user-directed opening.
+    assert text_settings(from_text("92 BPM，3/4，A 小调", session_id="text-opening"))[:2] == (92.0, Key(9, "minor"))
+    assert text_beats_per_bar(from_text("92 BPM，3/4，A 小调", session_id="text-opening")) == 3
+    three_four = from_text("92 BPM，3/4，每小节在第 1、2.5 拍起音", session_id="text-opening")
+    assert text_settings(three_four)[2] == (0.0, 1.5)
+    assert text_beats_per_bar(three_four) == 3
 
 
 def test_slow_model_does_not_block_buffering_and_misses_the_first_open_bar():

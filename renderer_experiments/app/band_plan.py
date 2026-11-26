@@ -17,7 +17,6 @@ import soundfile as sf
 
 from jammate.contracts import PlanError
 from jammate.instruments import ADDED_INSTRUMENTS, gm_program
-from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.backend_arrangement import TICKS_PER_BEAT, prepare_scoped_score
 from jammate.orchestration.offline import prepare_plan, RenderedPlan
 from jammate.orchestration.transitions import project
@@ -185,7 +184,7 @@ class KevinRuntime:
     def export_audio(self, folder, performance, conditioning):
         channels = conditioning if conditioning is not None else performance_channels(performance.notes)
         events = midi_events(performance, channels)
-        duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+        duration = performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm
         write_events(folder / "events.json", events)
         programs = dict(self.programs)
         occupied = {event.channel for event in events}
@@ -202,7 +201,7 @@ class KevinRuntime:
         # shortening one note with another note-off. Polyphonic different pitches work.
         import mido
         tempo = mido.bpm2tempo(performance.tempo_bpm)
-        tick = lambda beat: round(mido.second2tick((beat - performance.start_bar * 4) * 60 / performance.tempo_bpm, 480, tempo))
+        tick = lambda beat: round(mido.second2tick((beat - performance.start_bar * performance.beats_per_bar) * 60 / performance.tempo_bpm, 480, tempo))
         ends = {}
         channels = channels if channels is not None else performance_channels(performance.notes)
         for note in sorted(performance.notes, key=lambda n: n.start):
@@ -247,7 +246,7 @@ class KevinRuntime:
                 receipt["arrangement"] = arranger.last_trace
             capabilities = self.capabilities(plan, performance, conditioning)
             receipt["capabilities"] = capabilities
-            duration = performance.bars * BEATS_PER_BAR * 60 / performance.tempo_bpm
+            duration = performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm
             metadata = self.export_audio(folder, performance, conditioning)
             audio, sr = sf.read(folder / "band.wav", dtype="float32", always_2d=True)
             if sr != self.sample_rate or len(audio) < round(duration * sr) - 2 or not np.isfinite(audio).all():
@@ -285,7 +284,8 @@ class KevinRuntime:
                     receipt["persistence_warnings"].append({"file": name, "error": type(exc).__name__, "errno": exc.errno})
             self.last_receipt = receipt
             return RenderedPlan(performance.notes, performance.lead_notes, performance.generated_motif,
-                                performance.tempo_bpm, performance.start_bar, performance.bars, audio, sr)
+                                performance.tempo_bpm, performance.start_bar, performance.bars, audio, sr,
+                                beats_per_bar=performance.beats_per_bar)
         except Exception as exc:
             arranger = self.backend_arranger or self.arranger
             if arranger is not None and arranger.last_trace.get("plan_id") == plan.plan_id:

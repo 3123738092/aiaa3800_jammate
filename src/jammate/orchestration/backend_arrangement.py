@@ -71,7 +71,7 @@ def audible_layers(state, plan):
 
 
 def fits_harmony(pitch, beat, context):
-    bar = int(beat // BEATS_PER_BAR)
+    bar = int(beat // context.get("beats_per_bar", BEATS_PER_BAR))
     chords = context.get("chord_pitch_classes_by_bar", ())
     return (pitch % 12 in context["scale_pitch_classes"]
             or (bar < len(chords) and pitch % 12 in chords[bar]))
@@ -103,12 +103,13 @@ class MRTArrangement:
 class LLMBackendArranger:
     """Independent MIDI arrangement or direct MRT2 conditioning."""
 
-    def __init__(self, config, backend, *, provider=None, log=None, capture_replies=False):
+    def __init__(self, config, backend, *, provider=None, log=None, capture_replies=False, retry_invalid=False):
         if backend not in {"synth", "fluidsynth", "mrt2"}:
             raise ValueError("unknown backend for LLM arrangement")
         self.config, self.backend, self.log = config, backend, log
         self.provider = provider or OpenAIProvider(config, schema_name=f"jammate_{backend}_arrangement_v1")
         self.capture_replies = capture_replies
+        self.retry_invalid = retry_invalid
         self.last_trace = {}
 
     def _record(self, name, **fields):
@@ -133,18 +134,33 @@ class LLMBackendArranger:
             content = self._redact(content)
             self._record("backend_arrangement_request", context=content)
             messages = [{"role": "system", "content": prompt}, {"role": "user", "content": content}]
-            reply = self.provider.complete(messages, schema, self.config.timeout_s)
-            self.last_trace.update(model=reply.model, usage=reply.usage)
-            raw = self._redact(reply.text)
-            if self.capture_replies:
-                self.last_trace.update(reply=raw[:8000], reply_truncated=len(raw) > 8000)
-            self._record("backend_arrangement_output", raw=raw[:96_000], truncated=len(raw) > 96_000)
-            if len(raw) > 96_000:
-                raise PlanError("backend arrangement response is too large")
-            data = json.loads(raw, object_pairs_hook=_unique_object)
-            Draft202012Validator(schema).validate(data)
-            self.last_trace["output"] = data
-            result = compile_output(data)
+            for attempt in range(2):
+                remaining = self.config.timeout_s - (time.monotonic() - started)
+                if remaining <= 0:
+                    raise ProviderFailure("timeout")
+                reply = self.provider.complete(messages, schema, remaining)
+                self.last_trace.update(model=reply.model, usage=reply.usage)
+                raw = self._redact(reply.text)
+                if self.capture_replies:
+                    self.last_trace.update(reply=raw[:8000], reply_truncated=len(raw) > 8000)
+                self._record("backend_arrangement_output", raw=raw[:96_000], truncated=len(raw) > 96_000)
+                if len(raw) > 96_000:
+                    raise PlanError("backend arrangement response is too large")
+                try:
+                    data = json.loads(raw, object_pairs_hook=_unique_object)
+                    Draft202012Validator(schema).validate(data)
+                    self.last_trace["output"] = data
+                    result = compile_output(data)
+                except (PlanError, ValueError, ValidationError) as error:
+                    if attempt or not self.retry_invalid:
+                        raise
+                    self.last_trace["retry_reason"] = str(error)[:500]
+                    messages.append({"role": "user", "content":
+                        "The proposed arrangement failed validation: " + str(error)[:500]
+                        + ". Return a corrected complete arrangement for the same BandPlan. "
+                        "Check all pitches against the allowed pitch classes and all notes against the clip bounds."})
+                else:
+                    break
             self.last_trace["status"] = "accepted"
             return result
         except (ProviderFailure, PlanError, ValueError, ValidationError) as exc:
@@ -303,9 +319,10 @@ def prepare_scoped_score(state, plan, events, arranger, *, seed=3800, request_no
     if not mutable:
         arranger.skip(plan, "host_preserve_or_transport")
         return reference(state, plan, seed=seed), None
-    origin, length = start * BEATS_PER_BAR, bars * BEATS_PER_BAR
+    bar_length = target.beats_per_bar
+    origin, length = start * bar_length, bars * bar_length
     chords = [chord_for_bar(target, start + i) for i in range(bars)]
-    context = {"chords_by_bar": [chord.name if chord else None for chord in chords],
+    context = {"beats_per_bar": bar_length, "chords_by_bar": [chord.name if chord else None for chord in chords],
                "chord_pitch_classes_by_bar": [list(chord.pcs) if chord else [] for chord in chords],
                "target_key": target.key.name, "scale_pitch_classes": list(target.key.scale_pcs)}
     if request_notes is None:
@@ -317,8 +334,8 @@ def prepare_scoped_score(state, plan, events, arranger, *, seed=3800, request_no
     baseline = reference(state, plan, seed=seed)
     notes = [note for note in baseline.notes if note.instrument not in mutable]
     for i in range(bars):
-        beat = (start + i) * BEATS_PER_BAR
-        bar_notes = [n for n in model_notes if beat <= n.start < beat + BEATS_PER_BAR]
+        beat = (start + i) * bar_length
+        bar_notes = [n for n in model_notes if beat <= n.start < beat + bar_length]
         bar_state = performance_state_for_bar(state, target, actions, i, bars)
         notes.extend(apply_layer_settings(bar_notes, bar_state, bar=start + i))
     if not mutable <= {note.instrument for note in notes}:

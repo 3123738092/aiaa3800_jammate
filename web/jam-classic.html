@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JamMate · 一起 Jam</title>
+  <link rel="stylesheet" href="lab.css">
+  <link rel="stylesheet" href="jam.css?v=pipeline-log">
+  <link rel="stylesheet" href="jam-studio.css?v=1">
+  <link rel="stylesheet" href="jam-room.css?v=2">
+  <link rel="stylesheet" href="jam-spatial.css?v=3">
+  <link rel="stylesheet" href="jam-night.css?v=4">
+  <link rel="stylesheet" href="jam-inspector-view.css?v=5">
+</head>
+<body>
+<main class="jam-workspace">
+  <nav><a href="/">返回创作工作台</a></nav>
+  <h1>一起 Jam</h1>
+  <section class="panel jam-opening" id="jam-opening" aria-label="Jam 素材">
+    <h2>用文字或音频开始</h2>
+    <div id="opening-mic-row" class="opening-mic-row">
+      <button id="opening-mic" type="button" aria-pressed="false">🎙 总麦克风</button>
+      <span id="opening-mic-status" role="status">说说你想哼唱、拍手，还是给乐队提要求。</span>
+    </div>
+    <div class="jam-opening-mode">
+      <label for="jam-opening-mode">开场方式</label>
+      <select id="jam-opening-mode" aria-describedby="jam-opening-mode-note">
+        <option value="warm">暖启动 · 自动补全</option>
+        <option value="cold" disabled>冷启动 · 按素材开始</option>
+      </select>
+      <p id="jam-opening-mode-note" class="muted">模型会补全没指定的乐器、调性与和弦进行。</p>
+    </div>
+    <details id="jam-cold-settings" class="jam-cold-settings" hidden>
+      <summary>手动指定 BPM 和调性</summary>
+      <div class="jam-cold-fields">
+        <label for="jam-cold-bpm">BPM
+          <input id="jam-cold-bpm" type="number" min="30" max="250" step="any" placeholder="自动">
+        </label>
+        <label for="jam-cold-key">调性
+          <select id="jam-cold-key">
+            <option value="">未指定</option>
+          <optgroup label="大调">
+            <option>C 大调</option>
+            <option>C♯ 大调</option>
+            <option>D 大调</option>
+            <option>E♭ 大调</option>
+            <option>E 大调</option>
+            <option>F 大调</option>
+            <option>F♯ 大调</option>
+            <option>G 大调</option>
+            <option>A♭ 大调</option>
+            <option>A 大调</option>
+            <option>B♭ 大调</option>
+            <option>B 大调</option>
+          </optgroup>
+          <optgroup label="小调">
+            <option>C 小调</option>
+            <option>C♯ 小调</option>
+            <option>D 小调</option>
+            <option>E♭ 小调</option>
+            <option>E 小调</option>
+            <option>F 小调</option>
+            <option>F♯ 小调</option>
+            <option>G 小调</option>
+            <option>A♭ 小调</option>
+            <option>A 小调</option>
+            <option>B♭ 小调</option>
+            <option>B 小调</option>
+          </optgroup>
+          </select>
+        </label>
+      </div>
+      <p class="muted">拍号、速度、调性、声部与节奏均可用开场文字指定，按你的输入开始。</p>
+    </details>
+    <label id="jam-opening-direction">开场文字
+      <textarea id="jam-opening-text" rows="2" maxlength="500" placeholder="例如：92 BPM，D 大调，3/4，每小节在第 1、2.5 拍起音"></textarea>
+    </label>
+    <div id="opening-mic-review" class="opening-mic-row" hidden>
+      <button id="opening-mic-confirm" type="button">确认文字</button>
+      <button id="opening-mic-discard" type="button">撤销本次转写</button>
+    </div>
+    <div class="jam-opening-inputs">
+      <div class="jam-opening-card" data-jam-input="rhythm">
+        <h3>拍手节奏（可选）</h3>
+        <p data-guide>先均匀拍四下定速，再按开场设定的拍号录一小节节奏。</p>
+        <div class="jam-opening-actions">
+          <button type="button" data-record>录拍手</button>
+          <button type="button" data-clear hidden>移除</button>
+        </div>
+        <label class="jam-file jam-dropzone">拖入音频，或点击选择<input type="file" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm,.flac,.aac" aria-label="选择拍手音频"></label>
+        <label>拍手用途 <select id="jam-rhythm-timing">
+          <option value="strict">精确定速 · 先数拍</option>
+          <option value="feel">节奏草图 · 使用当前 BPM</option>
+        </select></label>
+        <p data-input-status role="status">等待拍手录音</p>
+        <audio controls hidden data-input-audio aria-label="试听拍手"></audio>
+        <button type="button" data-send hidden>发送拍手到 Jam</button>
+      </div>
+      <div class="jam-opening-card" data-jam-input="humming">
+        <h3>哼唱旋律（可选）</h3>
+        <p data-guide>单独哼一小句旋律，可以先试听再决定是否重录。</p>
+        <div class="jam-opening-actions">
+          <button type="button" data-record>录哼唱</button>
+          <button type="button" id="jam-complete-humming" aria-describedby="jam-humming-completion-note" hidden disabled>自动补全哼唱</button>
+          <button type="button" data-clear hidden>移除</button>
+        </div>
+        <p id="jam-humming-completion-note" hidden>录制或上传旋律后可用。乐队接续原句，并继续伴奏。</p>
+        <label class="jam-file jam-dropzone">拖入音频，或点击选择<input type="file" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm,.flac,.aac" aria-label="选择哼唱音频"></label>
+        <p data-input-status role="status">等待哼唱录音</p>
+        <fieldset data-humming-trim class="jam-humming-trim" hidden>
+          <legend>选择哼唱片段</legend>
+          <label>起始位置 <input type="range" min="0" step="any" value="0" data-trim-start></label>
+          <output data-trim-range></output>
+          <div class="jam-opening-actions">
+            <button type="button" data-trim-preview>试听选段</button>
+            <button type="button" data-trim-apply>使用选段</button>
+            <button type="button" data-trim-cancel>取消</button>
+          </div>
+          <audio controls hidden data-trim-audio aria-label="试听所选哼唱片段"></audio>
+        </fieldset>
+        <audio controls hidden data-input-audio aria-label="试听哼唱"></audio>
+        <button type="button" data-send hidden>发送哼唱到 Jam</button>
+      </div>
+    </div>
+    <p id="jam-opening-status" role="status">文字、拍手和哼唱任选一种，也可以搭配使用。</p>
+    <div id="jam-opening-result" hidden><strong id="jam-opening-ensemble"></strong><p id="jam-opening-reason"></p></div>
+  </section>
+  <div class="jam-deck">
+    <section class="jam-transport" aria-label="播放控制">
+      <div class="jam-readout">
+        <span id="jam-playback">等待开始</span>
+        <div class="jam-position"><span id="jam-bar">—</span><span> / 小节</span></div>
+        <div><strong id="jam-current-bpm">—</strong> BPM</div>
+      </div>
+      <div class="jam-settings">
+        <label for="jam-agent">演奏中指令处理 <select id="jam-agent">
+          <option value="rule">本地规则</option>
+          <option value="llm" disabled>大模型 Agent</option>
+        </select></label>
+        <details class="jam-advanced">
+          <summary>高级设置</summary>
+          <label for="jam-bpm" id="jam-warm-bpm">手动 BPM（可选）
+            <input id="jam-bpm" type="number" min="30" max="250" step="any" placeholder="自动">
+          </label>
+          <label for="jam-arranger">编排方式 <select id="jam-arranger">
+            <option value="rule">本地规则</option>
+            <option value="llm_all" disabled>LLM 编排所有声部</option>
+          </select></label>
+          <label for="jam-renderer">生成后端 <select id="jam-renderer">
+            <option value="synth">内置合成器</option>
+            <option value="fluidsynth" disabled>FluidSynth 音色库</option>
+            <option value="mrt2" disabled>MRT2 生成试听</option>
+            <option value="mrt2_stream" disabled>MRT2 本地流式播放</option>
+            <option value="mrt2_direct" disabled>MRT2 独立生成（BandPlan 直连）</option>
+          </select></label>
+          <div id="jam-timbres" hidden>
+            <label for="jam-override-timbres" id="jam-override-timbres-row">
+              开场使用自选键盘、贝斯音色 <input id="jam-override-timbres" type="checkbox">
+            </label>
+            <label for="jam-profile">音色组合 <select id="jam-profile">
+              <option value="electric">电钢琴 + 贝斯</option>
+              <option value="acoustic">原声钢琴 + 贝斯</option>
+              <option value="synth">合成器铺底 + 合成贝斯</option>
+              <option value="custom" disabled>自选音色</option>
+            </select></label>
+            <label for="jam-keys-program">键盘音色 <select id="jam-keys-program"></select></label>
+            <label for="jam-bass-program">贝斯音色 <select id="jam-bass-program"></select></label>
+            <p id="jam-timbre-status" aria-live="polite"></p>
+          </div>
+          <label for="jam-input-mode">演奏中麦克风识别 <select id="jam-input-mode">
+            <option value="speech">只识别语音</option>
+            <option value="auto">自动识别</option>
+            <option value="rhythm">只识别拍手</option>
+            <option value="humming">只识别哼唱</option>
+          </select></label>
+          <p id="jam-backend-status" role="status"></p>
+          <label id="jam-mrt2-reference-row" hidden>
+            哼唱音频用作 MRT2 风格参考 <input id="jam-mrt2-reference" type="checkbox">
+          </label>
+        </details>
+        <div class="jam-buttons">
+          <button id="jam-start" type="button" disabled>分析素材并开始</button>
+          <button id="jam-stop" type="button" disabled>结束会话</button>
+        </div>
+        <label id="jam-mrt2-auto-row" hidden>
+          MRT2 生成后自动接入 <input id="jam-mrt2-auto" type="checkbox" checked>
+        </label>
+        <p id="jam-mrt2-hint" role="status" hidden></p>
+      </div>
+    </section>
+    <section class="jam-layers" aria-label="当前声部">
+      <ul id="jam-layers"></ul>
+    </section>
+    <form class="panel jam-direct" id="jam-feedback">
+      <div class="jam-voice">
+        <button id="jam-microphone" type="button" aria-pressed="false" disabled>开启麦克风</button>
+        <button id="jam-captions-toggle" type="button" aria-controls="jam-captions" aria-pressed="false"
+                title="开始演奏并打开麦克风后，由浏览器转录指令" disabled>开启语音转录</button>
+        <button id="jam-nod-toggle" type="button" aria-controls="jam-nod" aria-pressed="false" disabled>开启点头确认</button>
+        <span class="muted">试着说「乐队，鼓少一点」。点头确认开启后，以「乐队」开头的语音会先等待确认。</span>
+      </div>
+      <p id="jam-voice-status" class="muted" role="status" aria-live="polite">开始演奏后自动开启麦克风，首次使用需要授权。</p>
+      <div id="jam-captions" class="jam-captions" hidden>
+        <p id="jam-captions-status" class="muted" role="status"></p>
+        <p id="jam-captions-text"></p>
+        <button id="jam-captions-use" type="button" disabled>填入指令框</button>
+      </div>
+      <div id="jam-nod" class="jam-nod" hidden>
+        <video id="jam-nod-camera" aria-label="摄像头预览" muted playsinline hidden></video>
+        <div>
+          <p id="jam-nod-status" class="muted" role="status"></p>
+          <div id="jam-nod-review" hidden>
+            <p>待发送 <strong id="jam-nod-text"></strong></p>
+            <button id="jam-nod-send" type="button">发送这句</button>
+            <button id="jam-nod-cancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+      <div id="jam-transcript" class="jam-transcript" hidden>
+        <span id="jam-transcript-text"></span>
+        <button id="jam-transcript-use" type="button">编辑识别结果</button>
+      </div>
+      <label for="jam-text">也可以输入文字</label>
+      <div class="jam-composer">
+        <textarea id="jam-text" rows="2" maxlength="500" placeholder="例如：鼓少一点" required disabled></textarea>
+        <button id="jam-send" type="submit" disabled>发送指令</button>
+      </div>
+      <div class="jam-quick" aria-label="示例指令">
+        <button type="button" data-example="鼓少一点" disabled>鼓少一点</button>
+        <button type="button" data-example="慢一点" disabled>慢一点</button>
+        <button type="button" data-example="去掉贝斯" disabled>去掉贝斯</button>
+      </div>
+      <p id="jam-feedback-status" role="status" aria-live="polite">开始演奏后可发送指令。</p>
+    </form>
+  </div>
+  <section class="panel jam-export" aria-label="伴奏导出">
+    <button id="jam-export" type="button" disabled>导出已播伴奏 WAV</button>
+    <button id="jam-debug-open" type="button" aria-controls="jam-debug">查看调试日志</button>
+    <span id="jam-export-status" class="muted" role="status"></span>
+  </section>
+  <section class="panel" id="jam-preview-output" hidden>
+    <h2>MRT2 试听</h2>
+    <p>播放试听时自动静音实时伴奏，暂停或播完后恢复。</p>
+    <audio id="jam-preview-audio" controls aria-label="MRT2 试听"></audio>
+    <a id="jam-preview-download" download="jam-preview.wav">下载 WAV</a>
+  </section>
+  <details class="jam-debug" id="jam-debug">
+    <summary>会话调试日志 <span id="jam-debug-summary">等待开始</span></summary>
+    <div class="jam-debug-content">
+      <dl class="jam-debug-music">
+        <div><dt>当前速度</dt><dd id="jam-debug-bpm">—</dd></div>
+        <div><dt>调性</dt><dd id="jam-debug-key">—</dd></div>
+        <div><dt>当前和弦</dt><dd id="jam-debug-chord">—</dd></div>
+        <div><dt>和弦进行</dt><dd id="jam-debug-progression">—</dd></div>
+      </dl>
+      <div class="jam-debug-toolbar">
+        <h2>端到端流水</h2>
+        <div>
+          <label>输入 <select id="jam-debug-turn"><option value="">最新输入</option></select></label>
+          <button id="jam-debug-copy" type="button" disabled>复制调试 JSON</button>
+        </div>
+      </div>
+      <p class="jam-debug-muted" id="jam-debug-status" role="status">开始演奏后记录输入、模型和排程。</p>
+      <ol id="jam-debug-pipeline" class="jam-debug-pipeline" aria-label="所选输入的处理步骤"></ol>
+      <p id="jam-debug-turn-status"></p>
+      <div class="jam-debug-toolbar">
+        <h2>小节输出与钢琴卷帘</h2>
+        <div>
+          <label>小节 <select id="jam-debug-bar">
+            <option value="current">当前</option><option value="queued">待播</option>
+          </select></label>
+          <label>声部 <select id="jam-debug-track"><option value="">全部</option></select></label>
+        </div>
+      </div>
+      <p class="jam-debug-muted" id="jam-debug-score-status">演奏开始后显示实际送去合成的音符。</p>
+      <dl id="jam-debug-output" class="jam-debug-output" aria-label="当前选择小节的输出"></dl>
+      <div class="jam-debug-roll"><canvas id="jam-debug-roll" role="img" aria-label="实际排程音符的钢琴卷帘图"></canvas></div>
+      <div class="jam-debug-table">
+        <table>
+          <caption>各声部共享速度。密度和音量为当前设置。起音数按同一时间点合并。</caption>
+          <thead><tr><th scope="col">声部</th><th scope="col">密度</th><th scope="col">音量设置</th>
+            <th scope="col">起音数</th><th scope="col">音符数</th><th scope="col">每秒起音</th></tr></thead>
+          <tbody id="jam-debug-tracks"></tbody>
+        </table>
+      </div>
+      <div class="jam-debug-data jam-debug-history">
+        <details><summary>开场素材、编制与模型</summary><pre id="jam-debug-opening">—</pre></details>
+        <details><summary>InputEvent</summary><pre id="jam-debug-event">—</pre></details>
+        <details><summary>JamState</summary><pre id="jam-debug-state">—</pre></details>
+        <details><summary>BandPlan 与播放回执</summary><pre id="jam-debug-plan">—</pre></details>
+        <details><summary>模型、回复与错误</summary><pre id="jam-debug-models">—</pre></details>
+        <details><summary>麦克风识别与浏览器错误</summary><pre id="jam-debug-capture">—</pre></details>
+        <details><summary>所选小节音符 JSON</summary><pre id="jam-debug-notes">—</pre></details>
+      </div>
+    </div>
+  </details>
+  <p class="muted">已确认播放的小节和指令状态会实时更新。刷新页面会结束本次会话。</p>
+</main>
+<script type="module" src="jam-studio.js?v=1"></script>
+<script type="module" src="jam-room.js?v=2"></script>
+<script type="module" src="jam-spatial.js?v=3"></script>
+<script type="module" src="jam-inspector-view.js?v=5"></script>
+<script type="module" src="jam.js?v=pipeline-log"></script>
+</body>
+</html>

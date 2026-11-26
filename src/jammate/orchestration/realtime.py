@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 
 from jammate.contracts import BandPlan, InputEvent, PlanError
 from jammate.interaction import TransportPosition
-from jammate.music import BEATS_PER_BAR, Note
+from jammate.music import Note
 from jammate.render.clock import BarClock, BarTiming
 from jammate.state import JamState
 from .decision_gate import should_execute
@@ -107,8 +107,9 @@ class PlaybackBar:
 
 
 def _notes_in_bar(performance: PlannedPerformance, bar: int) -> tuple[Note, ...]:
-    start = bar * BEATS_PER_BAR
-    return tuple(note for note in performance.notes if start <= note.start < start + BEATS_PER_BAR)
+    bar_length = performance.beats_per_bar
+    start = bar * bar_length
+    return tuple(note for note in performance.notes if start <= note.start < start + bar_length)
 
 
 def prepare_conditioning(state, plan, _events):
@@ -116,7 +117,7 @@ def prepare_conditioning(state, plan, _events):
     target = project(state, plan)
     data = plan.to_dict()
     return PlannedPerformance((), (), None, target.tempo_bpm,
-                              data["effective_at"]["bar"], data["valid_for_bars"])
+                              data["effective_at"]["bar"], data["valid_for_bars"], beats_per_bar=target.beats_per_bar)
 
 
 class RealtimeSession:
@@ -128,14 +129,14 @@ class RealtimeSession:
         if type(sample_rate) is not int or sample_rate <= 0:
             raise ValueError("sample_rate must be a positive integer")
         initial = manager.state
-        if initial.position != TransportPosition():
+        if initial.position != TransportPosition(beats_per_bar=initial.beats_per_bar):
             raise ValueError("a new realtime session must start at bar zero")
         if initial.playing and initial.auto_harmony and initial.key is None:
             raise ValueError("a playing realtime session needs a key")
         self.manager = manager
         self.sample_rate = sample_rate
         self.timing = timing
-        self._clock = BarClock(sample_rate)
+        self._clock = BarClock(sample_rate, beats_per_bar=initial.beats_per_bar)
         self._sample = 0
         self._playing_bar: BarTiming | None = None
         self._request: DecisionRequest | None = None
@@ -259,7 +260,8 @@ class RealtimeSession:
         if first >= end or not (protected or editable):
             return change
 
-        notes = [note for note in incoming.notes if not first * BEATS_PER_BAR <= note.start < end * BEATS_PER_BAR]
+        bar_length = source.beats_per_bar
+        notes = [note for note in incoming.notes if not first * bar_length <= note.start < end * bar_length]
         for bar in range(first, end):
             old, new = _notes_in_bar(active, bar), _notes_in_bar(incoming, bar)
             reused = {note.instrument for note in old if note.instrument in editable}
@@ -326,7 +328,7 @@ class RealtimeSession:
                 if timing.bar_index >= data["effective_at"]["bar"] + data["valid_for_bars"]:
                     plan = None
             return PlaybackBar(timing, (), receipt, plan=plan, state=state)
-        return PlaybackBar(timing, self._bar_notes(state, performance, timing.bar_index), receipt)
+        return PlaybackBar(timing, self._bar_notes(state, performance, timing.bar_index), receipt, state=state)
 
     @staticmethod
     def _bar_notes(state, performance, bar):
@@ -374,6 +376,6 @@ class RealtimeSession:
         self._sample = sample
         playing = self._playing_bar
         if playing is not None:
-            beat = BEATS_PER_BAR * (sample - playing.start_sample) / (playing.end_sample - playing.start_sample)
+            beat = self.manager.state.beats_per_bar * (sample - playing.start_sample) / (playing.end_sample - playing.start_sample)
             self.manager.update_transport(bar=playing.bar_index, beat=beat, next_bar=playing.bar_index + 1)
         return tuple(started)

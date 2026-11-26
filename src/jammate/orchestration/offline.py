@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import math
 import random
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -31,6 +31,7 @@ class PlannedPerformance:
     tempo_bpm: float
     start_bar: int
     bars: int
+    beats_per_bar: int = field(default=BEATS_PER_BAR, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -71,8 +72,8 @@ def prepare_humming_answer(state: JamState, motif: Motif) -> tuple[Note, ...]:
     if key is None:
         raise PlanError("哼唱补全需要一个可用的调性。")
     answer = continue_motif(motif.notes, key)
-    start = int(answer[0].start // BEATS_PER_BAR)
-    end = math.ceil(max(note.end for note in answer) / BEATS_PER_BAR)
+    start = int(answer[0].start // state.beats_per_bar)
+    end = math.ceil(max(note.end for note in answer) / state.beats_per_bar)
     backing = tuple(note for bar in range(start, end) for note in prepare_bar(state, bar)
                     if note.instrument not in {"drums", "lead"})
     scale = tuple(pitch for pitch in range(LEAD_LOW, LEAD_HIGH + 1) if key.contains(pitch))
@@ -80,7 +81,7 @@ def prepare_humming_answer(state: JamState, motif: Motif) -> tuple[Note, ...]:
     for index, note in enumerate(answer):
         sounding = {other.pitch for other in (*backing, *result)
                     if min(note.end, other.end) - max(note.start, other.start) >= .05}
-        chord = chord_for_bar(state, int(note.start // BEATS_PER_BAR))
+        chord = chord_for_bar(state, int(note.start // state.beats_per_bar))
         chord_tones = tuple(pitch for pitch in scale if chord and pitch % 12 in chord.pcs)
         safe = tuple(pitch for pitch in scale if all(abs(pitch - other) > 1 for other in sounding))
         anchors = tuple(pitch for pitch in chord_tones if pitch in safe)
@@ -125,15 +126,15 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800, opening_answer: 
             generated = Motif(params["motif_id"], "ai", tuple(data["trigger_event_ids"]), lead)
     if lead and (not target.playing or not target.layer("lead").active or target.layer("lead").level == 0):
         raise PlanError("motif response requires an audible lead layer")
-    if any(n.end > bars * 4 for n in lead):
+    if any(n.end > bars * target.beats_per_bar for n in lead):
         raise PlanError("generated motif extends past plan lifetime")
     performance_bars = bars
     if opening_answer:
         if (start != 0 or len(data["actions"]) != 1 or data["actions"][0]["action"] != "ECHO_MOTIF"
                 or not lead or opening_answer[0].start < max(note.end for note in lead)):
             raise PlanError("opening continuation must follow the replayed melody")
-        performance_bars = max(bars, math.ceil(max(note.end for note in opening_answer) / BEATS_PER_BAR))
-    lead_bars = place_lead(lead + opening_answer, start)
+        performance_bars = max(bars, math.ceil(max(note.end for note in opening_answer) / target.beats_per_bar))
+    lead_bars = place_lead(lead + opening_answer, start, target.beats_per_bar)
     all_notes = []
     violations = set()
     for offset in range(performance_bars):
@@ -158,7 +159,8 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800, opening_answer: 
     if violations:
         raise PlanError("render would change preserved " + ", ".join(sorted(violations)))
     notes = tuple(all_notes)
-    return PlannedPerformance(notes, lead, generated, target.tempo_bpm, start, performance_bars)
+    return PlannedPerformance(notes, lead, generated, target.tempo_bpm, start, performance_bars,
+                              beats_per_bar=target.beats_per_bar)
 
 
 def render_plan(state: JamState, plan: BandPlan, *, seed=3800, sample_rate=22050) -> RenderedPlan:
@@ -166,11 +168,12 @@ def render_plan(state: JamState, plan: BandPlan, *, seed=3800, sample_rate=22050
 
 
 def _render_performance(performance, sample_rate):
-    local = tuple(n.shifted(-performance.start_bar * 4) for n in performance.notes)
+    local = tuple(n.shifted(-performance.start_bar * performance.beats_per_bar) for n in performance.notes)
     audio = render(local, performance.tempo_bpm, sample_rate,
-                   total_s=performance.bars * 4 * 60 / performance.tempo_bpm + TAIL_S)
+                   total_s=performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm + TAIL_S)
     return RenderedPlan(performance.notes, performance.lead_notes, performance.generated_motif,
-                        performance.tempo_bpm, performance.start_bar, performance.bars, audio, sample_rate)
+                        performance.tempo_bpm, performance.start_bar, performance.bars, audio, sample_rate,
+                        beats_per_bar=performance.beats_per_bar)
 
 
 class OfflineRuntime:

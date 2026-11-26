@@ -5,6 +5,7 @@ import base64
 import io
 import os
 import re
+from random import choice
 import threading
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +24,7 @@ import soundfile as sf
 from jammate.analysis.jam_capture import analyze_capture
 from jammate.analysis.rhythm import analyze_rhythm_audio, analyze_rhythm_feel
 from jammate.contracts import BandPlan, InputEvent, PlanError
-from jammate.contracts.adapters import from_rhythm, from_text
+from jammate.contracts.adapters import from_rhythm, from_system, from_text
 from jammate.generate.arranger import chord_for_bar
 from jammate.generate.harmony import harmony_cycle
 from jammate.instruments import gm_program
@@ -35,11 +36,11 @@ from jammate.orchestration.backend_arrangement import (
 )
 from jammate.orchestration.decision_gate import should_execute
 from jammate.orchestration.explicit_request import explicit_request
-from jammate.orchestration.jam_opening import cold_audio_plan, prepare_opening, text_settings
+from jammate.orchestration.jam_opening import cold_audio_plan, prepare_opening, text_beats_per_bar, text_settings
 from jammate.orchestration.mrt2_intent import resolve_style, style_plan
 from jammate.orchestration.key_intent import explicit_key_plan
 from jammate.orchestration.progression_intent import asks_for_new_progression, explicit_progression_plan
-from jammate.orchestration.tempo_intent import explicit_tempo
+from jammate.orchestration.tempo_intent import compile_jev_tempo, explicit_tempo
 from jammate.orchestration.llm import LLMAgent, ProviderFailure, validate_plan
 from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
 from jammate.orchestration.live_text import JEV_TIMEOUT, JevLiveTagger, LiveTextAgent
@@ -49,12 +50,15 @@ from jammate.orchestration.offline import prepare_bar, prepare_humming_answer, p
 from jammate.orchestration.plans import make_plan
 from jammate.orchestration.realtime import RealtimeSession, TimingPolicy, prepare_conditioning
 from jammate.orchestration.transitions import project
+from jammate.orchestration.studio_suggestion import STUDIO_INTROS, accepted_plan, candidate
 from jammate.render.midi_out import midi_program
 from jammate.render.synth import SR, TAIL_S, render
 from jammate.render.mrt2 import FRAME_RATE, generate_isolated
 from jammate.render.soundfont import SoundFontRenderer
 from jammate.render.runtime import create_runtime
+from jammate.rhythm import RhythmContext
 from jammate.state import JamState, MAX_TEMPO_BPM, MIN_TEMPO_BPM
+from jammate.studio_input import midi_phrase, studio_text, with_studio_target
 
 
 BUFFER_SECONDS = .62
@@ -132,11 +136,11 @@ class BrowserJam:
         if selection is not None:
             self.manager.ingest(events)
             self.opening = {**selection, "input_events": [event.to_dict() for event in events]}
-            humming = next((event for event in events if event.source == "humming"), None)
+            humming = next((event for event in events if event.event_type == "musical_phrase"), None)
             if humming is not None and state.layer("lead").active:
                 registered = self.manager.state
                 motif = registered.motif(f"motif_{humming.event_id}")
-                bars = ceil(max(note.end for note in motif.notes) / BEATS_PER_BAR)
+                bars = ceil(max(note.end for note in motif.notes) / registered.beats_per_bar)
                 opening_plan = make_plan(registered, events, f"opening_{self.id}", "RESPOND", [
                     {"action": "ECHO_MOTIF", "scope": "lead", "strength": .5, "parameters": {"motif_id": motif.motif_id}},
                 ], [], {}, bars, selection["reason"], [])
@@ -173,7 +177,7 @@ class BrowserJam:
                                                 key=settings.get("key_source") in {"manual", "text"})
         budget = arrangement_config.timeout_s if arrangement_config and renderer not in {"mrt2", "mrt2_direct"} else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
-        lookahead = max(3, ceil((decision_timeout + budget) * MAX_TEMPO_BPM / (60 * BEATS_PER_BAR)) + 3)
+        lookahead = max(3, ceil((decision_timeout + budget) * MAX_TEMPO_BPM / (60 * state.beats_per_bar)) + 3)
         self.runtime = RealtimeSession(self.manager, sample_rate=SR, opening_plan=opening_plan,
                                        opening_answer=self.opening_answer, conditioning_only=self.direct_mrt2,
                                        timing=TimingPolicy(
@@ -184,7 +188,7 @@ class BrowserJam:
         self.preview = self.opening_preview = self.opening_preview_future = None
         self.preview_workers = preview_workers or workers
         self.preview_job = self.preview_future = self.preview_status = None
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.make_agent, self.workers = make_agent, workers
         self.soundfont = soundfont
         self.timbres = self.next_timbres = self.reserved_timbres = self.timbres_applied_at = None
@@ -194,6 +198,8 @@ class BrowserJam:
         self.reserved = self.packet = self.playing = None
         self.reserved_output = self.playing_output = None
         self.feedback = self.last_applied = self.deferred = self.future = None
+        self.studio_meter = None
+        self.suggestion_offer = self.accepted_suggestion = None
         self.target = ("flexible", None)
         self.turn_timing = None
         self.debug_turns = {}
@@ -212,8 +218,9 @@ class BrowserJam:
     def inspect_bar(bar, output):
         if bar is None:
             return None
-        offset = bar.timing.bar_index * BEATS_PER_BAR
-        return {**asdict(bar.timing), "beats": BEATS_PER_BAR, "output": output,
+        beat_count = bar.state.beats_per_bar if bar.state else BEATS_PER_BAR
+        offset = bar.timing.bar_index * beat_count
+        return {**asdict(bar.timing), "beats": beat_count, "output": output,
                 **({"band_plan": bar.plan.to_dict()} if bar.plan else {}),
                 "notes": [{**asdict(note), "start": note.start - offset} for note in bar.notes]}
 
@@ -272,7 +279,8 @@ class BrowserJam:
             output = {"renderer": self.renderer, "format": "PCM16", "sample_rate": SAMPLE_RATE, "channels": 2,
                       "sample_frames": packet["pcm_frames"], "model": self.mrt2_stream.model}
         else:
-            local_notes = tuple(note.shifted(-timing.bar_index * BEATS_PER_BAR) for note in bar.notes)
+            beat_count = bar.state.beats_per_bar if bar.state else BEATS_PER_BAR
+            local_notes = tuple(note.shifted(-timing.bar_index * beat_count) for note in bar.notes)
             solo = self.opening.get("solo_voice") if self.opening else None
             if solo:
                 local_notes = tuple(replace(note, instrument=solo) if note.instrument == "lead" else note
@@ -357,9 +365,15 @@ class BrowserJam:
 
     def snapshot(self, buffered=None):
         state = self.manager.state
+        cycle = harmony_cycle(state) if state.key else ()
+        index = ((self.playing.timing.bar_index - state.progression_start_bar) % len(cycle)
+                 if cycle and self.playing else None)
         return {
             "session": self.id, "sample_rate": SR, "current_bar": self.playing.timing.bar_index if self.playing else None,
             "bpm": state.tempo_bpm, "playing": state.playing, "feedback": self.feedback,
+            "meter": self.studio_meter, "key": state.key.name if state.key else None,
+            "chord": cycle[index].name if index is not None else None,
+            "progression": [chord.name for chord in cycle] or None, "progression_index": index,
             "last_applied": self.last_applied, "renderer": self.renderer,
             "preview_id": self.preview["id"] if self.preview else None, "timbres": self.timbre_status(),
             "auto_preview_id": self.eligible_preview_id(), "preview_status": self.preview_status,
@@ -414,8 +428,8 @@ class BrowserJam:
                             "mode": "mrt2_conditioning" if self.direct_mrt2 else "rendered_score",
                         })
                 if self.deferred is not None:
-                    event, self.deferred = self.deferred, None
-                    self.begin(event)
+                    batch, self.deferred = self.deferred, None
+                    self.begin(*batch)
             if self.playing is not None:
                 end = self.playing.timing.end_sample
                 self.runtime.advance_to(max(self.runtime.sample, min(sample, end - 1)))
@@ -433,15 +447,53 @@ class BrowserJam:
             raise ValueError("未知的指令来源。")
         return self.submit_event(from_text(text.strip(), session_id=self.id, source=source))
 
-    def submit_event(self, event):
-        if event.session_id != self.id or event.source not in {"text", "speech", "rhythm", "humming"}:
-            raise ValueError("输入事件不属于这个 Jam 会话。")
-        labels = {"rhythm": "拍手节奏", "humming": "哼唱旋律"}
+    def offer_suggestion(self):
         with self.lock:
             self.check_open()
-            if self.feedback and self.feedback["id"] == event.event_id:
-                return self.feedback
-            label = labels.get(event.source) or event.payload["text"]
+            if self.playing is None or self.feedback_in_progress():
+                return None
+            state = self.manager.state
+            if not (proposal := candidate(state)):
+                return None
+            offer = self.suggestion_offer
+            if not offer or offer["version"] != state.state_version or offer["expires"] <= monotonic():
+                offer = {**proposal, "id": uuid4().hex, "version": state.state_version, "expires": monotonic() + 90}
+                self.suggestion_offer = offer
+            return {"id": offer["id"], "message": offer["message"], "kind": offer["kind"]}
+
+    def feedback_in_progress(self):
+        return self.feedback and self.feedback["status"] in {
+            "buffered", "thinking", "waiting_ready", "arranging", "scheduled",
+        }
+
+    def accept_suggestion(self, offer_id):
+        with self.lock:
+            self.check_open()
+            if isinstance(offer_id, str) and (saved := self.debug_turns.get(offer_id)):
+                if saved.get("suggestion"):
+                    return saved["feedback"]
+            offer = self.suggestion_offer
+            state = self.manager.state
+            if (offer is None or offer["id"] != offer_id or offer["version"] != state.state_version
+                    or offer["expires"] <= monotonic() or self.feedback_in_progress() or not candidate(state)):
+                raise ValueError("这条提议已过期，请继续演奏。")
+            event = from_system("accept_suggestion", session_id=self.id, event_id=offer_id)
+            self.accepted_suggestion = offer
+            return self.submit_event(event, suggestion=offer)
+
+    def submit_event(self, event, *materials, suggestion=None):
+        batch = (event, *materials)
+        if any(item.session_id != self.id or (item.source not in {"text", "speech", "rhythm", "humming", "midi"}
+                   and not (suggestion and item is event and item.source == "system"))
+               for item in batch):
+            raise ValueError("输入事件不属于这个 Jam 会话。")
+        labels = {"rhythm": "拍手节奏", "humming": "哼唱旋律", "midi": "键盘旋律"}
+        with self.lock:
+            self.check_open()
+            if saved := self.debug_turns.get(event.event_id):
+                return saved["feedback"]
+            self.suggestion_offer = None
+            label = suggestion["message"] if suggestion else labels.get(event.source) or event.payload["text"]
             current_bar = self.playing.timing.bar_index if self.playing else -1
             self.target = target_position(label, current_bar)
             self.turn_timing = None
@@ -454,19 +506,23 @@ class BrowserJam:
                 self.update_feedback(status="superseded")
             self.feedback = {"id": event.event_id, "text": label, "source": event.source, "status": "thinking"}
             self.debug_turns[event.event_id] = {"input_event": event.to_dict(), "feedback": self.feedback}
+            if suggestion:
+                self.debug_turns[event.event_id]["suggestion"] = {k: suggestion[k] for k in ("id", "kind", "message")}
+            if materials:
+                self.debug_turns[event.event_id]["input_events"] = [item.to_dict() for item in batch]
             if len(self.debug_turns) > DEBUG_HISTORY:
                 del self.debug_turns[next(iter(self.debug_turns))]
             if self.reserved is not None:
                 # This buffer is already committed to the browser's playback
                 # timeline. Apply new observations after its start is confirmed.
-                self.deferred = event
+                self.deferred = batch
                 self.update_feedback(status="buffered")
             else:
-                self.begin(event)
+                self.begin(*batch)
             return self.feedback
 
-    def begin(self, event):
-        request = self.runtime.observe((event,))
+    def begin(self, event, *materials):
+        request = self.runtime.observe((event, *materials))
         self.update_feedback(status="thinking")
         if request is None:
             self.update_feedback(status="held", message="这段输入已处理。")
@@ -549,7 +605,7 @@ class BrowserJam:
                 self.opening_preview = {"status": "waiting_material"}
                 return
             frames_per_beat = 60 * FRAME_RATE / state.tempo_bpm
-            duration = bars * BEATS_PER_BAR * 60 / state.tempo_bpm
+            duration = bars * state.beats_per_bar * 60 / state.tempo_bpm
             frames = ceil(duration * FRAME_RATE)
             pitched, drums = [], set()
             for note in notes:
@@ -656,7 +712,10 @@ class BrowserJam:
         started = monotonic()
         try:
             plan, route = None, "cold_audio"
-            if self.direct_mrt2:
+            proposal = self.accepted_suggestion
+            if proposal and proposal["id"] == event_id:
+                plan, route = accepted_plan(proposal, request.events, request.state), "studio_initiative"
+            if plan is None and self.direct_mrt2:
                 plan = style_plan(request.events, request.state, self.style_config)
                 if plan is not None:
                     route = "mrt2_style"
@@ -666,6 +725,10 @@ class BrowserJam:
                                      ["tempo", "key", "progression", "groove", "playing"], {}, 1,
                                      "已将该录音安排为 MRT2 音频参考。", [])
                     route = "mrt2_audio_reference"
+            if plan is None and (tempo := explicit_tempo(request.events)):
+                plan = compile_jev_tempo(request.events, request.state, f"tempo_{uuid4().hex}",
+                                         mode=tempo.mode, value=tempo.value)
+                route = "local_explicit"
             plan = plan or cold_audio_plan(request)
             if plan is None:
                 agent = self.make_agent()
@@ -674,7 +737,7 @@ class BrowserJam:
             else:
                 trace = {"source": route}
             theme = request.state.accompaniment_motif
-            if theme is not None and len(request.events) == 1 and request.events[0].source == "humming" \
+            if theme is not None and len(request.events) == 1 and request.events[0].event_type == "musical_phrase" \
                     and theme.motif_id == f"motif_{event_id}":
                 # New humming supplies a new reference for the harmony layers.
                 # Do not keep notes precomputed against a previous motif.
@@ -685,7 +748,7 @@ class BrowserJam:
                 plan = BandPlan.from_dict(data)
             route = trace.get("source")
             direct = route in {"local_explicit", "explicit_music_request", "jev_direct", "cold_audio",
-                               "mrt2_style", "mrt2_audio_reference"}
+                               "mrt2_style", "mrt2_audio_reference", "studio_initiative"}
             allow_wait = not direct and can_wait(plan, request.state)
             with self.lock:
                 self.record_turn(event_id, proposed_plan=plan.to_dict(), decision=trace)
@@ -714,7 +777,7 @@ class BrowserJam:
                     self.update_feedback(status="arranging")
             if use_score:
                 backend = "synth" if self.mrt2_stream is not None else self.renderer
-                arranger = LLMBackendArranger(self.arrangement_config, backend, capture_replies=True)
+                arranger = LLMBackendArranger(self.arrangement_config, backend, capture_replies=True, retry_invalid=True)
             arrange = (lambda state, plan, events: self.prepare_arrangement(state, plan, events, arranger)) if use_score else None
             if self.direct_mrt2:
                 arrange = prepare_conditioning
@@ -845,13 +908,23 @@ class BrowserJamService:
             raise ValueError("录音数据无效。")
         return audio, rate
 
-    def opening_events(self, body, *, bpm=None, audio_references=None):
+    def opening_events(self, body, *, bpm=None, audio_references=None, session_id=None, beats=None):
         if not isinstance(body, dict):
             raise ValueError("请提供至少一种开场素材：文字、拍手或哼唱。")
         text = body.get("text", "")
         if not isinstance(text, str) or len(text) > 500:
             raise ValueError("开场说明最多 500 字。")
-        session_id = uuid4().hex
+        session_id = session_id or uuid4().hex
+        target, source = body.get("target", "band"), body.get("source", "text")
+        text_event = None
+        if text.strip():
+            text_event = (studio_text(text, target, session_id=session_id, source=source)
+                          if "target" in body or "source" in body else from_text(text, session_id=session_id))
+            if "studio_original" in body and isinstance(body["studio_original"], str):
+                raw = text_event.to_dict()
+                raw["provenance"]["original_text"] = body["studio_original"][:500]
+                text_event = InputEvent(raw)
+        beats_per_bar = beats or text_beats_per_bar(text_event)
         events = []
         if body.get("rhythm") is not None:
             clap, clap_rate = self.decode_recording(body["rhythm"], MAX_OPENING_SECONDS)
@@ -860,21 +933,25 @@ class BrowserJamService:
                 raise ValueError("请选择精确定速或节奏草图。")
             try:
                 if timing == "feel":
-                    text_event = from_text(text, session_id=session_id) if text.strip() else None
                     text_bpm = text_settings(text_event)[0]
-                    rhythm = analyze_rhythm_feel(clap, clap_rate, bpm or text_bpm or JamState.tempo_bpm)
+                    rhythm = analyze_rhythm_feel(clap, clap_rate, bpm or text_bpm or JamState.tempo_bpm, beats_per_bar)
                 else:
-                    rhythm = analyze_rhythm_audio(clap, clap_rate)
+                    rhythm = analyze_rhythm_audio(clap, clap_rate, beats_per_bar=beats_per_bar)
             except ValueError:
                 if timing == "feel":
                     raise ValueError("节奏草图需要至少两个清晰起音。可手动指定 BPM。") from None
                 raise ValueError("未能从拍手定速。请先均匀拍四下，再拍一整小节节奏，并录到小节结束。") from None
             if not rhythm.onset_beats:
                 raise ValueError("定速后的一个小节没有识别到拍点，请重新录制拍手。")
-            events.append(from_rhythm(rhythm, session_id=session_id, audio_duration_s=len(clap) / clap_rate,
-                                      tempo_source="detected" if timing == "strict" else "session",
-                                      confidence_kind="grid_alignment_heuristic" if timing == "strict"
-                                      else "feel_grid_heuristic"))
+            rhythm_event = from_rhythm(rhythm, session_id=session_id, audio_duration_s=len(clap) / clap_rate,
+                                       tempo_source="detected" if timing == "strict" else "session",
+                                       confidence_kind="grid_alignment_heuristic" if timing == "strict"
+                                       else "feel_grid_heuristic")
+            events.append(with_studio_target(rhythm_event, body["rhythm"]))
+        if body.get("midi") is not None:
+            if body.get("humming") is not None:
+                raise ValueError("每次请提交一段有音高的素材：键盘旋律或哼唱。")
+            events.append(midi_phrase(body["midi"], session_id=session_id))
         if body.get("humming") is not None:
             humming, humming_rate = self.decode_recording(body["humming"], MAX_HUMMING_SECONDS)
             melody, _ = analyze_capture(humming, humming_rate, mode="humming", session_id=session_id, bpm=None,
@@ -884,9 +961,9 @@ class BrowserJamService:
             if audio_references is not None:
                 melody = reference_event(melody)
                 audio_references[melody.event_id] = (humming, humming_rate)
-            events.append(melody)
-        if text.strip():
-            events.append(from_text(text.strip(), session_id=session_id))
+            events.append(with_studio_target(melody, body["humming"]))
+        if text_event:
+            events.append(text_event)
         if not events:
             raise ValueError("请提供至少一种开场素材：文字、拍手或哼唱。")
         return tuple(events)
@@ -912,11 +989,12 @@ class BrowserJamService:
         with session.lock:
             session.check_open()
             bpm = session.manager.state.tempo_bpm
+            beats_per_bar = session.manager.state.beats_per_bar
         event, speech = analyze_capture(audio, rate, mode=mode, session_id=session.id, bpm=bpm,
                                         allow_no_notes=session.audio_references is not None)
         if event is None and mode == "rhythm" and body.get("rhythm_timing") == "feel":
             try:
-                context = analyze_rhythm_feel(audio, rate, bpm)
+                context = analyze_rhythm_feel(audio, rate, bpm, beats_per_bar)
             except ValueError:
                 pass
             else:
@@ -964,13 +1042,34 @@ class BrowserJamService:
                                 for name in ("electric", "acoustic", "synth")},
                 }
             stream_ready = self.mrt2_stream_available()
-            return {"llm_ready": llm_ready, "local_scoped_opening": True, "speech_ready": True, "speech_mode": "browser",
+            return {"studio_v4": True, "llm_ready": llm_ready, "local_scoped_opening": True, "speech_ready": True, "speech_mode": "browser",
                     "music_capture": True, "humming_clip_seconds": MAX_HUMMING_SECONDS,
                     "rhythm_opening_seconds": MAX_OPENING_SECONDS,
                     "fluidsynth": self.soundfont is not None,
                     "timbre_catalog": catalog, "mrt2": self.mrt2_available(), "opening_modes": ["warm", "cold", "humming"],
                     "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True,
                     "mrt2_stream": stream_ready, "mrt2_direct": stream_ready}
+        if operation == "studio-classify":
+            bpm = body.get("bpm", 100)
+            if type(bpm) not in (int, float) or not MIN_TEMPO_BPM <= bpm <= MAX_TEMPO_BPM:
+                raise ValueError("识别参考 BPM 无效。")
+            audio, rate = self.decode_recording(body, MAX_HUMMING_SECONDS)
+            # Match the requested bar length for short, unsteady clap sketches.
+            session_id = uuid4().hex
+            event, speech = analyze_capture(audio, rate, mode="auto", session_id=session_id, bpm=bpm)
+            if event is None and not speech:
+                try:
+                    analyze_rhythm_feel(audio, rate, bpm, {"3/4": 3, "6/8": 2}.get(body.get("meter"), 4))
+                except ValueError:
+                    pass
+                else:
+                    return {"mode": "rhythm"}
+            return {"mode": event.source if event else "speech" if speech else None}
+        if operation == "studio-suggestion" and "session" not in body:
+            if "accept" in body:
+                raise ValueError("开场提议应通过开始会话接受。")
+            idea = choice(tuple(STUDIO_INTROS))
+            return {"offer": {"id": idea, "message": STUDIO_INTROS[idea]["message"], "kind": "opening"}}
         if operation == "start":
             agent = body.get("agent", "rule")
             mode = body.get("opening_mode", "warm")
@@ -996,17 +1095,59 @@ class BrowserJamService:
             if renderer == "mrt2_direct":
                 arrangement = "rule"
             opening = body.get("opening")
+            meter = body.get("meter")
+            idea_id = body.get("studio_idea")
+            if idea_id is not None and (not isinstance(idea_id, str) or idea_id not in STUDIO_INTROS):
+                raise ValueError("这个开场提议已失效。")
+            if (idea_id is None and meter and isinstance(opening, dict) and isinstance(opening.get("text"), str)
+                    and not any(opening.get(key) for key in ("midi", "humming", "rhythm"))
+                    and opening.get("target", "band") in {"band", "drums"}
+                    and re.fullmatch(r"\s*(?:请)?(?:你)?(?:给我)?(?:随便|随机)(?:来|给)?(?:一?个|一?段|点)?鼓点(?:吧)?[。！!]?\s*", opening["text"])):
+                idea_id = choice(tuple(key for key, idea in STUDIO_INTROS.items() if idea["instrument"] == "drums"))
+            idea = STUDIO_INTROS.get(idea_id)
+            if idea:
+                original = (opening or {}).get("text") or idea["message"]
+                instruction = "只要鼓点" if idea["instrument"] == "drums" else "只要钢琴旋律"
+                opening = {"text": instruction, "target": "band", "studio_original": original}
+                mode, meter, bpm_override = "cold", idea["meter"], idea["bpm"]
+            meters = {"4/4": 4, "3/4": 3, "6/8": 2}
+            if meter is not None and meter not in meters:
+                raise ValueError("请选择 4/4、3/4 或 6/8。")
+            beats = meters.get(meter)
             audio_references = {} if renderer == "mrt2_direct" and body.get("mrt2_audio_reference") is True else None
-            events = self.opening_events(opening, bpm=bpm_override, audio_references=audio_references)
+            events = self.opening_events(opening, bpm=bpm_override, audio_references=audio_references, beats=beats)
             if agent == "llm" or arrangement == "llm_all":
                 config = self.config()
             else:
                 config = self.optional_config() if mode == "warm" and renderer != "mrt2_direct" else None
             programs = self.soundfont.programs if self.soundfont else {}
             state, selection = prepare_opening(events, config, programs, tempo_override=bpm_override,
-                                               key_override=opening.get("key"), mode=mode, renderer=renderer)
+                                               key_override=opening.get("key"), mode=mode, renderer=renderer, beats_override=beats)
+            state = state.with_updates(beats_per_bar=beats or text_beats_per_bar(
+                next((event for event in events if event.event_type == "speech"), None)))
+            # Compound meter is two dotted beats. Provide a triplet groove for
+            # the default backing; explicit input rhythm keeps its real onsets.
+            if idea:
+                state = state.with_updates(interaction=replace(state.interaction, allow_initiative=True))
+                selection.update(suggestion={"id": idea_id, "message": idea["message"]},
+                                 reason="以一小节鼓点开场。" if idea["instrument"] == "drums" else "先弹一句短旋律。")
+            if idea and idea["instrument"] == "drums":
+                context = RhythmContext(state.tempo_bpm, idea["onsets"], idea["accents"], beats_per_bar=beats)
+                state = state.with_updates(rhythm=context)
+                selection["settings"].update(rhythm_source="accepted_studio_idea",
+                                             rhythm_beats_zero_based=list(context.onset_beats))
+            elif (meter == "6/8" and state.layer("drums").active and opening.get("rhythm") is None
+                    and not text_settings(next((event for event in events if event.event_type == "speech"), None))[2]):
+                context = RhythmContext(state.tempo_bpm, tuple(step / 3 for step in range(6)),
+                                        (1., .35, .4, .72, .35, .4), beats_per_bar=2)
+                state = state.with_updates(rhythm=context)
+                selection["settings"].update(rhythm_source="compound_meter",
+                                             rhythm_beats_zero_based=list(context.onset_beats))
+            if meter and not selection["instruments"] and opening.get("text") and not state.key:
+                raise ValueError("本地规则需要明确的声部、和声或演奏素材才能开始。可使用大模型 Agent 理解开放式描述。")
+            selection.setdefault("settings", {})["beats_per_bar"] = state.beats_per_bar
             if renderer in {*MRT2_STREAM_RENDERERS, "mrt2"}:
-                text = next((event.payload["text"] for event in events if event.source == "text"), "")
+                text = next((event.payload["text"] for event in events if event.event_type == "speech"), "")
                 style = selection.get("style_hint") or resolve_style(text, self.optional_config)
                 if mode == "humming" or selection.get("develop_humming"):
                     style = ", ".join(filter(None, (style, "continue the hummed melody")))
@@ -1032,6 +1173,7 @@ class BrowserJamService:
                                      preview_lock=self.preview_lock, opening=(state, events, selection),
                                      preview_workers=self.preview_workers, style_config=self.optional_config,
                                      audio_references=audio_references)
+                session.studio_meter = meter
                 session.reserve()
                 if mode in {"cold", "humming"} and renderer == "mrt2":
                     session.start_opening_preview()
@@ -1059,6 +1201,22 @@ class BrowserJamService:
             return session.debug()
         if operation == "timbres":
             return {"timbres": session.set_timbres(body.get("programs"))}
+        if operation == "studio-suggestion":
+            if "accept" in body:
+                return {"feedback": session.accept_suggestion(body["accept"])}
+            return {"offer": session.offer_suggestion()}
+        if operation == "studio-input":
+            refs = {} if session.audio_references is not None else None
+            with session.lock:
+                session.check_open()
+                bpm, beats = session.manager.state.tempo_bpm, session.manager.state.beats_per_bar
+            events = self.opening_events(body["input"], bpm=bpm, audio_references=refs, session_id=session.id, beats=beats)
+            if refs:
+                with session.lock:
+                    session.check_open()
+                    session.audio_references.update(refs)
+            primary = next((event for event in events if event.event_type == "speech"), events[0])
+            return {"feedback": session.submit_event(primary, *(event for event in events if event is not primary))}
         if operation == "feedback":
             if "event" in body:
                 event = InputEvent.from_dict(body["event"])

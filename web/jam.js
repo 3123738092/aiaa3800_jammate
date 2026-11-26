@@ -250,6 +250,11 @@ async function sendTimbres(live) {
 }
 
 function show(view, live) {
+  window.dispatchEvent(new CustomEvent('jammate:view', {detail: view}));
+  window.dispatchEvent(new CustomEvent('jammate:playback-metrics', {detail: {
+    session: live.id, gaps: live.gaps, failures: live.failures,
+    bar: view.current_bar, contextState: live.clock.state,
+  }}));
   if (view.current_bar !== null && !live.exportReady) {
     live.exportReady = true;
     updateExport();
@@ -604,6 +609,9 @@ async function startJam(mode) {
     live.output.connect(live.baselineGate).connect(live.clock.destination);
     live.autoOutput.connect(live.clock.destination);
   }
+  window.dispatchEvent(new CustomEvent('jammate:audio', {detail: {
+    context: live.clock, output: live.baselineGate ?? live.output, autoOutput: live.autoOutput,
+  }}));
   run = live;
   debug.start(null);
   controls();
@@ -647,6 +655,11 @@ async function startJam(mode) {
 
 stop.addEventListener('click', () => end());
 async function sendToJam(live, text, source, voice = null, event = null) {
+  if (text && source === 'speech' && !/鼓|键盘|钢琴|贝斯|主奏|drum|piano|keys|bass/i.test(text)) {
+    const target = document.querySelector('main.studio')?.dataset.target;
+    if (target === 'drums') text = '鼓' + text;
+    else if (target === 'keys') text = '键盘' + text;
+  }
   if (!live?.id || (!text && !event)) return;
   if (live.sending) await live.sending;
   if (run !== live || (voice && live.voice !== voice)) return;
@@ -662,6 +675,7 @@ async function sendToJam(live, text, source, voice = null, event = null) {
     feedbackStatus.textContent = result.error.message;
   } else {
     if (source === 'text' && input.value.trim() === text) input.value = '';
+    window.dispatchEvent(new CustomEvent('jammate:submitted', {detail: {source, text}}));
     feedbackStatus.textContent = result.feedback.status === 'buffered' ? '下一小节起拍后处理。' : '正在理解…';
   }
   controls();

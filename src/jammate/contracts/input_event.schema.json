@@ -9,7 +9,7 @@
     "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0"]},
     "event_id": {"$ref": "#/$defs/id"},
     "session_id": {"$ref": "#/$defs/id"},
-    "source": {"enum": ["text", "speech", "rhythm", "humming", "system"]},
+    "source": {"enum": ["text", "speech", "rhythm", "humming", "midi", "system"]},
     "event_type": {"enum": ["speech", "rhythm_seed", "musical_phrase", "session_control"]},
     "started_at": {"type": ["number", "null"], "minimum": 0},
     "ended_at": {"type": ["number", "null"], "minimum": 0},
@@ -24,7 +24,9 @@
         "source_schema_version": {"$ref": "#/$defs/id"},
         "audio_ref": {"$ref": "#/$defs/id"},
         "analysis_ref": {"$ref": "#/$defs/id"},
-        "confidence_method": {"$ref": "#/$defs/id"}
+        "confidence_method": {"$ref": "#/$defs/id"},
+        "target": {"enum": ["band", "drums", "keys", "harmony", "bass"]},
+        "original_text": {"type": "string", "maxLength": 500}
       }
     }
   },
@@ -40,7 +42,7 @@
     },
     {
       "if": {"properties": {"schema_version": {"const": "1.0.0"}}},
-      "then": {"properties": {"source": {"enum": ["text", "speech", "rhythm", "humming"]}, "event_type": {"enum": ["speech", "rhythm_seed", "musical_phrase"]}}}
+      "then": {"properties": {"source": {"enum": ["text", "speech", "rhythm", "humming", "midi"]}, "event_type": {"enum": ["speech", "rhythm_seed", "musical_phrase"]}}}
     },
     {
       "if": {"properties": {"event_type": {"const": "session_control"}}},
@@ -63,7 +65,7 @@
     {
       "if": {"properties": {"event_type": {"const": "musical_phrase"}}},
       "then": {"properties": {
-        "source": {"const": "humming"},
+        "source": {"enum": ["humming", "midi"]},
         "payload": {"$ref": "#/$defs/hummingPayload"}
       }}
     }
@@ -71,7 +73,7 @@
   "$defs": {
     "controlPayload": {
       "type": "object", "additionalProperties": false, "required": ["command"],
-      "properties": {"command": {"enum": ["stop", "start", "user_activity", "idle"]}, "active": {"type": "boolean"}, "bars": {"type": "integer", "minimum": 0}},
+      "properties": {"command": {"enum": ["stop", "start", "user_activity", "idle", "accept_suggestion"]}, "active": {"type": "boolean"}, "bars": {"type": "integer", "minimum": 0}},
       "allOf": [
         {"if": {"properties": {"command": {"const": "user_activity"}}}, "then": {"required": ["active"]}, "else": {"properties": {"active": false}}},
         {"if": {"properties": {"command": {"const": "idle"}}}, "then": {"required": ["bars"]}, "else": {"properties": {"bars": false}}}
@@ -105,10 +107,10 @@
           "required": ["tempo_bpm", "onset_beats", "accents", "beat_origin_s", "beats_per_bar", "confidence"],
           "properties": {
             "tempo_bpm": {"type": "number", "minimum": 30, "maximum": 250},
-            "onset_beats": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "number", "minimum": 0, "exclusiveMaximum": 4}},
-            "accents": {"type": "array", "maxItems": 16, "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}},
+            "onset_beats": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "number", "minimum": 0, "exclusiveMaximum": 16}},
+            "accents": {"type": "array", "maxItems": 64, "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}},
             "beat_origin_s": {"type": "number", "minimum": 0},
-            "beats_per_bar": {"const": 4},
+            "beats_per_bar": {"type": "integer", "minimum": 1, "maximum": 16},
             "confidence": {"$ref": "#/$defs/score"}
           }
         }

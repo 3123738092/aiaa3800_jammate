@@ -32,6 +32,7 @@ class Action(str, Enum):
 @dataclass(frozen=True)
 class JamState:
     tempo_bpm: float = 96.0
+    beats_per_bar: int = 4
     key: Key | None = Key(0, "major")
     energy: int = 1
     progression_variant: int = 0
@@ -63,6 +64,8 @@ class JamState:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rhythm_mode", RhythmMode(self.rhythm_mode))
+        if type(self.beats_per_bar) is not int or not 1 <= self.beats_per_bar <= 16:
+            raise ValueError("beats_per_bar must be an integer within 1..16")
         for name in ("last_user_motif", "last_ai_motif", "tags", "layers", "motifs", "rhythm_sources", "chord_cycle"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         if not isinstance(self.session_id, str) or not self.session_id.strip() or type(self.state_version) is not int or self.state_version < 0:
@@ -121,7 +124,7 @@ class JamState:
         """SPEC wire view of the same state, not a second writable state."""
         data = {
             "schema_version": "1.0.0", "session_id": self.session_id, "state_version": self.state_version,
-            "transport": {**asdict(self.position), "tempo_bpm": self.tempo_bpm, "playing": self.playing},
+            "transport": {**{**asdict(self.position), "beats_per_bar": self.beats_per_bar}, "tempo_bpm": self.tempo_bpm, "playing": self.playing},
             "harmony": {"key": asdict(self.key) if self.key else None, "progression_variant": self.progression_variant},
             "form": {"section": self.section, "bars_elapsed": self.section_bars},
             "feel": {"energy": self.energy, "density": self.density, "brightness": self.brightness, "tension": self.tension, "tags": list(self.tags)},
@@ -157,7 +160,9 @@ class JamState:
         return cls(
             session_id=data["session_id"], state_version=data["state_version"],
             tempo_bpm=transport["tempo_bpm"], playing=transport["playing"],
-            position=TransportPosition(**{k: transport[k] for k in ("bar", "beat", "next_bar")}),
+            beats_per_bar=transport["beats_per_bar"],
+            position=TransportPosition(**{k: transport[k] for k in ("bar", "beat", "next_bar")},
+                                        beats_per_bar=transport["beats_per_bar"]),
             key=Key(**harmony["key"]) if harmony["key"] else None, progression_variant=harmony["progression_variant"],
             section=form["section"], section_bars=form["bars_elapsed"], **feel,
             last_user_motif=tuple(Note(**n) for n in motifs["last_user"]), last_ai_motif=tuple(Note(**n) for n in motifs["last_ai"]),

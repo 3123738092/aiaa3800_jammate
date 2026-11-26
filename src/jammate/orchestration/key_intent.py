@@ -8,7 +8,7 @@ from .tempo_intent import speech_clauses
 
 
 _TARGET = re.compile(
-    r"(?:请\s*|please\s+)?"
+    r"(?:接下来\s*)?(?:请\s*|please\s+)?"
     r"(?:(?:把(?:调性|曲子|它|这段音乐)\s*)?(?:换成|换到|换为|转成|转到|改成|改为|切换到|切换成)"
     r"|(?:调性|曲调)(?:设为|调到|改为|换到)"
     r"|(?:change|switch|transpose|modulate)(?:\s+(?:(?:the\s+)?key|it))?\s+to)\s*"

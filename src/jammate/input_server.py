@@ -6,11 +6,13 @@ import json
 import os
 import shutil
 import subprocess
+from urllib.error import HTTPError, URLError
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from contextlib import closing
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urljoin
+from urllib.request import Request, urlopen
 
 import numpy as np
 import soundfile as sf
@@ -30,7 +32,10 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path, _, query = self.path.partition("?")
         if path == "/api/jam/mrt2-stream":
-            self.send_mrt2_bar(query)
+            if self.server.remote_backend_url:
+                self.proxy_remote("GET", self.path)
+            else:
+                self.send_mrt2_bar(query)
         elif self.path == "/api/ready":
             self.json_response(200, {"service": SERVICE_ID, "root": str(ROOT.parent),
                                      "implementation": self.server.reference.implementation})
@@ -78,6 +83,33 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def proxy_remote(self, method, path, body=None):
+        """Forward JamMate operations through the configured SSH tunnel."""
+        target = urljoin(self.server.remote_backend_url.rstrip("/") + "/", path.lstrip("/"))
+        request = Request(target, data=body, method=method,
+                          headers={"Content-Type": "application/json"} if body is not None else {})
+        try:
+            with urlopen(request, timeout=180) as response:
+                self.send_response(response.status)
+                for name in ("Content-Type", "Content-Length", "Cache-Control"):
+                    value = response.headers.get(name)
+                    if value:
+                        self.send_header(name, value)
+                self.end_headers()
+                while chunk := response.read(64 * 1024):
+                    self.wfile.write(chunk)
+        except HTTPError as error:
+            self.send_response(error.code)
+            self.send_header("Content-Type", error.headers.get("Content-Type", "application/json"))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(error.read())
+        except (URLError, TimeoutError, OSError) as error:
+            if isinstance(error, (BrokenPipeError, ConnectionResetError)):
+                self.close_connection = True
+                return
+            self.json_response(502, {"error": "Mac 后端不可达；请检查 SSH 4215 端口转发。"})
+
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -96,11 +128,14 @@ class Handler(SimpleHTTPRequestHandler):
                 if not isinstance(body, dict):
                     raise ValueError("请求必须为 JSON 对象。")
                 if self.path.startswith("/api/jam/"):
+                    if self.server.remote_backend_url:
+                        self.proxy_remote("POST", self.path, json.dumps(body, ensure_ascii=False).encode())
+                        return
                     operation = self.path.removeprefix("/api/jam/")
                     if operation == "opening-mic":
                         self.json_response(200, self.server.opening_mic.recognize(body))
                         return
-                    if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop", "debug"}:
+                    if operation not in {"status", "start", "poll", "feedback", "transcribe", "capture", "preview", "timbres", "stop", "debug", "studio-input", "studio-classify", "studio-suggestion"}:
                         self.json_response(404, {"error": "unknown Jam endpoint"})
                         return
                     self.json_response(200, self.server.jam.dispatch(operation, body))
@@ -108,6 +143,9 @@ class Handler(SimpleHTTPRequestHandler):
                     operation = self.path.removeprefix("/api/reference/")
                     if operation not in {"rhythm/analyze", "rhythm/create", "text/status", "text/turn", "style"}:
                         self.json_response(404, {"error": "unknown reference endpoint"})
+                        return
+                    if operation in {"text/status", "text/turn"} and self.server.remote_backend_url:
+                        self.proxy_remote("POST", self.path, json.dumps(body, ensure_ascii=False).encode())
                         return
                     self.json_response(200, self.server.reference.request(operation, body))
             elif self.path in ("/api/rhythm", "/api/rhythm/v1"):
@@ -170,6 +208,7 @@ def main():
         ThreadingHTTPServer(("127.0.0.1", args.port), partial(Handler, directory=str(ROOT))) as server,
     ):
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
+        server.remote_backend_url = os.environ.get("JAMMATE_REMOTE_BACKEND_URL", "").strip()
         server.reference = reference
         server.opening_mic = opening_mic
         server.jam = jam
