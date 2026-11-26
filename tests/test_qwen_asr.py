@@ -43,7 +43,9 @@ def test_qwen_sends_inline_wav_and_returns_text():
     assert request["headers"]["Authorization"] == "Bearer secret"
     assert request["headers"]["X-DashScope-SSE"] == "disable"
     assert request["json"]["model"] == "qwen-audio-3.1-asr-flash"
-    data = request["json"]["input"]["messages"][0]["content"][0]["input_audio"]["data"]
+    context, utterance = request["json"]["input"]["messages"]
+    assert "Bossa Nova" in context["content"][0]["text"]
+    data = utterance["content"][0]["input_audio"]["data"]
     assert data.startswith("data:audio/wav;base64,")
     assert request["json"]["parameters"]["language_hints"] == ["zh", "en"]
 

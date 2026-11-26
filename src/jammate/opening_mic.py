@@ -84,10 +84,18 @@ def spoken_intent(words):
 
 
 _WAKE = re.compile(
-    r"^(?:hey\b|hey(?=[\u4e00-\u9fff])|嗨|嘿|黑|喂)[\s,，、。.!！:：·-]*"
+    r"^(?:(?:hey|hi)(?![a-z])|嗨|嘿|黑|喂)[\s,，、。.!！:：·-]*"
     r"(?:(?P<band>jam[\s-]*ma(?:te|de)\b|jam[\s-]*ma(?:te|de)(?=[\u4e00-\u9fff])|全乐队|乐队)"
     r"|(?P<drums>节奏组|鼓组)|(?P<keys>旋律组|键盘组))"
     r"[\s,，、。.!！?？:：·-]*", re.IGNORECASE)
+
+
+_BOSSA = re.compile(r"(?<![a-z])(?:bossa|bosa|boss(?:\s+and)?)\s+nova(?![a-z])"
+                    r"|[波博巴][萨沙薩]诺[瓦娃]", re.I)
+
+
+def normalize_music_words(words):
+    return _BOSSA.sub("Bossa Nova", words)
 
 
 def wake_command(words, target=None):
@@ -150,19 +158,24 @@ class OpeningMic:
         return QwenASRTranscriber(QwenASRConfig.from_environment())
 
     def _transcribe(self, pcm):
-        primary_error = None
-        try:
-            if self._transcriber is None:
-                self._transcriber = self._create_transcriber()
-            return self._transcriber.transcribe(pcm)
-        except (XfyunConfigurationError, XfyunRecognitionError) as exc:
-            primary_error = exc
-        try:
-            if self._fallback_transcriber is None:
-                self._fallback_transcriber = self._create_fallback_transcriber()
-            return self._fallback_transcriber.transcribe(pcm)
-        except (QwenConfigurationError, QwenRecognitionError) as exc:
-            raise QwenRecognitionError(f"讯飞不可用：{primary_error}；百炼备用不可用：{exc}") from exc
+        providers = [
+            ("讯飞", "_transcriber", self._create_transcriber, (XfyunConfigurationError, XfyunRecognitionError)),
+            ("百炼", "_fallback_transcriber", self._create_fallback_transcriber,
+             (QwenConfigurationError, QwenRecognitionError)),
+        ]
+        if os.getenv("JAMMATE_ASR_PRIMARY", "xfyun").lower() == "qwen":
+            providers.reverse()
+        failures = []
+        for label, field, create, errors in providers:
+            try:
+                transcriber = getattr(self, field)
+                if transcriber is None:
+                    transcriber = create()
+                    setattr(self, field, transcriber)
+                return transcriber.transcribe(pcm)
+            except errors as exc:
+                failures.append(f"{label}不可用：{exc}")
+        raise QwenRecognitionError("；".join(failures))
 
     def _complete(self, messages, schema, *, schema_name=None, timeout_s=None):
         with self._requests:
@@ -253,10 +266,18 @@ class OpeningMic:
                 QwenRecognitionError) as exc:
             raise ValueError(str(exc)) from exc
 
+        raw_words = words
+        words = normalize_music_words(words)
         if mode == "wake":
-            return wake_command(words, target)
+            result = wake_command(words, target)
+            if result and words != raw_words:
+                result["raw_transcript"] = raw_words
+            return result
         if mode == "dictation":
-            return {"route": "SEND_TEXT", "instruction": words} if words else {"route": "KEEP_LISTENING"}
+            result = {"route": "SEND_TEXT", "instruction": words} if words else {"route": "KEEP_LISTENING"}
+            if words != raw_words:
+                result["raw_transcript"] = raw_words
+            return result
         if not words:
             cue = listening_cue(pcm)
             if cue and cue.startswith("持续变化的频率"):

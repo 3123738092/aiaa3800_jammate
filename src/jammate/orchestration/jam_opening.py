@@ -28,6 +28,9 @@ from .progression_intent import named_chords
 from .tempo_intent import speech_clauses, tempo_clause
 
 
+from .meter_intent import METERS, requested_meter
+
+
 PROMPT = """Choose an opening ensemble, tempo, key, harmony and groove for a live jam.
 The user may provide text, claps, humming, or any combination. Respect the
 locked fields in the input. Use the text to resolve the other requested musical
@@ -76,7 +79,9 @@ def opening_focus(event, programs):
         r"\s*(?:请)?(?:给我(?:来)?(?:个|一段)?|来(?:点|个))?\s*(?:4\s*/\s*4\s*拍?(?:的)?)?\s*(?:鼓点|鼓组|鼓)\s*[。.!]?"
         r"|\s*(?:(?:please )?give me (?:a|some) )?(?:4/4 )?(?:drums?|drum groove|percussion)\s*[.!]?",
         requested, re.I)
-    if (len(parts) == 1 and (drum_request or _SOLO.search(requested)
+    meter_drum_request = parts == {"drums"} and requested_meter(requested) and not re.search(
+        r"不要鼓|去掉鼓|别加鼓|保留鼓|旋律|伴奏", requested)
+    if (len(parts) == 1 and (drum_request or meter_drum_request or _SOLO.search(requested)
             or re.search(r"旋律|riff|\bmelody\b", requested, re.I))):
         return matches[0]
     if _SOLO.search(requested):
@@ -126,6 +131,8 @@ def text_beats_per_bar(event):
     if event is None:
         return 4
     text = normalize("NFKC", event.payload["text"])
+    if meter := requested_meter(text):
+        return METERS[meter]
     meters = re.findall(r"(?<!\d)(\d+)\s*/\s*(\d+)\s*(?:拍|time\b|(?=[，,。；;]|$))", text, re.I)
     if meters:
         valid = {int(numerator) for numerator, denominator in meters
@@ -317,10 +324,11 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
             rhythm = state.rhythm if voice == "drums" else None
             if voice == "drums" and rhythm is None:
                 rhythm = RhythmContext(state.tempo_bpm,
-                    tuple(float(beat) for beat in range(state.beats_per_bar)),
-                    tuple(1. if beat == 0 else .65 for beat in range(state.beats_per_bar)),
-                    beats_per_bar=state.beats_per_bar)
-                selection["settings"].update(rhythm_source="requested_groove", rhythm_beats_zero_based=[0, 1, 2, 3])
+                    tuple(float(beat) for beat in range(beats_per_bar)),
+                    tuple(1. if beat == 0 else .65 for beat in range(beats_per_bar)),
+                    beats_per_bar=beats_per_bar)
+                selection["settings"].update(rhythm_source="requested_groove",
+                                             rhythm_beats_zero_based=list(rhythm.onset_beats))
             key = state.key
             if voice == "drums":
                 key = None

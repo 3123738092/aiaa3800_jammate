@@ -8,6 +8,13 @@ import wave
 from dataclasses import dataclass
 
 
+MUSIC_VOCABULARY = (
+    "JamMate, Hey JamMate, 节奏组, 旋律组, 全乐队, Bossa Nova, 波萨诺瓦, 爵士, 摇摆, 切分, 反拍, "
+    "放克, Funk, Lo-fi, 鼓点, 底鼓, 军鼓, 踩镲, 贝斯, 钢琴, 吉他, 和弦, 三连音, "
+    "BPM, 3/4 拍, 4/4 拍, 6/8 拍, 三拍子, 大调, 小调"
+)
+
+
 class QwenConfigurationError(ValueError):
     pass
 
@@ -69,6 +76,10 @@ class QwenASRTranscriber:
             }]}]},
             "parameters": {"format": "wav", "sample_rate": "16000", "language_hints": ["zh", "en"]},
         }
+        if self.config.model == "qwen-audio-3.1-asr-flash":
+            payload["input"]["messages"].insert(0, {"role": "user", "content": [
+                {"type": "input_text", "text": MUSIC_VOCABULARY},
+            ]})
         try:
             response = self.session.post(
                 self.config.endpoint,

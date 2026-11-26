@@ -6,6 +6,7 @@ from jammate.generate.harmony import harmony_cycle, same_cycle
 from jammate.instruments import MAX_JAM_LAYERS, added_program
 from jammate.interaction import Layer, Strategy
 from jammate.music import ChordStep, Key
+from jammate.rhythm import RhythmContext
 from jammate.state import JamState
 from jammate.texture import ArrangementTexture
 
@@ -14,7 +15,20 @@ def project(state: JamState, plan: BandPlan) -> JamState:
     data = plan.to_dict()
     if data["session_id"] != state.session_id or data["based_on_state_version"] != state.state_version:
         raise PlanError("plan is based on a different session/state version")
-    target = state.with_updates(**{("tempo_bpm" if k == "tempo_bpm" else "playing"): v for k, v in data["transport"].items()})
+    target = state.with_updates(**data["transport"])
+    if target.beats_per_bar != state.beats_per_bar:
+        rhythm = state.rhythm
+        beats = target.beats_per_bar
+        if beats == 2:
+            rhythm = RhythmContext(target.tempo_bpm, tuple(i / 3 for i in range(6)),
+                                   (1., .35, .4, .72, .35, .4), beats_per_bar=2)
+        elif rhythm:
+            if state.beats_per_bar == 2:
+                rhythm = None
+            else:
+                rhythm = replace(rhythm, beats_per_bar=beats,
+                                 onset_beats=tuple(b * beats / rhythm.beats_per_bar for b in rhythm.onset_beats))
+        target = target.with_updates(rhythm=rhythm, position=replace(state.position, beat=0., beats_per_bar=beats))
     if "style" in data:
         target = target.with_updates(style=data["style"])
     for action in data["actions"]:

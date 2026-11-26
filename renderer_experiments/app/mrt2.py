@@ -72,7 +72,7 @@ class MRT2Runtime(KevinRuntime):
                               backend=self.engine, model=self.model)
 
     def render_audio(self, folder, performance):
-        duration = performance.bars * 4 * 60 / performance.tempo_bpm
+        duration = performance.bars * performance.beats_per_bar * 60 / performance.tempo_bpm
         if not performance.notes:
             sf.write(folder / "band.wav", np.zeros((round(duration*48000), 2)), 48000, subtype="PCM_16")
             return {"inference": "host_silence_no_model", "reason": "silent plan"}

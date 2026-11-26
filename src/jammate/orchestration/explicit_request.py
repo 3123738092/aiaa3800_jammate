@@ -38,7 +38,7 @@ _MIX_TARGETS = rf"{_MIX_NAMES}(?:\s*(?:以及|和|与|及|、)\s*{_MIX_NAMES})*"
 _MIX_SPLIT = re.compile(r"\s*(?:以及|和|与|及|、)\s*")
 _MIX_DOWN = re.compile(
     rf"(?:把|让)?(?P<layers>{_MIX_TARGETS})(?:的)?(?P<controls>声音以及密度|音量和密度|声音和密度|声音|音量|密度)?"
-    r"(?:都)?(?P<verb>压低|降低|小一点|少一点)(?:一点|一些)?")
+    r"(?:都)?(?P<verb>压低|降低|轻一点|小一点|少一点)(?:一点|一些)?")
 _MIX_UP = re.compile(rf"(?:突出|调高)(?P<layer>{_NAMES})(?:的?(?:音量|声音))?")
 _MIX_COMMENT = re.compile(rf"我(?:还是)?听不到(?P<layer>{_NAMES})")
 

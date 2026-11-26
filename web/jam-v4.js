@@ -12,7 +12,7 @@ const requests = new Map();
 const traces = new Map();
 let live, preparing, timer, publish, service, previewUrl, previewShown, previewPending, savedTake;
 let failureCount = 0;
-let pendingTempo;
+let pendingTempo, pendingMeter;
 let lastActivity = performance.now();
 let offer, offeredThisLull = false, requestingOffer = false;
 let activityVersion = 0;
@@ -155,16 +155,26 @@ function outputVisibility() {
 
 async function preview(active, view) {
   if (view.renderer !== 'mrt2') return;
-  const result = view.preview_status ?? view.opening_preview;
+  const id = view.auto_preview_id;
+  active.eligiblePreview = id;
+  const result = view.feedback ? view.preview_status : view.opening_preview;
   const label = $('backend-preview-status');
+  if (previewShown && previewShown !== id) {
+    wavPlayer.pause();
+    wavPlayer.removeAttribute('src');
+    wavPlayer.load();
+    URL.revokeObjectURL(previewUrl);
+    previewUrl = previewShown = null;
+    wavPlayer.hidden = $('backend-preview-download').hidden = true;
+  }
   label.hidden = !result;
   label.textContent = {generating: '正在生成 MRT2 试听', waiting_material: '等待生成素材',
     completed: 'MRT2 试听 · 独立音频', failed: result?.error || 'MRT2 试听生成失败'}[result?.status] || '';
-  if (view.preview_id && previewShown !== view.preview_id && !previewPending) {
-    previewPending = view.preview_id;
+  if (id && previewShown !== id && !previewPending) {
+    previewPending = id;
     try {
-      const data = await post('preview', {session: active.id, id: previewPending}, 30_000);
-      if (live !== active) return;
+      const data = await post('preview', {session: active.id, id}, 30_000);
+      if (live !== active || active.eligiblePreview !== id) return;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(new Blob([decodeBase64(data.wav)], {type: 'audio/wav'}));
       wavPlayer.src = previewUrl;
@@ -238,7 +248,14 @@ function showView(active, view) {
       send({type: 'error', requestId, message: '速度调整未应用。'});
     }
   }
+  if (pendingMeter && feedback?.id === pendingMeter.id
+      && ['applied', 'held', 'expired', 'superseded'].includes(feedback.status)) {
+    if (feedback.status !== 'applied') send({type: 'error', requestId: pendingMeter.requestId,
+      message: '拍号调整未应用。'});
+    pendingMeter = null;
+  }
   config.bpm = view.bpm;
+  config.meter = view.meter ?? config.meter;
   const next = {
     phase: active.clock.state === 'suspended' ? 'paused' : !view.playing ? 'ended' :
       view.current_bar == null ? 'starting' : 'playing',
@@ -295,7 +312,7 @@ function stop(phase = 'ended', retain = true) {
   const active = live;
   live = null;
   preparing = null;
-  pendingTempo = null;
+  pendingTempo = pendingMeter = null;
   if (active) {
     if (retain && !exportButton.hidden) savedTake = active.export().catch(() => null);
     active.close();
@@ -425,6 +442,7 @@ async function voiceTurn(action) {
   const recording = await audioWave(wave(pcm, action.sampleRate), 13);
   const result = await post('opening-mic', {...recording, mode: 'wake', wake_target: action.wakeTarget}, 52_000);
   if (!action.current() || live !== previous) return {};
+  if (result.target) send({type: 'voice.wake', target: result.target});
   if (!result.instruction) return result;
   send({type: 'transcript', requestId: action.requestId, text: result.instruction});
   trace(action.requestId, 'recognition', 'completed', result, action.requestId);
@@ -458,12 +476,20 @@ async function dispatch(action) {
       state({phase: pause ? 'paused' : 'playing'}, requestId);
       return;
     }
-    case 'meter.set':
-      if (live || preparing) throw new Error('结束会话后可更改拍号。');
+    case 'meter.set': {
       if (!['3/4', '4/4', '6/8'].includes(action.meter)) throw new Error('请选择 4/4、3/4 或 6/8。');
-      config.meter = action.meter;
-      state({meter: config.meter}, requestId);
+      if (preparing || (live && !live.id)) throw new Error('乐队还在准备，请稍等。');
+      if (!live) {
+        config.meter = action.meter;
+        state({meter: config.meter}, requestId);
+        return;
+      }
+      if (live.clock.state !== 'running') throw new Error('继续演奏后可在小节边界换拍号。');
+      const {feedback} = await post('feedback', {session: live.id, text: '切到 ' + action.meter + ' 拍'});
+      saveRequest(feedback.id, requestId);
+      pendingMeter = {id: feedback.id, requestId};
       return;
+    }
     case 'tempo.set': {
       if (preparing || (live && !live.id)) throw new Error('请等待当前输入准备完毕。');
       if (!live) {

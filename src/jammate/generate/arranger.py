@@ -69,6 +69,9 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         pads = {layer.name for layer in state.layers if layer.active and layer.role == "pad"}
         backing = follow_motif(backing, chord, state.motif(theme.motif_id).notes,
                               bar_index - theme.start_bar, pads=pads)
+    if state.beats_per_bar < 4:
+        backing = tuple(replace(note, duration=min(note.duration, state.beats_per_bar - note.start))
+                        for note in backing if note.start < state.beats_per_bar)
     bar_notes = backing + tuple(lead)
     offset = bar_index * state.beats_per_bar
     return tuple(n.shifted(offset) for n in bar_notes)

@@ -35,8 +35,9 @@ from jammate.orchestration.addition_intent import asks_for_instruments
 from jammate.orchestration.backend_arrangement import (
     LLMBackendArranger, MRTArrangement, prepare_scoped_score, writable_layers,
 )
+from jammate.orchestration.bossa_intent import bossa_melody_plan
 from jammate.orchestration.decision_gate import should_execute
-from jammate.orchestration.explicit_request import explicit_request
+from jammate.orchestration.explicit_request import explicit_mix_plan, explicit_request
 from jammate.orchestration.jam_opening import cold_audio_plan, prepare_opening, text_beats_per_bar, text_settings
 from jammate.orchestration.mrt2_intent import resolve_style, style_plan
 from jammate.orchestration.key_intent import explicit_key_plan
@@ -49,6 +50,7 @@ from jammate.orchestration.live_timing import LiveTurnTiming, can_wait, target_p
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import prepare_bar, prepare_humming_answer, prepare_plan
 from jammate.orchestration.plans import make_plan
+from jammate.orchestration.meter_intent import METERS, remaining_meter_clauses, requested_meter
 from jammate.orchestration.realtime import RealtimeSession, TimingPolicy, prepare_conditioning
 from jammate.orchestration.transitions import project
 from jammate.orchestration.studio_suggestion import STUDIO_INTROS, accepted_plan, candidate
@@ -199,7 +201,6 @@ class BrowserJam:
         self.reserved = self.packet = self.playing = None
         self.reserved_output = self.playing_output = None
         self.feedback = self.last_applied = self.deferred = self.future = None
-        self.studio_meter = None
         self.suggestion_offer = self.accepted_suggestion = None
         self.target = ("flexible", None)
         self.turn_timing = None
@@ -372,7 +373,8 @@ class BrowserJam:
         return {
             "session": self.id, "sample_rate": SR, "current_bar": self.playing.timing.bar_index if self.playing else None,
             "bpm": state.tempo_bpm, "playing": state.playing, "feedback": self.feedback,
-            "meter": self.studio_meter, "key": state.key.name if state.key else None,
+            "meter": next((name for name, beats in METERS.items() if beats == state.beats_per_bar), None),
+            "key": state.key.name if state.key else None,
             "chord": cycle[index].name if index is not None else None,
             "progression": [chord.name for chord in cycle] or None, "progression_index": index,
             "last_applied": self.last_applied, "renderer": self.renderer,
@@ -643,7 +645,7 @@ class BrowserJam:
                 with self.lock:
                     if self.closed:
                         return
-                    if self.preview is None:
+                    if self.preview is None and self.feedback is None:
                         self.preview = {"id": f"opening_{self.id}", "wav": wav,
                                         "conditioning": conditions.to_dict()}
                     self.opening_preview = {**self.opening_preview, "status": "completed", "inference": inference}
@@ -688,13 +690,24 @@ class BrowserJam:
                     if not self.is_current(event_id):
                         raise PlanError("preview was superseded")
             check_current()
+            style = bound.plan.to_dict().get("style", self.mrt2_style)
             runtime = create_runtime(directory, backend="mrt2", allow_preview=True, backend_arranger=arranger,
-                                     generator=generate_isolated, prompt=self.mrt2_style)
+                                     generator=generate_isolated, prompt=style)
             with self.lock:
                 self.record_turn(event_id, inference={"model": runtime.model, "backend": runtime.engine,
                                                       "status": "preparing", "state_committed": False})
-            performance, conditioning = runtime.prepare_execution(
-                bound.state, bound.plan, bound.request.events, check_current)
+            try:
+                performance, conditioning = runtime.prepare_execution(
+                    bound.state, bound.plan, bound.request.events, check_current)
+            except PlanError:
+                if arranger is None or arranger.last_trace.get("status") != "failed":
+                    raise
+                check_current()
+                arranger.last_trace.update(status="fallback", fallback="scheduled_score")
+                runtime = create_runtime(directory, backend="mrt2", allow_preview=True,
+                                         generator=generate_isolated, prompt=style)
+                performance, conditioning = runtime.prepare_execution(
+                    bound.state, bound.plan, bound.request.events, check_current)
             check_current()
             condition_data = conditioning.to_dict() if conditioning else None
             with self.lock:
@@ -726,10 +739,31 @@ class BrowserJam:
                                      ["tempo", "key", "progression", "groove", "playing"], {}, 1,
                                      "已将该录音安排为 MRT2 音频参考。", [])
                     route = "mrt2_audio_reference"
+            meter = next((meter for event in request.events if event.event_type == "speech"
+                          and (meter := requested_meter(event.payload["text"]))), None)
+            if plan is None and meter and METERS[meter] != request.state.beats_per_bar:
+                plan_id = f"meter_{uuid4().hex}"
+                remaining = [remaining_meter_clauses(event.payload["text"]) for event in request.events
+                             if event.event_type == "speech"]
+                extras = [from_text(text, session_id=request.state.session_id) for text in remaining if text]
+                mix_plan = explicit_mix_plan(extras, request.state, plan_id) if extras else None
+                mix = mix_plan.to_dict() if mix_plan else None
+                reason = f"切换到 {meter} 拍。"
+                if mix:
+                    reason += mix["reason"]
+                elif extras:
+                    reason += "如需其他调整，可以接着说。"
+                plan = make_plan(request.state, request.events, plan_id, "FOLLOW", mix["actions"] if mix else [],
+                                 ("tempo", "key", "progression", "playing"),
+                                 {"beats_per_bar": METERS[meter]}, mix["valid_for_bars"] if mix else 1,
+                                 reason, mix["unresolved"] if mix else [])
+                route = "local_explicit"
             if plan is None and (tempo := explicit_tempo(request.events)):
                 plan = compile_jev_tempo(request.events, request.state, f"tempo_{uuid4().hex}",
                                          mode=tempo.mode, value=tempo.value)
                 route = "local_explicit"
+            if plan is None and (bossa := bossa_melody_plan(request)) is not None:
+                plan, route = bossa, "studio_bossa"
             plan = plan or cold_audio_plan(request)
             if plan is None:
                 agent = self.make_agent()
@@ -749,7 +783,7 @@ class BrowserJam:
                 plan = BandPlan.from_dict(data)
             route = trace.get("source")
             direct = route in {"local_explicit", "explicit_music_request", "jev_direct", "cold_audio",
-                               "mrt2_style", "mrt2_audio_reference", "studio_initiative"}
+                               "mrt2_style", "mrt2_audio_reference", "studio_initiative", "studio_bossa"}
             allow_wait = not direct and can_wait(plan, request.state)
             with self.lock:
                 self.record_turn(event_id, proposed_plan=plan.to_dict(), decision=trace)
@@ -1174,10 +1208,11 @@ class BrowserJamService:
                 instruction = "只要鼓点" if idea["instrument"] == "drums" else "只要钢琴旋律"
                 opening = {"text": instruction, "target": "band", "studio_original": original}
                 mode, meter, bpm_override = "cold", idea["meter"], idea["bpm"]
-            meters = {"4/4": 4, "3/4": 3, "6/8": 2}
-            if meter is not None and meter not in meters:
+            if meter is not None and meter not in METERS:
                 raise ValueError("请选择 4/4、3/4 或 6/8。")
-            beats = meters.get(meter)
+            if not idea and isinstance(opening, dict) and isinstance(opening.get("text"), str):
+                meter = requested_meter(opening["text"]) or meter
+            beats = METERS.get(meter)
             audio_references = {} if renderer == "mrt2_direct" and body.get("mrt2_audio_reference") is True else None
             events = self.opening_events(opening, bpm=bpm_override, audio_references=audio_references, beats=beats)
             if agent == "llm" or arrangement == "llm_all":
@@ -1237,7 +1272,6 @@ class BrowserJamService:
                                      preview_lock=self.preview_lock, opening=(state, events, selection),
                                      preview_workers=self.preview_workers, style_config=self.optional_config,
                                      audio_references=audio_references)
-                session.studio_meter = meter
                 session.reserve()
                 if mode in {"cold", "humming"} and renderer == "mrt2":
                     session.start_opening_preview()

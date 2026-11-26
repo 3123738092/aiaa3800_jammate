@@ -372,19 +372,39 @@ function mergeJMMusicState(previous, patch) {
     if(button){const b=node('button','',button.label);b.type='button';b.onclick=button.action;box.append(b)}return box;
   }
   function attachDetails(el,key) { el.dataset.insKey=key;el.open=openDetails.has(key);el.addEventListener('toggle',()=>{if(!el.isConnected)return;if(el.open)openDetails.add(key);else openDetails.delete(key)});return el; }
-  function rawDetails(label, data, key) { const d=attachDetails(node('details','ins-raw'),key);d.append(node('summary','',label),node('pre','ins-json',stringify(data)));return d; }
+  function rawDetails(label, data, key) {
+    const d = attachDetails(node('details','ins-raw'), key);
+    const pre = node('pre','ins-json',stringify(data));
+    pre.dataset.insScroll = key;
+    pre.tabIndex = 0;
+    d.append(node('summary','',label), pre);
+    return d;
+  }
   function field(label, data, key) {
     const f=node('div','ins-field');f.append(node('p','ins-field-label',label));
-    if (typeof data==='object'&&data!==null) f.append(node('pre','ins-json',stringify(data)));
+    if (typeof data==='object'&&data!==null) {
+      const pre = node('pre','ins-json',stringify(data));
+      pre.dataset.insScroll = key;
+      pre.tabIndex = 0;
+      f.append(pre);
+    }
     else f.append(node('div','ins-field-value',str(data)));return f;
   }
   function rememberRender(root, render) {
     const scroll=$('insScroll'),top=scroll.scrollTop;
     // Snapshot current DOM state before replacement; a detached detail may still have a queued toggle.
     root.querySelectorAll('details[data-ins-key]').forEach(el=>{if(el.open)openDetails.add(el.dataset.insKey);else openDetails.delete(el.dataset.insKey)});
+    const nested = new Map([...root.querySelectorAll('[data-ins-scroll]')].map(el => [
+      el.dataset.insScroll, {top: el.scrollTop, left: el.scrollLeft},
+    ]));
     const focused=document.activeElement;const focusedDetails=focused?.closest?.('[data-ins-key]');
     const key=focusedDetails?.dataset.insKey;const isSummary=focused?.tagName==='SUMMARY';
     render();scroll.scrollTop=top;
+    for (const el of root.querySelectorAll('[data-ins-scroll]')) {
+      const saved = nested.get(el.dataset.insScroll);
+      if (saved) { el.scrollTop = saved.top; el.scrollLeft = saved.left; }
+      if (el.dataset.insScroll === focused?.dataset.insScroll) el.focus({preventScroll:true});
+    }
     if(key&&isSummary){const found=[...root.querySelectorAll('[data-ins-key]')].find(x=>x.dataset.insKey===key);found?.querySelector('summary')?.focus({preventScroll:true})}
   }
   function currentTrace(){return selectedTrace&&traces.has(selectedTrace)?traces.get(selectedTrace):[...traces.values()].at(-1)}
@@ -457,7 +477,7 @@ function mergeJMMusicState(previous, patch) {
   function prune(){while(traces.size>retained.traces){const oldest=traces.keys().next().value;const removed=traces.get(oldest);removed.events.forEach(e=>{openDetails.delete(e.key);openDetails.delete(e.key+'raw')});traces.delete(oldest);if(selectedTrace===oldest)selectedTrace=''}let total=[...traces.values()].reduce((n,t)=>n+t.events.length,0);for(const t of traces.values()){while(total>retained.events&&t.events.length>1){const e=t.events.shift();openDetails.delete(e.key);openDetails.delete(e.key+'raw');t.dropped=(t.dropped||0)+1;total--}if(total<=retained.events)break}}
   function receiveBrowser(type,data={},meta={}){const e={key:`browser-${++sequence}`,type:String(type),timestamp:new Date().toISOString(),data:clone(data),meta:clone(meta)};browserEvents.push(e);while(browserEvents.length>retained.browser){const removed=browserEvents.shift();openDetails.delete(removed.key)}schedule();return e.key}
   function receiveBackend(event){if(!event||typeof event!=='object')return;const e=clone(event),receivedAt=new Date().toISOString();
-    if(e.type==='state'&&e.state&&typeof e.state==='object'){backendState=mergeJMMusicState(backendState||{},e.state);stateTimestamp=e.timestamp??e.state.timestamp??null;stateReceived=receivedAt;stateReceipts.push(e);if(stateReceipts.length>30)stateReceipts.shift();schedule();if(!(e.traceId??e.trace_id??e.requestId??e.request_id))return}
+    if(e.type==='state'&&e.state&&typeof e.state==='object'){backendState=mergeJMMusicState(backendState||{},e.state);stateTimestamp=e.timestamp??e.state.timestamp??null;stateReceived=receivedAt;stateReceipts.push(e);if(stateReceipts.length>30)stateReceipts.shift();if(activeTab==='state')schedule();if(!(e.traceId??e.trace_id??e.requestId??e.request_id))return}
     if(e.type==='capabilities'||e.type==='connection')return;
     const request=e.requestId??e.request_id;const id=e.traceId??e.trace_id??request,unlinked=id==null||id==='';const linked=request!=null?[...traces.values()].find(t=>t.events.some(ev=>(ev.raw.requestId??ev.raw.request_id)===request)):null;const key=linked?.key??(unlinked?'__unlinked__':String(id));
     if(!traces.has(key))traces.set(key,{key,id:unlinked?null:String(id),unlinked,events:[]});const t=traces.get(key);t.events.push({key:`backend-${++sequence}`,raw:e,receivedAt});prune();schedule();
@@ -632,7 +652,7 @@ function mergeJMMusicState(previous, patch) {
   function receive(event){
     if(!online()||!event||typeof event!=='object')return;
     if(event.type==='state'&&event.state&&typeof event.state==='object'){
-      if(['ended','error'].includes(event.state.phase))tempoPending=null;
+      if(['ended','error','ready'].includes(event.state.phase))tempoPending=meterPending=null;
       state=mergeJMMusicState(state,event.state);
       const receiptId=event.requestId||event.state.requestId;
       if(transportPending&&(!receiptId||receiptId===transportPending.requestId)){
@@ -657,7 +677,14 @@ function mergeJMMusicState(previous, patch) {
       if(!event.requestId||event.requestId===meterPending?.requestId)meterPending=null;
       for(const [id,p] of mixPending)if(!event.requestId||event.requestId===p.requestId)mixPending.delete(id);
       updateTransport();if(typeof event.message==='string')showAgentReply({...event,status:'error'});toast(String(event.message||'后端返回错误，请查看 Inspector'));
+    }else if(event.type==='voice.wake'){
+      if (ids.includes(event.target)) moveTo(nearest(event.target));
+      else if (event.target === 'band') setTarget('band');
     }else if(event.type==='transcript'&&typeof event.text==='string'){
+      if (micSession?.wake && micSession.busy) {
+        micSession.caption = '已听到，乐队正在处理…';
+        updateRecording();
+      }
       hint('识别到：'+event.text);
       if(event.requiresConfirmation)showClarification({requestId:event.requestId,message:event.text,options:[{id:'accept',label:'确认识别结果'},{id:'retry',label:'重新输入'}]});
     }else if(event.type==='clarification'){if(Array.isArray(event.options)&&event.options.length)showClarification(event);else showAgentReply({...event,status:'clarification'})}
@@ -680,6 +707,7 @@ function mergeJMMusicState(previous, patch) {
       catch(error){if(backend===adapter&&backendEpoch===epoch)disconnect(false);throw error}
     }
     updateTransport();updateHint();log('adapter_connected',{label:adapter.label||'adapter',capabilities});
+    void autoStartWake();
     return()=>{if(backend===adapter&&backendEpoch===epoch)disconnect()};
   }
   function disconnect(announce=true){
@@ -1050,14 +1078,14 @@ function mergeJMMusicState(previous, patch) {
       if(drafts.length)hint('素材已加入输入，可试听或补充一句要求',5000);
     }finally{importing=false;$('attachBtn').disabled=false;$('fileInput').value='';syncComposer()}
   }
-  function syncComposer(){const enabled=!!($('txt').value.trim()||drafts.length);$('sendText').disabled=!enabled||sending||importing||!!micSession||micPending;$('sendText').setAttribute('aria-label',sending?'正在提交':'发送输入');$('sendText').title='发送输入';$('attachBtn').disabled=importing||!!micSession||micPending;$('drafts').querySelectorAll('select').forEach(el=>el.disabled=sending)}
+  function syncComposer(){const enabled=!!($('txt').value.trim()||drafts.length), recording=micSession&&!micSession.wake;$('sendText').disabled=!enabled||sending||importing||!!recording||micPending;$('sendText').setAttribute('aria-label',sending?'正在提交':'发送输入');$('sendText').title='发送输入';$('attachBtn').disabled=importing||!!recording||micPending;$('drafts').querySelectorAll('select').forEach(el=>el.disabled=sending)}
   function mediaPayload(d){
     const base={target:d.target,fileName:d.name,origin:d.origin};
     if(d.kind==='audio')return{...base,type:'input.audio',mode:d.mode,audio:d.blob||d.file,durationMs:d.durationMs??null};
     return{...base,type:'input.midi',events:selectedEvents(d).map(e=>({...e})),tempos:d.tempos||[],tempoProvided:!!d.tempoProvided,ppq:d.ppq??null,tracks:d.tracks||[],sourceBpm:d.tempoProvided?d.tempos?.find(t=>t.provided)?.bpm??null:null,...(d.file?{file:d.file}:{})};
   }
   async function sendInput(e){
-    e.preventDefault();if(sending||importing||micSession||micPending)return;
+    e.preventDefault();if(sending||importing||(micSession&&!micSession.wake)||micPending)return;
     const content=$('txt').value,text=content.trim(),saved=drafts.slice();if(!text&&!saved.length)return;
     const docs=saved.filter(d=>d.kind==='text').map(d=>({name:d.name,text:d.text,role:'user_context',target:commandTarget}));
     const media=saved.filter(d=>d.kind!=='text');
@@ -1089,14 +1117,16 @@ function mergeJMMusicState(previous, patch) {
 
   function updateRecording(){
     const active=!!micSession;
-    document.body.classList.toggle('rec',active);$('mic').disabled=micPending;$('mic').setAttribute('aria-pressed',String(active));$('mic').innerHTML=icon(active?'stop':'mic');
+    document.body.classList.toggle('rec',active&&!micSession.wake);
+    document.body.classList.toggle('wake-listening',active&&micSession.wake);
+    $('mic').disabled=micPending;$('mic').setAttribute('aria-pressed',String(active));$('mic').innerHTML=icon(active?'stop':'mic');
     const speech = inputMode === 'speech';
     const label = active && micSession.wake ? '关闭语音唤醒' :
       micPending ? (active ? '正在保存录音' : '等待麦克风权限') : active ? '停止录音' :
         speech ? '开启语音唤醒' : '开始录音';
     $('mic').setAttribute('aria-label',label);
     $('mic').title=label;
-    $('inputModes').querySelectorAll('button').forEach(b=>b.disabled=active||micPending);
+    $('inputModes').querySelectorAll('button').forEach(b=>b.disabled=(active&&!micSession.wake)||micPending);
     $('recordingCaption').hidden=!active;
     if(active){
       $('recordingCaption').textContent=micSession.wake ? micSession.caption :
@@ -1173,17 +1203,32 @@ function mergeJMMusicState(previous, patch) {
     updateRecording();
   }
 
-  async function startWakeMic() {
-    if (!capabilities.voiceWake) { toast('语音服务尚未配置'); return; }
-    if (document.hidden || sending || importing) return;
+  let wakeDisabled = false;
+  try { wakeDisabled = localStorage.getItem('jammate-wake') === 'off'; } catch {}
+  function setWakePreference(enabled) {
+    wakeDisabled = !enabled;
+    try { localStorage.setItem('jammate-wake', enabled ? 'on' : 'off'); } catch {}
+  }
+
+  async function autoStartWake() {
+    if (!wakeDisabled && capabilities.voiceWake && navigator.mediaDevices?.getUserMedia
+        && !micSession && !micPending && !document.hidden) {
+      await startWakeMic(true);
+    }
+  }
+
+  async function startWakeMic(automatic = false) {
+    if (!capabilities.voiceWake) { if (!automatic) toast('语音服务尚未配置'); return; }
+    if (document.hidden || sending || importing || micSession || micPending) return;
+    if (inputMode !== 'speech') setMode('speech');
     micPending = true;
     updateRecording();
     let capture;
     try {
-      const context = await audio.ensure();
+      if (!automatic) await audio.ensure();
       const {openWakeInput} = await import('./jam-v4-voice.js');
       const session = {wake:true, target:null, busy:false, hearing:false, caption:waitingForWake};
-      capture = await openWakeInput(context, phrase => void recognizeWakePhrase(session, phrase), () => {
+      capture = await openWakeInput(audio.ensure, phrase => void recognizeWakePhrase(session, phrase), () => {
         if (micSession !== session || session.busy) return;
         session.hearing = true;
         session.hearingStartedArmed = Boolean(session.target);
@@ -1196,10 +1241,17 @@ function mergeJMMusicState(previous, patch) {
       for (const track of capture.stream.getAudioTracks()) track.addEventListener('ended', () => closeWakeMic(session), {once:true});
       micSession = session;
       log('mic_start', {mode:'wake'});
-      drawWave();
     } catch (error) {
       capture?.close();
-      toast('无法启动语音唤醒，请检查麦克风权限');
+      if (automatic && error.name === 'PlaybackGestureRequired') {
+        hint('麦克风已授权 · 页面声音待解锁');
+        document.addEventListener('pointerdown', event => {
+          if (!wakeDisabled && inputMode === 'speech' && !event.target.closest('#mic, #inputModes')) {
+            void startWakeMic();
+          }
+        }, {once: true});
+      } else if (automatic) hint('语音监听未开启 · 请检查浏览器麦克风权限');
+      else toast('无法启动语音唤醒，请检查麦克风权限和页面声音权限');
       log('mic_error', {message:error.message}, {level:'error'});
     } finally {
       micPending = false;
@@ -1209,9 +1261,9 @@ function mergeJMMusicState(previous, patch) {
 
   async function toggleMic(){
     if(micPending)return;
-    if(micSession?.wake){closeWakeMic(micSession);return}
+    if(micSession?.wake){setWakePreference(false);closeWakeMic(micSession);return}
     if(micSession){stopRecording();return}
-    if(inputMode==='speech'){await startWakeMic();return}
+    if(inputMode==='speech'){setWakePreference(true);await startWakeMic();return}
     if(importing){toast('文件正在读取，完成后即可录音');return}
     if(drafts.length>=4){toast('请先提交或移除一份素材');return}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){toast('当前环境无法录音，请用 HTTPS 或 localhost 打开，也可导入音频文件');log('mic_unavailable',{});return}
@@ -1248,7 +1300,11 @@ function mergeJMMusicState(previous, patch) {
   const clarificationRoot=create('div','clarification');clarificationRoot.id='clarification';clarificationRoot.hidden=true;$('drafts').before(clarificationRoot);
   document.querySelectorAll('.theme-dot').forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
   $('clearTarget').onclick=()=>setTarget('band');$('instrumentName').onclick=()=>setTarget(focused());
-  $('inputModes').querySelectorAll('button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+  $('inputModes').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    if (micSession?.wake && b.dataset.mode !== 'speech') closeWakeMic(micSession);
+    setMode(b.dataset.mode);
+    if (b.dataset.mode === 'speech') { setWakePreference(true); void startWakeMic(); }
+  });
   $('prev').onclick=()=>moveTo(focusIndex-1);$('next').onclick=()=>moveTo(focusIndex+1);
   $('play').onclick=togglePlayback;$('tempoBtn').onclick=()=>$('tempoPopover').hidden?openTempo():closeTempo();
   $('tempoBtn').addEventListener('wheel',wheelTempo,{passive:false});$('bpmInput').addEventListener('wheel',e=>{if(!e.deltaY)return;e.preventDefault();adjustTempo((e.deltaY<0?1:-1)*(e.shiftKey?5:1))},{passive:false});
@@ -1277,7 +1333,7 @@ function mergeJMMusicState(previous, patch) {
   });
   document.addEventListener('keyup',e=>{const key=e.key.toLowerCase(),note=typingHeld.get(key);if(note!==undefined){noteOff(note,'typing:'+key);typingHeld.delete(key)}});
   window.addEventListener('blur',()=>{releaseAllNotes();swipe=null});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});if(micSession.wake)closeWakeMic(micSession);else stopRecording()}}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});if(micSession.wake)closeWakeMic(micSession);else stopRecording()}}else void autoStartWake()});
   const resize=()=>{const n=$('stage').clientWidth<560?7:14;if(n!==whiteCount){releaseScreenNotes();whiteCount=n;keyboardMarkup()}renderStage()};
   window.addEventListener('resize',resize);
   if(window.ResizeObserver)new ResizeObserver(resize).observe($('stage'));

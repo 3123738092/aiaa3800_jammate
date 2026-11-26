@@ -19,7 +19,7 @@ python -m venv .venv
 ## 试一轮 Jam
 
 1. **开场。** 在输入栏发送「来个鼓点」，或者点唱机的播放键开始全乐队伴奏。也可以空等约 8 秒，看看乐队是否提议一个短鼓点或旋律。点「试试」才会采用提议。
-2. **边听边改。** 演奏时发送「鼓少一点」。如果只想对一个声部说话，先左右切换到对应乐器，再点乐器名称，把它设为输入目标。
+2. **边听边改。** 演奏时发送「鼓少一点」。如果只想对一个声部说话，先左右切换到对应乐器，再点乐器名称，把它设为输入目标。演奏中可说「换到 3/4 拍」，或在速度面板直接选拍号，变更在可用小节生效。
 3. **看结果。** 输入栏上方显示乐队回应。右上角「运行日志」可以查看输入、编排、渲染和播放回执。实际应用后，唱机与和声屏才更新相应的演奏状态。
 4. **保留演奏。** 播放后可点「导出演奏 WAV」。唱机键负责暂停或继续。在「设置」里点「结束会话」，就能换音频后端或重新开场。
 
@@ -27,7 +27,7 @@ python -m venv .venv
 
 | 输入 | 在 Studio 里怎么用 |
 | --- | --- |
-| **说话** | 选「说话」，点一次麦克风。只说「Hey JamMate」，听到「我在」再说指令。也可叫「Hey 节奏组」「Hey 旋律组」，或一句话说完「Hey JamMate，速度调到 108」。停顿后自动提交。 |
+| **说话** | 语音服务和浏览器权限就绪时，工作台打开后自动监听。说「Hey JamMate」，听到「我在」再说指令。叫「Hey 节奏组」「Hey 旋律组」会切到相应乐器。停顿后自动提交。 |
 | **哼唱、拍手** | 选对应模式，点麦克风开始，再点一次结束。音频作为素材放进输入栏，可先试听，再单独发送或附上一句说明。 |
 | **键盘、MIDI** | 在旋律组点「录入旋律」，用屏幕琴键或通过「连接 MIDI」接上的外部键盘演奏。点「完成」和「加入输入」，再提交。已有 `.mid` / `.midi` 文件可通过附件导入。 |
 
@@ -42,7 +42,7 @@ python -m venv .venv
 if (-not (Test-Path xfyun-asr.secrets.json)) { Copy-Item xfyun-asr.example.json xfyun-asr.secrets.json }
 ```
 
-- **讯飞听写。** 在 `xfyun-asr.secrets.json` 中填写流式听写服务的 `app_id`、`api_key` 和 `api_secret`。如果已有文件，直接检查现有配置即可。也可用 `JAMMATE_XFYUN_ASR_CONFIG` 指向其他位置。讯飞调用失败时，有 `DASHSCOPE_API_KEY` 才会尝试百炼备用。
+- **讯飞听写。** 在 `xfyun-asr.secrets.json` 中填写流式听写服务的 `app_id`、`api_key` 和 `api_secret`。如果已有文件，直接检查现有配置即可。也可用 `JAMMATE_XFYUN_ASR_CONFIG` 指向其他位置。有百炼密钥时，可以设置 `$env:JAMMATE_ASR_PRIMARY = "qwen"` 优先使用带音乐词表的 Qwen-Audio，失败时回退讯飞。默认使用讯飞，有百炼密钥时才启用备用。
 - **ChatAnywhere Agent。** 创建 `chatanywhere-llm.secrets.json`，填写自己的密钥和有权限的模型。当前联调使用 `gpt-5.4-mini`。在启动前设定 `$env:JAMMATE_LLM_CONFIG = (Resolve-Path .\chatanywhere-llm.secrets.json).Path`。
 
 ```json

@@ -177,3 +177,14 @@ def initiate_motif(key: Key, rng: random.Random) -> tuple[Note, ...]:
             step = -step
         index += step
     return _finish(rhythm, pitches, key)
+
+
+def bossa_motif(key: Key, beats_per_bar: int) -> tuple[Note, ...]:
+    """Two syncopated measures around the tonic triad and passing tones."""
+    tonic = 60 + key.tonic
+    origin = key.to_index(tonic)
+    offsets = (0.0, .25, .4375, .6875, .875, 1.125, 1.375, 1.625)
+    degrees = (0, 2, 4, 3, 2, 4, 1, 0)
+    return tuple(Note(key.from_index(origin + degree), phase * beats_per_bar,
+                      (.11 if i % 3 else .16) * beats_per_bar, 72 + 8 * (i % 3 == 0), "lead")
+                 for i, (phase, degree) in enumerate(zip(offsets, degrees)))

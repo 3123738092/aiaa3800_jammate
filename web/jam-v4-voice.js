@@ -1,5 +1,22 @@
-export async function openWakeInput(context, onPhrase, onActivity) {
-  const module = new URL('jam-voice-processor.js', import.meta.url);
+export async function openWakeInput(ensureAudio, onPhrase, onActivity) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1},
+  });
+  let context;
+  let deadline;
+  try {
+    context = await Promise.race([
+      ensureAudio(),
+      new Promise((_, reject) => { deadline = setTimeout(() => reject(
+        new DOMException('浏览器需要一次页面交互才能开始播报', 'PlaybackGestureRequired')), 1500); }),
+    ]);
+    await context.audioWorklet.addModule(new URL('jam-voice-processor.js', import.meta.url));
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop());
+    throw error;
+  } finally {
+    clearTimeout(deadline);
+  }
   const cue = fetch(new URL('assets/studio/wake-ack-zh.wav', import.meta.url))
     .then(response => {
       if (!response.ok) throw new Error('唤醒回应音频无法加载');
@@ -7,10 +24,6 @@ export async function openWakeInput(context, onPhrase, onActivity) {
     })
     .then(bytes => context.decodeAudioData(bytes))
     .catch(() => null);
-  await context.audioWorklet.addModule(module);
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1},
-  });
   let source, gate, analyser, processor, reply, closed = false;
   const close = () => {
     if (closed) return;

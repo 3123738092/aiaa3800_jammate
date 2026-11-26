@@ -44,7 +44,7 @@
         }
       }
     }},
-    "transport": {"type": "object", "additionalProperties": false, "properties": {"playing": {"type": "boolean"}, "tempo_bpm": {"type": "number", "minimum": 30, "maximum": 250}}},
+    "transport": {"type": "object", "additionalProperties": false, "properties": {"playing": {"type": "boolean"}, "beats_per_bar": {"enum": [2, 3, 4]}, "tempo_bpm": {"type": "number", "minimum": 30, "maximum": 250}}},
     "plan_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
     "reason": {"type": "string", "minLength": 1},
     "unresolved": {"type": "array", "items": {"type": "string"}}

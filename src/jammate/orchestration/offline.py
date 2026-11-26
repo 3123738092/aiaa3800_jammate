@@ -14,7 +14,7 @@ import numpy as np
 
 from jammate.contracts.band_plan import BandPlan, PlanError
 from jammate.generate.arranger import arrange_bar, chord_for_bar, place_lead
-from jammate.generate.response import answer_motif, continue_motif, initiate_motif
+from jammate.generate.response import answer_motif, bossa_motif, continue_motif, initiate_motif
 from jammate.interaction import Motif
 from jammate.music import BEATS_PER_BAR, Note
 from jammate.render.synth import render, TAIL_S
@@ -126,7 +126,8 @@ def prepare_plan(state: JamState, plan: BandPlan, *, seed=3800, opening_answer: 
         elif name == "VARY_MOTIF":
             lead = answer_motif(target.motif(params["motif_id"]).notes, target.key, rng).notes
         elif name == "INTRODUCE_MOTIF":
-            lead = initiate_motif(target.key, rng)
+            lead = (bossa_motif(target.key, target.beats_per_bar) if target.style == "bossa nova"
+                    and bars >= 2 else initiate_motif(target.key, rng))
             generated = Motif(params["motif_id"], "ai", tuple(data["trigger_event_ids"]), lead)
     if lead and (not target.playing or not target.layer("lead").active or target.layer("lead").level == 0):
         raise PlanError("motif response requires an audible lead layer")

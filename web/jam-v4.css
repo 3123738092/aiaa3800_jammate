@@ -88,3 +88,9 @@
 #studio-suggestion button { padding: 8px 12px; font-size: 13px; border-radius: 999px; color: inherit; }
 #suggestion-accept { background: #4f4235; }
 #suggestion-skip { background: transparent; color: #c3b7a6 !important; }
+
+.wake-listening .mic-button {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 3px;
+}
+.ins-json { overscroll-behavior: auto; }

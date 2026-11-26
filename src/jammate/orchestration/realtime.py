@@ -217,7 +217,8 @@ class RealtimeSession:
         """Queue one prepared plan, rechecking request and deadline on the owner."""
         decision = change.decision
         self._require_current(decision.request)
-        if reuse_local_score and self._active is not None and not self.conditioning_only:
+        if (reuse_local_score and self._active is not None and not self.conditioning_only
+                and change.performance.beats_per_bar == self._active.beats_per_bar):
             change = self._reuse_local_score(change)
         if self._queued is not None:
             if self._queued is change or (reuse_local_score and self._queued == change):
@@ -318,6 +319,7 @@ class RealtimeSession:
                 performance = queued.performance
             if self.conditioning_only and (plan is None or queued.decision.updates_conditioning()):
                 plan = queued.decision.plan
+        clock.beats_per_bar = state.beats_per_bar
         timing = clock.reserve(state.tempo_bpm)
         return self._make_bar(timing, state, performance, plan)
 
@@ -357,6 +359,7 @@ class RealtimeSession:
                     if self.conditioning_only and (self._active_plan is None or queued.decision.updates_conditioning()):
                         self._active_plan = plan
         state = self.manager.state
+        self._clock.beats_per_bar = state.beats_per_bar
         timing = self._clock.reserve(state.tempo_bpm)
         self._playing_bar = timing
         if receipt is None:

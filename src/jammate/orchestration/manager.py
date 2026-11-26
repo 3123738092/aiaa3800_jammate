@@ -302,7 +302,7 @@ class StateManager:
         section = "build" if any(a["action"] == "BUILD" for a in data["actions"]) else "space" if any(a["action"] == "SIMPLIFY" for a in data["actions"]) else target.section
         committed = target.with_updates(state_version=state.state_version + 1, section=section,
             section_bars=(state.section_bars if section == state.section else 0) + completed_bars,
-            position=position)
+            position=replace(position, beats_per_bar=target.beats_per_bar))
         self._state = JamState.from_dict(committed.to_dict())
         self._turns[-1]["state_after"] = self._context_state(self._state)
         self._status[plan.plan_id] = "applied"
