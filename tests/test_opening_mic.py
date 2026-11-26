@@ -198,7 +198,7 @@ def test_wake_dictation_routes_only_addressed_speech(monkeypatch):
     speech.transcribe.side_effect = [
         "今天要把鼓关掉。", "嘿，节奏组，把声音放轻一些。",
         "黑旋律组。", "改成钢琴", "嗨，Jam Mate，把速度设成96。",
-        "Hey JamMatey，速度减半", "Hey JamMate 给我一个节奏",
+        "Hey JamMatey，速度减半", "Hey JamMate 给我一个节奏", "Hey, jam made.",
     ]
     monkeypatch.setattr(opening_mic.OpeningMic, "_create_transcriber", Mock(return_value=speech))
     body = {"mode": "wake", "audio": recording()}
@@ -211,5 +211,6 @@ def test_wake_dictation_routes_only_addressed_speech(monkeypatch):
         assert mic.recognize(body) == {"target": "band", "instruction": "把速度设成96。"}
         assert mic.recognize(body) == {}
         assert mic.recognize({**body, "wake_target": "keys"}) == {"target": "band", "instruction": "给我一个节奏"}
+        assert mic.recognize(body) == {"target": "band", "instruction": ""}
         with pytest.raises(ValueError, match="唤醒目标"):
             mic.recognize({**body, "wake_target": "anything"})

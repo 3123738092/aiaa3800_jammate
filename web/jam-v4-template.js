@@ -1151,10 +1151,14 @@ function mergeJMMusicState(previous, patch) {
     const result = await dispatch({type:'voice.turn', samples:phrase.samples, sampleRate:phrase.sampleRate,
       wakeTarget, current:() => micSession === session});
     if (micSession !== session) return;
-    session.busy = false;
     if (result?.target) {
+      session.caption = result.target === 'band' ? '我在。' : names[result.target] + '在听。';
+      updateRecording();
+      const played = await session.acknowledge().catch(() => false);
+      if (micSession !== session) return;
+      log('voice_wake', {target: result.target, replyPlayed: played});
       session.target = result.target;
-      session.caption = names[result.target] + '在听，请说指令';
+      session.caption = (result.target === 'band' ? 'JamMate' : names[result.target]) + '在听，请说指令';
       session.wakeTimer = setTimeout(() => {
         session.target = null;
         if (!session.hearing && !session.busy) {
@@ -1165,6 +1169,7 @@ function mergeJMMusicState(previous, patch) {
     } else {
       session.caption = result?.sent ? '指令已提交 · 继续说唤醒词' : waitingForWake;
     }
+    session.busy = false;
     updateRecording();
   }
 

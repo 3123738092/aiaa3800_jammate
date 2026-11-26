@@ -85,7 +85,7 @@ def spoken_intent(words):
 
 _WAKE = re.compile(
     r"^(?:hey\b|hey(?=[\u4e00-\u9fff])|嗨|嘿|黑|喂)[\s,，、。.!！:：·-]*"
-    r"(?:(?P<band>jam[\s-]*mate\b|jam[\s-]*mate(?=[\u4e00-\u9fff])|全乐队|乐队)"
+    r"(?:(?P<band>jam[\s-]*ma(?:te|de)\b|jam[\s-]*ma(?:te|de)(?=[\u4e00-\u9fff])|全乐队|乐队)"
     r"|(?P<drums>节奏组|鼓组)|(?P<keys>旋律组|键盘组))"
     r"[\s,，、。.!！?？:：·-]*", re.IGNORECASE)
 
