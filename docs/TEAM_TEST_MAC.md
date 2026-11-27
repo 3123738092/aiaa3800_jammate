@@ -50,9 +50,9 @@ JAMMATE_MRT2_ENGINE=mlx .venv/bin/python -m jammate.render.mrt2 \
 | 环节 | 验收 |
 | --- | --- |
 | 冷启动和语音 | 授予麦克风权限。分别打开 `/jam.html?asr=xfyun`、`/jam.html?asr=qwen`。说「Hey 旋律组」和「加一段 Bossa Nova 旋律」。运行日志里的识别结果会记录所选服务。这两个测试入口各自直连指定服务，普通地址按服务配置自动备用。 |
-| Agent 和编排 | 选择大模型 Agent，发送「先来三拍子的鼓点」。演奏中改为 4/4，核对 InputEvent、JamState、BandPlan 和播放回执。 |
+| Agent 和编排 | 在 Studio 直接发送「先来三拍子的鼓点」。演奏中改为 4/4，核对 InputEvent、JamState、BandPlan 和播放回执。 |
 | 拍手、哼唱、MIDI | 分别提交三种输入。在 Inspector 查看识别或导入结果，并确认乐队实际使用了素材。 |
-| FluidSynth 与 MRT2 | 分别试 FluidSynth、内置伴奏加 MRT2 试听、MRT2 流式和独立生成。试听需要实际 WAV，流式需要收到连续 PCM 并验证可播放。 |
+| 内置伴奏与 MRT2 | 在 Studio 听实时伴奏，并等待 MRT2 试听 WAV。需要单独比较 FluidSynth、MRT2 流式和独立生成时，从「设置」打开经典工作台。流式需收到连续 PCM 并验证可播放。 |
 | 并行测试 | 两个浏览器分别开场、发指令和导出，核对每个窗口只看到自己的会话。记录两路 MRT2 同时运行时的首帧延迟和断音情况。 |
 
 临时联调用的团队登录仅适用于受控成员。语音片段会经 HTTPS 入口发送到 Mac，由所选的听写服务处理。团队成员可以在自己的会话里看到转写、计划和渲染记录。

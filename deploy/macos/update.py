@@ -90,7 +90,7 @@ def prepare_runtime(base, current, release):
         return
     old = current / ".python"
     if all((current / name).exists() and (release / name).exists()
-           and (current / name).read_bytes() == (release / name).read_bytes() for name in MANIFESTS):
+           and (current / name).read_text() == (release / name).read_text() for name in MANIFESTS):
         runtime = old.read_text().strip() if old.exists() else str(base / "venv/bin/python")
     else:
         uv = base / "bin/uv"
