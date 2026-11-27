@@ -406,7 +406,8 @@ async function launch(active, opening, requestId, ideaId) {
     const profile = studioProfile();
     const openingMode = profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
     const useConfiguredTempo = tempoExplicit || opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
-    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm: useConfiguredTempo ? config.bpm : null,
+    const bpm = useConfiguredTempo && !opening.rhythm?.count_in_ms?.length ? config.bpm : null;
+    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm,
       meter: config.meter, ...profile, allow_preview: profile.renderer === 'mrt2'}, 100_000);
     if (live !== active) {
       release(view.session);
@@ -471,7 +472,7 @@ async function prepareInput(action) {
   for (const item of materials) {
     if (item.type === 'input.pads') {
       if (input.rhythm) throw new Error('拍手和鼓垫节奏请分开提交。');
-      input.rhythm = {hits: item.hits, bpm: item.bpm, meter: item.meter};
+      input.rhythm = {hits: item.hits, bpm: item.bpm, meter: item.meter, count_in_ms: item.countInMs};
       continue;
     }
     if (item.type === 'input.midi') {

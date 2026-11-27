@@ -101,6 +101,21 @@
         "audio_duration_s": {"type": "number", "exclusiveMinimum": 0},
         "tempo_source": {"enum": ["detected", "manual", "session"]},
         "confidence_kind": {"enum": ["grid_alignment_heuristic", "feel_grid_heuristic", "manual", "unspecified"]},
+        "pad_recording": {
+          "type": "object", "additionalProperties": false, "required": ["hits", "count_in_ms"],
+          "properties": {
+            "hits": {"type": "array", "minItems": 1, "maxItems": 64, "items": {
+              "type": "object", "additionalProperties": false, "required": ["pad", "pitch", "timestamp_ms"],
+              "properties": {
+                "pad": {"type": "integer", "minimum": 0, "maximum": 15},
+                "pitch": {"enum": [36, 38, 42, 75]},
+                "timestamp_ms": {"type": "number", "minimum": 0, "maximum": 300000}
+              }
+            }},
+            "count_in_ms": {"type": "array", "items": {"type": "number", "minimum": 0},
+              "anyOf": [{"maxItems": 0}, {"minItems": 4, "maxItems": 4}]}
+          }
+        },
         "rhythm": {
           "type": "object",
           "additionalProperties": false,

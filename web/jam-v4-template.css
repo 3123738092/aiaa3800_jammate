@@ -97,6 +97,13 @@ body #ins .ins-empty button{color:color-mix(in srgb,var(--accent-light) 60%,#f4e
 .drum-capture{display:flex;align-items:center;gap:6px;min-width:0}
 .drum-capture [hidden]{display:none}
 #padCount{white-space:nowrap;font-size:11px}
+.pad-tempo-option{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;font-size:11px}
+.pad-tempo-option input{margin:0;accent-color:var(--accent-dark)}
+@container studio (max-width:560px){
+ .drum-capture{flex-wrap:wrap;gap:3px 6px}
+ #padCount{flex-basis:100%;line-height:11px}
+ #padCount:empty{display:none}
+}
 @container studio (max-width:560px){
  .drum-capture .device-control{min-height:28px;padding:4px 6px}
  .drum-capture:has(#padAdd:not([hidden])) #padCount{display:none}

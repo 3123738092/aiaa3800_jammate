@@ -533,7 +533,7 @@ function mergeJMMusicState(previous, patch) {
   let localBpm=96, localMeter='4/4', previewStarted=false, backend=null, backendEpoch=0, unsubscribe=null, state={}, capabilities={};
   let wheelTempoDraft=null,wheelTempoTimer=0;
   let transportPending=null, tempoPending=null, meterPending=null, sending=false, sendTicket=0, importing=false, toastTimer=0, hintTimer=0;
-  let padCapture=null, padTake=null, padTimer=0;
+  let padCapture=null, padTake=null;
   let octave=4, whiteCount=14, melodyCapture=false, melodyStart=0, melodyEvents=[], melodyDown=new Map();
   let sounding=new Map(), notePointers=new Map(), typingHeld=new Map(), fileNotes=new Set();
   let midiAccess=null, midiDevices=new Set(), micSession=null, micPending=false, autoWakePending=false, waveId=0, micTimer=0, micLimit=0;
@@ -845,7 +845,7 @@ function mergeJMMusicState(previous, patch) {
       el.addEventListener('keydown',e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();moveTo(nearest(id))}});
     }
     objects.keys.innerHTML='<div class="instrument-head"><div class="key-left"><button type="button" class="device-control" id="melodyRecord" aria-pressed="false"><span class="record-dot"></span><span id="melodyRecordLabel">录入旋律</span></button><button type="button" class="device-control" id="midiConnect">连接 MIDI</button></div><div class="key-right"><span id="melodyCount"></span><button type="button" class="device-control" id="melodySend" hidden>加入输入</button><div class="octave-controls"><button type="button" class="device-control" id="octaveDown" aria-label="降低八度">−</button><span class="octave-label">C4</span><button type="button" class="device-control" id="octaveUp" aria-label="提高八度">+</button></div></div></div><div class="instrument-body">'+channelMarkup('keys')+'<div class="keyboard"></div></div>';
-    objects.drums.innerHTML='<div class="instrument-head"><div class="drum-capture"><button id="padRecord" type="button" class="device-control" aria-pressed="false" title="从第一次敲击开始录一小节"><span class="record-dot"></span><span id="padRecordLabel">录入鼓型</span></button><button id="padAdd" type="button" class="device-control" hidden>加入输入</button><span id="padCount" role="status"></span></div><div class="meter-selector" role="group" aria-label="拍号">'+['4/4','3/4','6/8'].map(m=>'<button type="button" data-meter="'+m+'" aria-pressed="'+(m===localMeter)+'" aria-label="'+m+' 拍">'+m+'</button>').join('')+'</div></div><div class="instrument-body">'+channelMarkup('drums')+'<div class="pad-grid">'+Array.from({length:16},(_,i)=>'<button class="pad" type="button" data-pad="'+i+'" aria-label="'+['底鼓','军鼓','踩镲','打击乐'][i%4]+' '+(Math.floor(i/4)+1)+'"><span>'+(['KICK','SNARE','HAT','PERC'][i%4])+'</span></button>').join('')+'</div></div>';
+    objects.drums.innerHTML='<div class="instrument-head"><div class="drum-capture"><button id="padRecord" type="button" class="device-control" aria-pressed="false" title="录完后点完成"><span class="record-dot"></span><span id="padRecordLabel">录入鼓型</span></button><button id="padAdd" type="button" class="device-control" hidden>加入输入</button><label class="pad-tempo-option"><input id="padCountIn" type="checkbox">四击定速</label><span id="padCount" role="status"></span></div><div class="meter-selector" role="group" aria-label="拍号">'+['4/4','3/4','6/8'].map(m=>'<button type="button" data-meter="'+m+'" aria-pressed="'+(m===localMeter)+'" aria-label="'+m+' 拍">'+m+'</button>').join('')+'</div></div><div class="instrument-body">'+channelMarkup('drums')+'<div class="pad-grid">'+Array.from({length:16},(_,i)=>'<button class="pad" type="button" data-pad="'+i+'" aria-label="'+['底鼓','军鼓','踩镲','打击乐'][i%4]+' '+(Math.floor(i/4)+1)+'"><span>'+(['KICK','SNARE','HAT','PERC'][i%4])+'</span></button>').join('')+'</div></div>';
     objects.harmony.innerHTML='<div class="harmony-display" aria-label="和声状态"><div class="harmony-top"><span>调性</span><span class="harmony-key" id="harmonyKey"></span></div><div class="harmony-current"><span>当前和弦</span><strong class="harmony-chord" id="harmonyChord"></strong></div><div class="harmony-progression"><span>和弦进行</span><div class="harmony-sequence" id="harmonySequence"></div></div><span id="harmonySource" class="harmony-source">尚未连接乐队</span></div>';
     for(const el of document.querySelectorAll('[data-volume]')){el.addEventListener('input',()=>{setVolume(el.dataset.volume,+el.value)});el.addEventListener('change',()=>setVolume(el.dataset.volume,+el.value))}
     for(const el of document.querySelectorAll('[data-mute]'))el.onclick=()=>{const id=el.dataset.mute,v=volumes[id];if(validGain(v))setVolume(id,v===0?(lastVolumes[id]||.8):0)};
@@ -876,13 +876,24 @@ function mergeJMMusicState(previous, patch) {
     $('padRecord').setAttribute('aria-pressed',String(Boolean(padCapture)));
     $('padRecordLabel').textContent=padCapture?'完成':count?'重新录入':'录入鼓型';
     $('padAdd').hidden=Boolean(padCapture)||!count;
-    $('padCount').textContent=count?count+' 击':padCapture?'等第一击':'';
+    $('padCountIn').disabled=Boolean(padCapture);
+    updatePadStatus();
     syncComposer();
+  }
+
+  function updatePadStatus(){
+    const take=padCapture??padTake;
+    let label='';
+    if(take){
+      if(take.bpm===null)label='定速 '+take.countInMs.length+'/4';
+      else if(take.hits.length)label=take.hits.length+' 击';
+      else label=take.bpm+' BPM · 等第一击';
+    }
+    $('padCount').textContent=label;
   }
 
   function finishPadCapture(){
     if(!padCapture)return;
-    clearTimeout(padTimer);
     padTake=padCapture.hits.length?padCapture:null;
     padCapture=null;
     log('pad_capture_stop',{hits:padTake?.hits.length??0});
@@ -895,33 +906,53 @@ function mergeJMMusicState(previous, patch) {
     const view=api.getState();
     const bpm=bpmValid(view.bpm)?view.bpm:localBpm;
     const meter=meterValid(view.meter)?view.meter:localMeter;
-    const beats={'4/4':4,'3/4':3,'6/8':2}[meter];
+    const countIn=$('padCountIn').checked;
     padTake=null;
-    padCapture={bpm,meter,start:null,durationMs:beats*60000/bpm,hits:[]};
-    log('pad_capture_start',{bpm,meter});
+    padCapture={bpm:countIn?null:bpm,meter,start:null,countInMs:[],hits:[]};
+    log('pad_capture_start',{bpm,meter,countIn});
     updatePadCapture();
+    if(countIn)hint('请在鼓垫上均匀敲四下主拍',6000);
+  }
+
+  function recordPadCountIn(take, now){
+    take.countInMs.push(now-(take.countInStart??=now));
+    if(take.countInMs.length!==4)return;
+    const gaps=take.countInMs.slice(1).map((ms,index)=>ms-take.countInMs[index]);
+    const mean=gaps.reduce((sum,gap)=>sum+gap,0)/gaps.length;
+    const deviation=Math.sqrt(gaps.reduce((sum,gap)=>sum+(gap-mean)**2,0)/gaps.length);
+    const bpm=60000/gaps.sort((a,b)=>a-b)[1];
+    if(!bpmValid(bpm)||Math.min(...gaps)<150||deviation/mean>.2){
+      take.countInMs=[];
+      take.countInStart=null;
+      hint('这四下未能定速，请再均匀敲四下',6000);
+      return;
+    }
+    take.bpm=Math.round(bpm);
+    hint('已定速 '+take.bpm+' BPM · 从下一击开始录鼓型',6000);
   }
 
   function recordPadHit(pad){
     if(!padCapture)return;
-    const take=padCapture, now=performance.now();
-    if(take.start===null){
-      take.start=now;
-      padTimer=setTimeout(finishPadCapture,take.durationMs);
+    const take=padCapture,now=performance.now();
+    if(take.bpm===null){
+      recordPadCountIn(take,now);
+    }else if(take.hits.length<64){
+      take.start??=now;
+      take.hits.push({pad,timestampMs:now-take.start});
+      if(take.hits.length===64)toast('已记满 64 击，请点完成');
     }
-    const timestampMs=now-take.start;
-    if(timestampMs>=take.durationMs){finishPadCapture();return}
-    take.hits.push({pad,timestampMs});
-    if(take.hits.length===64){finishPadCapture();return}
-    $('padCount').textContent=take.hits.length+' 击';
+    updatePadStatus();
   }
 
   function addCapturedPads(){
     if(!padTake)return;
     if(drafts.length>=4){toast('一次最多添加 4 份素材');return}
-    const {hits,bpm,meter,durationMs}=padTake;
-    addDraft({kind:'pads',origin:'drum_pads',name:'鼓垫节奏',hits,bpm,meter,durationMs,target:'drums',
-      summary:hits.length+' 击 · '+meter+' · '+bpm+' BPM'});
+    const {hits,bpm,meter,countInMs}=padTake;
+    const barMs={'4/4':4,'3/4':3,'6/8':2}[meter]*60000/bpm;
+    const inBar=hits.filter(hit=>hit.timestampMs<barMs).length;
+    const details=inBar<hits.length?' · 循环首小节 '+inBar+' 击':'';
+    addDraft({kind:'pads',origin:'drum_pads',name:'鼓垫节奏',hits,bpm,meter,countInMs,target:'drums',
+      summary:hits.length+' 击 · '+meter+' · '+bpm+' BPM'+(countInMs.length?'（定速）':'（工作台）')+details});
     padTake=null;
     updatePadCapture();
     hint('鼓型已加入输入，可附一句说明再发送',5000);
@@ -1154,7 +1185,7 @@ function mergeJMMusicState(previous, patch) {
   function mediaPayload(d){
     const base={target:d.target,fileName:d.name,origin:d.origin};
     if(d.kind==='audio')return{...base,type:'input.audio',mode:d.mode,audio:d.blob||d.file,durationMs:d.durationMs??null};
-    if(d.kind==='pads')return{...base,type:'input.pads',hits:d.hits,bpm:d.bpm,meter:d.meter};
+    if(d.kind==='pads')return{...base,type:'input.pads',hits:d.hits,bpm:d.bpm,meter:d.meter,countInMs:d.countInMs};
     return{...base,type:'input.midi',events:selectedEvents(d).map(e=>({...e})),tempos:d.tempos||[],tempoProvided:!!d.tempoProvided,ppq:d.ppq??null,tracks:d.tracks||[],sourceBpm:d.tempoProvided?d.tempos?.find(t=>t.provided)?.bpm??null:null,...(d.file?{file:d.file}:{})};
   }
   async function sendInput(e){

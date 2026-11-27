@@ -116,6 +116,36 @@ def test_pad_recording_preserves_drum_sounds_and_uses_the_session_tempo():
         assert session.debug()["opening"]["playback_receipt"]["bar"] == 0
 
 
+@pytest.mark.parametrize("bpm, count_in, expected_source", [
+    (84, [], "session"),
+    (120, [0, 500, 1000, 1500], "detected"),
+])
+def test_pad_tempo_mode_keeps_all_hits_in_the_opening_event(bpm, count_in, expected_source):
+    with closing(BrowserJamService()) as service:
+        view = service.dispatch("start", {
+            "opening": {"rhythm": {"bpm": bpm, "meter": "4/4", "count_in_ms": count_in, "hits": [
+                {"pad": 0, "timestampMs": 0}, {"pad": 1, "timestampMs": 500},
+                {"pad": 3, "timestampMs": 3100},
+            ]}},
+            "opening_mode": "cold", "meter": "4/4",
+        })
+        session = service.sessions[view["session"]]
+        event, = session.debug()["opening"]["input_events"]
+        payload = event["payload"]
+        assert view["bpm"] == bpm
+        assert payload["tempo_source"] == expected_source
+        assert payload["rhythm"]["onset_beats"] == pytest.approx([0, bpm / 120])
+        assert payload["rhythm"]["drum_pitches"] == [[36], [38]]
+        assert payload["pad_recording"] == {
+            "count_in_ms": count_in,
+            "hits": [
+                {"pad": 0, "pitch": 36, "timestamp_ms": 0},
+                {"pad": 1, "pitch": 38, "timestamp_ms": 500},
+                {"pad": 3, "pitch": 75, "timestamp_ms": 3100},
+            ],
+        }
+
+
 def test_live_pad_recording_replaces_groove_and_enables_drums_in_a_cold_melody_session():
     with closing(BrowserJamService()) as service:
         view = service.dispatch("start", {

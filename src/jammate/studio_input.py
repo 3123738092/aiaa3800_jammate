@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 from math import isfinite
 from uuid import uuid4
 
+from jammate.analysis.tempo import tempo_from_onsets
 from jammate.contracts import InputEvent
 from jammate.contracts.adapters import from_humming, from_rhythm, from_text
 from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
@@ -54,26 +55,42 @@ def pad_rhythm(data, *, session_id, beats_per_bar=None):
     if beats_per_bar is not None and beats != beats_per_bar:
         raise ValueError("鼓垫录入的拍号与当前拍号不同，请按当前拍号重新录入。")
     if not isinstance(hits, list) or not 1 <= len(hits) <= 64:
-        raise ValueError("请录入一小节鼓垫，包含 1–64 次敲击。")
+        raise ValueError("请输入 1–64 次鼓垫敲击。")
+    count_in = data.get("count_in_ms", [])
+    if (not isinstance(count_in, list) or len(count_in) not in (0, 4)
+            or any(type(ms) not in (int, float) or not 0 <= ms <= 30_000 for ms in count_in)
+            or (count_in and count_in[0] != 0)
+            or any(b - a < 150 for a, b in zip(count_in, count_in[1:]))):
+        raise ValueError("鼓垫定速需要四下均匀敲击。")
+    if count_in:
+        estimated = tempo_from_onsets([ms / 1000 for ms in count_in])
+        if estimated is None or bpm != int(estimated + .5):
+            raise ValueError("鼓垫定速结果与四击记录不一致，请重新录入。")
 
     bar_ms = beats * 60000 / bpm
     drums = {}
+    recorded_hits = []
     previous = 0.
     for hit in hits:
         if not isinstance(hit, dict):
             raise ValueError("鼓垫敲击记录无效。")
         pad, timestamp = hit.get("pad"), hit.get("timestampMs")
         if (type(pad) is not int or not 0 <= pad < 16 or type(timestamp) not in (int, float)
-                or not previous <= timestamp < bar_ms):
+                or not previous <= timestamp <= 300_000):
             raise ValueError("鼓垫编号或起音时间无效。")
         previous = timestamp
-        beat = timestamp / bar_ms * beats
-        drums.setdefault(beat, set()).add(PAD_DRUM_PITCHES[pad % len(PAD_DRUM_PITCHES)])
+        pitch = PAD_DRUM_PITCHES[pad % len(PAD_DRUM_PITCHES)]
+        recorded_hits.append({"pad": pad, "pitch": pitch, "timestamp_ms": timestamp})
+        if timestamp < bar_ms:
+            drums.setdefault(timestamp / bar_ms * beats, set()).add(pitch)
+    if not drums:
+        raise ValueError("鼓垫录入的首小节没有敲击。")
 
     context = RhythmContext(bpm, tuple(drums), (1.,) * len(drums), beats_per_bar=beats,
                             drum_pitches=tuple(tuple(sorted(group)) for group in drums.values()))
-    event = from_rhythm(context, session_id=session_id, audio_duration_s=bar_ms / 1000,
-                        tempo_source="session", confidence_kind="manual").to_dict()
+    event = from_rhythm(context, session_id=session_id, audio_duration_s=max(bar_ms, previous) / 1000,
+                        tempo_source="detected" if count_in else "session", confidence_kind="manual").to_dict()
+    event["payload"]["pad_recording"] = {"hits": recorded_hits, "count_in_ms": count_in}
     event["provenance"].update(producer="studio_drum_pads", target="drums")
     return InputEvent(event)
 
