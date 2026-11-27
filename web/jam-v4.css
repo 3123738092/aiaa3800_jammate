@@ -6,6 +6,24 @@
 }
 .brand { color: inherit; text-decoration: none; font-family: "DM Sans", sans-serif; }
 .brand b { font-size: 23px; font-weight: 600; letter-spacing: -.5px; }
+#release-notice {
+  width: min(640px, calc(100% - 32px));
+  margin: 0 auto 14px;
+  padding: 7px 10px 7px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  border: 1px solid #695843;
+  border-radius: 13px;
+  background: #29241e;
+  color: #f0e4d2;
+  font-size: 13px;
+}
+#release-message { margin: 0; }
+#release-notice[hidden], #release-action[hidden] { display: none; }
+#release-action { white-space: nowrap; }
 .harmony-display { position: relative; }
 .harmony-source:empty { display: none; }
 .harmony-empty .harmony-display > :not(.harmony-source) { visibility: hidden; }

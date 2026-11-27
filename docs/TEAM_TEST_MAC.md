@@ -6,7 +6,7 @@
 
 - 每个成员在自己的分支修改 `web/`，从仓库根目录运行 `python scripts/team_frontend.py`。在终端粘贴固定团队邀请链接，再打开 [本地 Studio](http://127.0.0.1:4188/jam.html)。修改前端文件后刷新页面。该程序只提供本机页面与转发 API，无需安装音频模型或保存供应商密钥。也可传 `--port 4190` 或 `--invite-file <团队邀请文本>`。
 - 本地页面的「设置」展示 Mac 当前后端提交号。团队共享 Mac 上的最新通过检查版本。需要联调尚未合入 `main` 的后端改动时，应在单独的服务环境测试。
-- 代码进入 GitHub `main` 后，Mac 大约每 90 秒检查一次。更新器按完整提交号下载源码，使用独立端口验证候选服务，检查可用能力并合成开场。已有 Jam 会话结束后再切换，启动失败自动恢复上一版本。邀请链接、数据和模型缓存留在部署账户中。
+- 代码进入 GitHub `main` 后，Mac 大约每 90 秒检查一次。更新器按完整提交号下载源码，使用独立端口验证候选服务，检查可用能力并合成开场。候选版本就绪时，Studio 会提示正在测试的成员，可以结束会话，也可以继续演奏。全部会话结束后自动发布，启动失败自动恢复上一版本。网页提示刷新时，可保存当前演奏后手动刷新。本地联调的前端文件随自己的 Git 检出更新。邀请链接、数据和模型缓存留在部署账户中。
 
 Mac 管理者在已有 `~/jammate-team` 安装上，从仓库运行 `~/jammate-team/python/bin/python3.12 deploy/macos/install-updater.py` 注册发布任务。发布与候选检查日志位于 `~/jammate-team/logs/com.jammate.team.update.{out,err}.log` 及 `candidate.log`。手动回退运行 `~/jammate-team/python/bin/python3.12 ~/jammate-team/bin/update.py --rollback`。回退会暂停自动发布。解决问题后删除 `~/jammate-team/config/deploy-paused` 即可恢复。
 
@@ -49,7 +49,7 @@ JAMMATE_MRT2_ENGINE=mlx .venv/bin/python -m jammate.render.mrt2 \
 
 | 环节 | 验收 |
 | --- | --- |
-| 冷启动和语音 | 授予麦克风权限。分别打开 `/jam.html?asr=xfyun`、`/jam.html?asr=qwen`。说「Hey 旋律组」和「加一段 Bossa Nova 旋律」。运行日志里的识别结果会记录所选服务。这两个测试入口各自直连指定服务，普通地址按服务配置自动备用。 |
+| 冷启动和语音 | 首次允许浏览器使用麦克风。刷新后无须点 JamMate 的麦克风按钮，看到「在听」后说「Hey JamMate」或「Hey 旋律组」，再说「加一段 Bossa Nova 旋律」。用 `/jam.html?asr=xfyun`、`/jam.html?asr=qwen` 分别测试两家转写。浏览器如限制自动播放，页面仍可识别并显示指令。 |
 | Agent 和编排 | 在 Studio 直接发送「先来三拍子的鼓点」。演奏中改为 4/4，核对 InputEvent、JamState、BandPlan 和播放回执。 |
 | 拍手、哼唱、MIDI | 分别提交三种输入。在 Inspector 查看识别或导入结果，并确认乐队实际使用了素材。 |
 | 内置伴奏与 MRT2 | 在 Studio 听实时伴奏，并等待 MRT2 试听 WAV。需要单独比较 FluidSynth、MRT2 流式和独立生成时，从「设置」打开经典工作台。流式需收到连续 PCM 并验证可播放。 |

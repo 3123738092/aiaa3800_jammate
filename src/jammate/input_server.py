@@ -4,6 +4,7 @@ import base64
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 from urllib.error import HTTPError, URLError
@@ -76,9 +77,20 @@ class Handler(SimpleHTTPRequestHandler):
                 active = sum(not session.closed and monotonic() - session.last_seen <= 90
                              for session in self.server.jam.sessions.values())
                 pending = self.server.pending_starts
+            drain = self.server.drain_file
+            available = None
+            if drain:
+                try:
+                    value = drain.with_name("deploy-available").read_text(encoding="ascii").strip()
+                    if re.fullmatch(r"[a-f0-9]{40}", value):
+                        available = value
+                except (OSError, UnicodeError):
+                    pass
             self.json_response(200, {"service": SERVICE_ID, "root": str(ROOT.parent),
                                      "implementation": self.server.reference.implementation,
                                      "release": os.getenv("JAMMATE_RELEASE"),
+                                     "available_release": available,
+                                     "updating": bool(drain and drain.is_file()),
                                      "active_sessions": active, "pending_starts": pending})
         else:
             super().do_GET()

@@ -12,6 +12,8 @@ const volume = {band: studio.getConfig().volumes.band};
 const requests = new Map();
 const traces = new Map();
 let live, preparing, timer, publish, service, previewUrl, previewShown, previewPending, savedTake;
+let loadedRelease, releaseStatus;
+let checkingRelease = false;
 let failureCount = 0;
 let pendingTempo, pendingMeter;
 let lastActivity = performance.now();
@@ -120,7 +122,63 @@ function renderConnection() {
   ];
   $('backend-note').textContent = !ready ? '尚未连上支持 Studio v4 的 JamMate 服务。'
     : features.filter(Boolean).join(' · ');
+  showRelease();
 }
+
+function showRelease() {
+  const notice = $('release-notice');
+  const message = $('release-message');
+  const action = $('release-action');
+  const status = releaseStatus;
+  const updated = loadedRelease && status?.release && loadedRelease !== status.release;
+  const pending = status?.available_release && status.available_release !== status.release;
+  const busy = live || preparing || studio.isPerforming();
+  let text = '', label = '';
+  if (updated) {
+    text = status.local ? 'Mac 后端已更新' : 'JamMate 已更新';
+    label = status.local ? '重新连接' : '刷新页面';
+    if (busy) {
+      text += '。可以先完成手上的操作。';
+      label = '';
+    }
+  } else if (status?.updating) {
+    text = 'JamMate 正在切换版本，请稍等。';
+  } else if (pending) {
+    text = '新版本已就绪，等当前会话结束后自动发布。';
+    if (live && !preparing && !studio.isPerforming()) label = '结束会话';
+  }
+  if (message.textContent !== text) message.textContent = text;
+  if (action.textContent !== label) action.textContent = label;
+  action.hidden = !label;
+  notice.hidden = !text;
+}
+
+async function checkRelease() {
+  if (checkingRelease || document.hidden) return;
+  checkingRelease = true;
+  try {
+    const response = await fetch('/api/ready', {cache: 'no-store', signal: AbortSignal.timeout(5000)});
+    if (!response.ok) return;
+    const status = await response.json();
+    loadedRelease ||= service?.release || status.release;
+    releaseStatus = {...status, local: response.headers.get('X-JamMate-Frontend') === 'local'};
+  } catch {
+    if (releaseStatus?.available_release && !live) releaseStatus.updating = true;
+  } finally {
+    checkingRelease = false;
+    showRelease();
+  }
+}
+
+$('release-action').onclick = () => {
+  if (live) {
+    stop();
+    void checkRelease();
+  } else if (!preparing && !studio.isPerforming()) {
+    const hasDraft = $('txt').value.trim() || studio.getDrafts().length;
+    if (!hasDraft || window.confirm('刷新会清除未发送的素材和文字。继续刷新？')) window.location.reload();
+  }
+};
 
 async function connect() {
   if (studio.connected) return;
@@ -369,12 +427,18 @@ async function launch(active, opening, requestId, ideaId) {
 
 async function openPlayback() {
   const clock = new AudioContext();
+  let timeout;
   try {
-    await clock.resume();
+    await Promise.race([clock.resume(), new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new DOMException('浏览器限制了自动播放，请点一次播放或发送。',
+        'PlaybackGestureRequired')), 1800);
+    })]);
     return new StudioPlayback(clock, volume.band, failPlayback);
   } catch (error) {
     void clock.close();
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -450,7 +514,18 @@ async function voiceTurn(action) {
   if (!result.instruction) return result;
   send({type: 'transcript', requestId: action.requestId, text: result.instruction});
   trace(action.requestId, 'recognition', 'completed', result, action.requestId);
-  await dispatch({...action, type: 'input.text', target: result.target, text: result.instruction, source: 'speech'});
+  try {
+    await dispatch({...action, type: 'input.text', target: result.target, text: result.instruction, source: 'speech'});
+  } catch (error) {
+    if (error.name !== 'PlaybackGestureRequired') throw error;
+    const composer = $('txt');
+    if (!composer.value.trim()) {
+      composer.value = result.instruction;
+      composer.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+    reply(action.requestId, '听到了：' + result.instruction + '。浏览器限制了自动播放，可以点发送继续。', 'needs_input');
+    return {};
+  }
   return {sent: true};
 }
 
@@ -568,7 +643,8 @@ $('suggestion-accept').onclick = async () => {
 $('suggestion-skip').onclick = () => activity(false);
 $('txt').addEventListener('input', () => activity());
 window.addEventListener('jammate:studio-activity', () => activity());
-document.addEventListener('visibilitychange', () => activity(false));
+document.addEventListener('visibilitychange', () => { activity(false); void checkRelease(); });
+setInterval(checkRelease, 10000);
 const idleTimer = setInterval(checkIdle, 500);
 $('backend-settings').onclick = () => {
   activity(false);
@@ -602,4 +678,4 @@ exportButton.onclick = async () => {
   }
 };
 window.addEventListener('pagehide', () => { clearInterval(idleTimer); stop('ended', false); });
-void connect();
+void connect().then(checkRelease);

@@ -86,9 +86,13 @@ def spoken_intent(words):
 _WAKE = re.compile(
     r"^(?:(?:hey|hi)(?![a-z])|嗨|嘿|黑|喂)[\s,，、。.!！:：·-]*"
     r"(?:(?P<band>jam[\s-]*ma(?:te|de)\b|jam[\s-]*ma(?:te|de)(?=[\u4e00-\u9fff])|全乐队|乐队)"
-    r"|(?P<drums>节奏组|鼓组)|(?P<keys>旋律组|键盘组))"
+    r"|(?P<drums>节奏组|鼓组|节奏(?=[\s,，。.!！?？:：]|$))"
+    r"|(?P<keys>旋律组|键盘组|旋律(?=[\s,，。.!！?？:：]|$)))"
     r"[\s,，、。.!！?？:：·-]*", re.IGNORECASE)
 
+
+_WAKE_NAMES = {"全乐队": "band", "乐队": "band", "节奏组": "drums", "鼓组": "drums",
+               "旋律组": "keys", "键盘组": "keys"}
 
 _BOSSA = re.compile(r"(?<![a-z])(?:bossa|bosa|boss(?:\s+and)?)\s+nova(?![a-z])"
                     r"|[波博巴][萨沙薩]诺[瓦娃]", re.I)
@@ -106,6 +110,8 @@ def wake_command(words, target=None):
     match = _WAKE.match(words)
     if match is not None:
         target, words = match.lastgroup, words[match.end():].strip()
+    elif name := _WAKE_NAMES.get(words.strip(" ,，、。.!！?？:：")):
+        target, words = name, ""
     if target is None:
         return {}
     return {"target": target, "instruction": words}

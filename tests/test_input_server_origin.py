@@ -1,8 +1,9 @@
 import argparse
+import json
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
-from threading import Thread
+from threading import Lock, Thread
 from types import SimpleNamespace
 
 import pytest
@@ -14,7 +15,7 @@ PUBLIC_ORIGIN = "https://studio.example.com"
 
 
 @contextmanager
-def serve(public_origin=None, *, origin_file=None):
+def serve(public_origin=None, *, origin_file=None, drain_file=None):
     @contextmanager
     def open_bar(session, index):
         assert (session, index) == ("jam", 2)
@@ -24,7 +25,12 @@ def serve(public_origin=None, *, origin_file=None):
         server.public_origins = {public_origin} if public_origin else set()
         server.public_origin_file = origin_file
         server.remote_backend_url = ""
-        server.jam = SimpleNamespace(dispatch=lambda op, body: {"operation": op}, open_mrt2_bar=open_bar)
+        server.start_lock = Lock()
+        server.pending_starts = 0
+        server.drain_file = drain_file
+        server.reference = SimpleNamespace(implementation="workspace")
+        server.jam = SimpleNamespace(dispatch=lambda op, body: {"operation": op}, open_mrt2_bar=open_bar,
+                                     lock=Lock(), sessions={})
         thread = Thread(target=server.serve_forever)
         thread.start()
         try:
@@ -76,6 +82,26 @@ def test_rotating_origin_only_accepts_the_current_name(tmp_path):
         assert request(port, "POST", "/api/jam/status", first)[0] == 403
         assert request(port, "POST", "/api/jam/status", second)[0] == 200
         assert request(port, "POST", "/api/jam/status", PUBLIC_ORIGIN)[0] == 200
+
+
+def test_release_notice_and_drain_are_independent(tmp_path, monkeypatch):
+    drain = tmp_path / "deploy-drain"
+    available = tmp_path / "deploy-available"
+    monkeypatch.setenv("JAMMATE_RELEASE", "a" * 40)
+    with serve(drain_file=drain) as port:
+        available.write_text("b" * 40)
+        status, body = request(port, "GET", "/api/ready")
+        assert status == 200
+        ready = json.loads(body)
+        assert ready["release"] == "a" * 40
+        assert ready["available_release"] == "b" * 40
+        assert not ready["updating"]
+        assert request(port, "POST", "/api/jam/start")[0] == 200
+
+        drain.touch()
+        assert request(port, "POST", "/api/jam/start")[0] == 503
+        assert request(port, "POST", "/api/jam/poll")[0] == 200
+        assert json.loads(request(port, "GET", "/api/ready")[1])["updating"]
 
 
 @pytest.mark.parametrize("value", ["http://example.com", "https://", "https://example.com/",

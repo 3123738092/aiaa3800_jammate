@@ -100,6 +100,8 @@ class Frontend(SimpleHTTPRequestHandler):
                     for header in ("Content-Type", "Content-Length", "Cache-Control"):
                         if value := response.getheader(header):
                             self.send_header(header, value)
+                    if method == "GET" and self.path == "/api/ready":
+                        self.send_header("X-JamMate-Frontend", "local")
                     self.end_headers()
                     upstream_started = True
                     while chunk := response.read1(64 * 1024):

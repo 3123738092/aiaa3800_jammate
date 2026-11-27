@@ -536,6 +536,7 @@ function mergeJMMusicState(previous, patch) {
   let octave=4, whiteCount=14, melodyCapture=false, melodyStart=0, melodyEvents=[], melodyDown=new Map();
   let sounding=new Map(), notePointers=new Map(), typingHeld=new Map(), fileNotes=new Set();
   let midiAccess=null, midiDevices=new Set(), micSession=null, micPending=false, autoWakePending=false, waveId=0, micTimer=0, micLimit=0;
+  let wakeDisabled=false;
   let drafts=[], previewDraftId=null, previewGeneration=0, selectedDraftId=null, clarification=null, taps=[], swipe=null, wheelStamp=0;
   const focused = () => ids[mod(focusIndex)];
   const online = () => backend !== null;
@@ -558,7 +559,8 @@ function mergeJMMusicState(previous, patch) {
     else if(commandTarget==='harmony'&&inputMode==='rhythm')hint('拍手只提供和声变化的节奏参考，不自动补充和弦');
     else if(commandTarget==='harmony'&&inputMode==='humming')hint('哼唱提供音高素材，和声调整由乐队理解你的意图');
     else if(!online())hint('本地试听 · 指令与素材将在接入后处理');
-    else if(inputMode==='speech')hint(capabilities.voiceWake?'打开麦克风后，说「Hey JamMate」或叫声部名字':'当前服务未启用语音唤醒');
+    else if(inputMode==='speech')hint(!capabilities.voiceWake?'当前服务未启用语音唤醒':
+      wakeDisabled?'本次语音唤醒已暂停':'授权后可直接说「Hey JamMate」或声部名字');
     else hint(commandTarget==='band'?'对全乐队输入，由乐队理解你的意图':'本次输入给'+names[commandTarget]);
   }
   function setTheme(name,remember=true){
@@ -707,7 +709,7 @@ function mergeJMMusicState(previous, patch) {
       catch(error){if(backend===adapter&&backendEpoch===epoch)disconnect(false);throw error}
     }
     updateTransport();updateHint();log('adapter_connected',{label:adapter.label||'adapter',capabilities});
-    void autoStartWake();
+    void autoStartWake(true);
     return()=>{if(backend===adapter&&backendEpoch===epoch)disconnect()};
   }
   function disconnect(announce=true){
@@ -1204,15 +1206,9 @@ function mergeJMMusicState(previous, patch) {
     updateRecording();
   }
 
-  let wakeDisabled = false;
-  try { wakeDisabled = localStorage.getItem('jammate-wake') === 'off'; } catch {}
-  function setWakePreference(enabled) {
-    wakeDisabled = !enabled;
-    try { localStorage.setItem('jammate-wake', enabled ? 'on' : 'off'); } catch {}
-  }
-
-  async function autoStartWake() {
-    if (!wakeDisabled && capabilities.voiceWake && navigator.mediaDevices?.getUserMedia
+  async function autoStartWake(initial = false) {
+    const speechMode = inputMode === 'speech' || (initial && inputMode === 'auto');
+    if (!wakeDisabled && speechMode && capabilities.voiceWake && navigator.mediaDevices?.getUserMedia
         && !micSession && !micPending && !document.hidden) {
       await startWakeMic(true);
     }
@@ -1227,7 +1223,6 @@ function mergeJMMusicState(previous, patch) {
     updateRecording();
     let capture;
     try {
-      if (!automatic) await audio.ensure();
       const {openWakeInput} = await import('./jam-v4-voice.js');
       const session = {wake:true, target:null, busy:false, hearing:false, caption:waitingForWake};
       capture = await openWakeInput(audio.ensure, phrase => void recognizeWakePhrase(session, phrase), () => {
@@ -1245,15 +1240,8 @@ function mergeJMMusicState(previous, patch) {
       log('mic_start', {mode:'wake'});
     } catch (error) {
       capture?.close();
-      if (automatic && error.name === 'PlaybackGestureRequired') {
-        hint('麦克风已授权 · 页面声音待解锁');
-        document.addEventListener('pointerdown', event => {
-          if (!wakeDisabled && inputMode === 'speech' && !event.target.closest('#mic, #inputModes')) {
-            void startWakeMic();
-          }
-        }, {once: true});
-      } else if (automatic) hint('语音监听未开启 · 请检查浏览器麦克风权限');
-      else toast('无法启动语音唤醒，请检查麦克风权限和页面声音权限');
+      if (error.name === 'NotAllowedError') hint('允许此网页访问麦克风，即可直接语音唤醒');
+      else hint('语音监听暂不可用，请检查麦克风或用文字输入');
       log('mic_error', {message:error.message}, {level:'error'});
     } finally {
       micPending = false;
@@ -1264,9 +1252,9 @@ function mergeJMMusicState(previous, patch) {
 
   async function toggleMic(){
     if(micPending)return;
-    if(micSession?.wake){setWakePreference(false);closeWakeMic(micSession);return}
+    if(micSession?.wake){wakeDisabled=true;closeWakeMic(micSession);return}
     if(micSession){stopRecording();return}
-    if(inputMode==='speech'){setWakePreference(true);await startWakeMic();return}
+    if(inputMode==='speech'){wakeDisabled=false;await startWakeMic();return}
     if(importing){toast('文件正在读取，完成后即可录音');return}
     if(drafts.length>=4){toast('请先提交或移除一份素材');return}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){toast('当前环境无法录音，请用 HTTPS 或 localhost 打开，也可导入音频文件');log('mic_unavailable',{});return}
@@ -1306,7 +1294,7 @@ function mergeJMMusicState(previous, patch) {
   $('inputModes').querySelectorAll('button').forEach(b=>b.onclick=()=>{
     if (micSession?.wake && b.dataset.mode !== 'speech') closeWakeMic(micSession);
     setMode(b.dataset.mode);
-    if (b.dataset.mode === 'speech') { setWakePreference(true); void startWakeMic(); }
+    if (b.dataset.mode === 'speech') { wakeDisabled=false; void startWakeMic(); }
   });
   $('prev').onclick=()=>moveTo(focusIndex-1);$('next').onclick=()=>moveTo(focusIndex+1);
   $('play').onclick=togglePlayback;$('tempoBtn').onclick=()=>$('tempoPopover').hidden?openTempo():closeTempo();

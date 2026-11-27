@@ -210,6 +210,7 @@ def main():
     os.umask(0o077)
     base = BASE
     pause = base / "config/deploy-paused"
+    available = base / "config/deploy-available"
     with (base / "config/deploy.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -218,10 +219,12 @@ def main():
         # Recover if the previous updater exited during cutover.
         (base / "config/deploy-drain").unlink(missing_ok=True)
         if args.rollback:
+            available.unlink(missing_ok=True)
             if activate(base, (base / "previous").resolve(strict=True)):
                 pause.touch()
             return
         if pause.exists():
+            available.unlink(missing_ok=True)
             return
         with fetch(API) as response:
             sha = json.load(response)["object"]["sha"]
@@ -229,14 +232,25 @@ def main():
             raise RuntimeError("main 的提交号无效。")
         current = (base / "current").resolve(strict=True)
         if committed_release(current) == sha:
+            available.unlink(missing_ok=True)
             return
+        if available.exists() and available.read_text().strip() != sha:
+            available.unlink()
         release = download_release(base, sha)
         prepare_runtime(base, current, release)
         checked = release / ".checked"
         if not checked.exists():
             check_candidate(base, release, sha)
             checked.touch()
-        activate(base, release)
+        pending = available.with_suffix(".new")
+        pending.write_text(sha + "\n")
+        pending.replace(available)
+        try:
+            if activate(base, release):
+                available.unlink(missing_ok=True)
+        except (RuntimeError, OSError, subprocess.CalledProcessError):
+            available.unlink(missing_ok=True)
+            raise
 
 
 if __name__ == "__main__":
