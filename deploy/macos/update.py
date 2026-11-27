@@ -150,7 +150,13 @@ def legacy_session(base):
 
 
 def active_session(base):
-    status = backend(API_PORT)
+    try:
+        status = backend(API_PORT)
+    except URLError as error:
+        # An offline API has no live sessions. Let the validated release restore it.
+        if isinstance(error.reason, ConnectionRefusedError):
+            return False
+        raise
     if "active_sessions" not in status:
         return legacy_session(base)
     return status.get("active_sessions", 0) or status.get("pending_starts", 0)
