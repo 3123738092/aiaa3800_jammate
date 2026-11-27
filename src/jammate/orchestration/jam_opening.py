@@ -4,6 +4,7 @@ import json
 import re
 from dataclasses import replace
 from math import ceil
+from time import monotonic
 from unicodedata import normalize
 from uuid import uuid4
 
@@ -412,31 +413,26 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
         "target": text_event.to_dict().get("provenance", {}).get("target") if text_event else None,
         "instruments": instruments,
     }
+    messages = [{"role": "system", "content": PROMPT},
+                {"role": "user", "content": json.dumps(context, ensure_ascii=False, allow_nan=False)}]
     provider = provider or OpenAIProvider(config, schema_name="jammate_live_opening")
-    try:
-        reply = provider.complete(
-            [{"role": "system", "content": PROMPT},
-             {"role": "user", "content": json.dumps(context, ensure_ascii=False, allow_nan=False)}],
-            schema, config.timeout_s,
-        )
-    except ProviderFailure as error:
-        raise ValueError(f"开场编制模型调用失败（{config.model} · {error.kind}），请重试。") from None
-    try:
-        data = json.loads(reply.text, object_pairs_hook=_unique_object)
-        Draft202012Validator(schema).validate(data)
-        if len(set(data["rhythm_steps"])) != len(data["rhythm_steps"]):
-            raise ValueError("duplicate rhythm steps")
-        selected = data["instruments"]
-        if ((data["tonic"] is None) != (data["mode"] is None) or len(data["chords"]) == 1
-                or (data["chords"] and text_key is None and data["tonic"] is None)):
-            raise ValueError("invalid optional harmony")
-        if len(set(selected)) != len(selected):
-            raise ValueError("duplicate instruments")
-        if any(name.startswith("gm_") and added_program(name) == added_program(other)
-               for name in selected for other in selected if name != other):
-            raise ValueError("duplicate SoundFont program")
-    except (ValueError, TypeError, ValidationError, RecursionError):
-        raise ValueError(f"开场编制模型返回了无效的选曲结果（{reply.model}），请重试。") from None
+    deadline = monotonic() + config.timeout_s
+    for attempt in range(2):
+        try:
+            reply = provider.complete(messages, schema, max(.01, deadline - monotonic()))
+        except ProviderFailure as error:
+            raise ValueError(f"开场编制模型调用失败（{config.model} · {error.kind}），请重试。") from None
+        try:
+            data = opening_choice(reply.text, schema, text_key)
+        except (ValueError, TypeError, ValidationError, RecursionError) as error:
+            if attempt or deadline - monotonic() < 1:
+                raise ValueError(f"开场编制模型返回了无效的选曲结果（{reply.model}），请重试。") from None
+            detail = error.message if isinstance(error, ValidationError) else str(error)
+            messages.append({"role": "user", "content": "Return corrected JSON matching the schema and input. "
+                             "The previous answer was invalid: " + detail.replace(config.api_key, "[redacted]")[:240]})
+        else:
+            break
+    selected = data["instruments"]
     bpm = locked_tempo if locked_tempo is not None else data["tempo_bpm"]
     key = text_key or (Key(data["tonic"], data["mode"]) if data["tonic"] is not None else None)
     if claps is not None and text_beats is None:
@@ -468,3 +464,21 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
                               "rhythm_beats_zero_based": list(rhythm.onset_beats) if rhythm else []},
                  "reason": data["reason"].replace(config.api_key, "[redacted]")[:500]}
     return state, selection
+
+
+def opening_choice(text, schema, text_key):
+    data = json.loads(text, object_pairs_hook=_unique_object)
+    Draft202012Validator(schema).validate(data)
+    if len(set(data["rhythm_steps"])) != len(data["rhythm_steps"]):
+        raise ValueError("duplicate rhythm steps")
+    if (data["tonic"] is None) != (data["mode"] is None):
+        raise ValueError("tonic and mode must either both describe the key or both be null")
+    if len(data["chords"]) == 1 or (data["chords"] and text_key is None and data["tonic"] is None):
+        raise ValueError("provide a key and at least two chords, or leave the chord list empty")
+    selected = data["instruments"]
+    if len(set(selected)) != len(selected):
+        raise ValueError("duplicate instruments")
+    if any(name.startswith("gm_") and added_program(name) == added_program(other)
+           for name in selected for other in selected if name != other):
+        raise ValueError("duplicate SoundFont program")
+    return data

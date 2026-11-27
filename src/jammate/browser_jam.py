@@ -178,7 +178,7 @@ class BrowserJam:
                                                 direct=self.direct_mrt2,
                                                 tempo=settings.get("tempo_source") in {"manual", "text", "claps"},
                                                 key=settings.get("key_source") in {"manual", "text"})
-        budget = arrangement_config.timeout_s if arrangement_config and renderer not in {"mrt2", "mrt2_direct"} else 0.
+        budget = arrangement_config.timeout_s if arrangement_config and renderer != "mrt2_direct" else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
         lookahead = max(3, ceil((decision_timeout + budget) * MAX_TEMPO_BPM / (60 * state.beats_per_bar)) + 3)
         self.runtime = RealtimeSession(self.manager, sample_rate=SR, opening_plan=opening_plan,
@@ -581,7 +581,7 @@ class BrowserJam:
                                  after_bar=sent_bar, through_bar=through)
 
     def prepare_arrangement(self, state, plan, events, arranger):
-        if self.renderer in {"synth", "mrt2_stream"}:
+        if self.renderer in {"synth", "mrt2", "mrt2_stream"}:
             performance, _ = prepare_scoped_score(state, plan, events, arranger)
             return performance
         runtime = create_runtime(".", backend="fluidsynth", fluidsynth=self.soundfont.executable,
@@ -660,11 +660,12 @@ class BrowserJam:
         expected = self.feedback["id"] if self.feedback else f"opening_{self.id}"
         return expected if self.preview["id"] == expected else None
 
-    def finish_plan_preview(self, event_id, bound):
+    def finish_plan_preview(self, event_id, bound, scheduled_score=None):
         arranger = (LLMBackendArranger(self.arrangement_config, self.renderer, capture_replies=True)
-                    if self.arrangement_config is not None else None)
+                    if self.arrangement_config is not None and scheduled_score is None else None)
         try:
-            preview = self.render_preview(bound, event_id, arranger)
+            preview = (self.render_preview(bound, event_id, arranger) if scheduled_score is None
+                       else self.render_preview(bound, event_id, arranger, scheduled_score))
             with self.lock:
                 if self.is_current(event_id):
                     self.preview = preview
@@ -682,7 +683,7 @@ class BrowserJam:
                 with self.lock:
                     self.record_turn(event_id, arrangement=arranger.last_trace)
 
-    def render_preview(self, bound, event_id, arranger):
+    def render_preview(self, bound, event_id, arranger, scheduled_score=None):
         validate_plan(bound.plan, bound.request.events, bound.state)
         with self.preview_lock, TemporaryDirectory(prefix="jammate-live-preview-") as directory:
             def check_current():
@@ -697,8 +698,11 @@ class BrowserJam:
                 self.record_turn(event_id, inference={"model": runtime.model, "backend": runtime.engine,
                                                       "status": "preparing", "state_committed": False})
             try:
-                performance, conditioning = runtime.prepare_execution(
-                    bound.state, bound.plan, bound.request.events, check_current)
+                if scheduled_score is None:
+                    performance, conditioning = runtime.prepare_execution(
+                        bound.state, bound.plan, bound.request.events, check_current)
+                else:
+                    performance, conditioning = scheduled_score, None
             except PlanError:
                 if arranger is None or arranger.last_trace.get("status") != "failed":
                     raise
@@ -794,7 +798,7 @@ class BrowserJam:
                 if timing_label == "fixed" and confidence >= .90 and self.turn_timing.target_bar is None:
                     self.update_feedback(status="held", message="需要明确生效位置，目前可以说「下一小节……」。")
                     return
-                use_score = (self.arrangement_config is not None and self.renderer not in {"mrt2", "mrt2_direct"}
+                use_score = (self.arrangement_config is not None and not self.direct_mrt2
                              and not direct
                              and bool(harmony_cycle(target := project(self.manager.state, plan)))
                              and bool(writable_layers(target, plan)))
@@ -811,7 +815,7 @@ class BrowserJam:
                 if use_score and self.feedback["status"] != "waiting_ready":
                     self.update_feedback(status="arranging")
             if use_score:
-                backend = "synth" if self.mrt2_stream is not None else self.renderer
+                backend = "fluidsynth" if self.renderer == "fluidsynth" else "synth"
                 arranger = LLMBackendArranger(self.arrangement_config, backend, capture_replies=True, retry_invalid=True)
             arrange = (lambda state, plan, events: self.prepare_arrangement(state, plan, events, arranger)) if use_score else None
             if self.direct_mrt2:
@@ -841,7 +845,7 @@ class BrowserJam:
                         "keeps_material": keeps_material,
                     })
                     if self.renderer == "mrt2" and not keeps_material and project(bound.state, bound.plan).playing:
-                        self.preview_job = (event_id, bound)
+                        self.preview_job = (event_id, bound, change.performance if use_score else None)
                     self.update_feedback(status="scheduled", bar=bound.slot.bar, plan=plan.plan_id,
                                          keeps_material=keeps_material,
                                          message=data["reason"], decision_source=route,
@@ -1137,7 +1141,8 @@ class BrowserJamService:
                 }
             stream_ready = self.mrt2_stream_available()
             speech_ready = bool(getattr(self.audio_router, "dictation_ready", False))
-            return {"studio_v4": True, "llm_ready": llm_ready, "llm_model": llm.model if llm else None,
+            return {"studio_v4": True, "release": os.getenv("JAMMATE_RELEASE"),
+                    "llm_ready": llm_ready, "llm_model": llm.model if llm else None,
                     "local_scoped_opening": True, "voice_wake": speech_ready,
                     "speech_ready": speech_ready, "speech_mode": "server" if speech_ready else "browser",
                     "humming_correction_ready": bool(self.humming_provider()) or llm_ready,
@@ -1242,7 +1247,7 @@ class BrowserJamService:
                 state = state.with_updates(rhythm=context)
                 selection["settings"].update(rhythm_source="compound_meter",
                                              rhythm_beats_zero_based=list(context.onset_beats))
-            if meter and not selection["instruments"] and opening.get("text") and not state.key:
+            if renderer != "mrt2_direct" and meter and not selection["instruments"] and opening.get("text") and not state.key:
                 raise ValueError("本地规则需要明确的声部、和声或演奏素材才能开始。可使用大模型 Agent 理解开放式描述。")
             selection.setdefault("settings", {})["beats_per_bar"] = state.beats_per_bar
             if renderer in {*MRT2_STREAM_RENDERERS, "mrt2"}:

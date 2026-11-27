@@ -212,9 +212,11 @@ protect real trace endpoints on the server as well.
 <dialog id="backend-dialog" aria-labelledby="backend-title">
   <form method="dialog">
     <header><h2 id="backend-title">设置</h2><button class="inspector-trigger">关闭</button></header>
-    <label>指令处理 <select id="backend-agent"><option value="rule">本地规则</option><option value="llm">大模型 Agent</option></select></label>
-    <label>音符编排 <select id="backend-arranger"><option value="rule">本地规则</option><option value="llm_all">大模型编排</option></select></label>
-    <label>音频后端 <select id="backend-renderer"><option value="synth">内置合成器</option><option value="fluidsynth">FluidSynth</option><option value="mrt2">内置伴奏 + MRT2 试听</option><option value="mrt2_stream">MRT2 流式伴奏</option><option value="mrt2_direct">MRT2 独立生成</option></select></label>
+    <dl class="backend-profile">
+      <div><dt>指令处理</dt><dd id="backend-agent">正在连接</dd></div>
+      <div><dt>音符编排</dt><dd id="backend-arranger">正在连接</dd></div>
+      <div><dt>声音</dt><dd id="backend-renderer">正在连接</dd></div>
+    </dl>
     <p id="backend-note" role="status"></p>
     <div class="backend-links"><button id="backend-stop" class="inspector-trigger" type="button" disabled>结束会话</button><a href="jam-classic.html">经典工作台 · 键盘、设置与日志</a></div>
   </form>

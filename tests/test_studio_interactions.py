@@ -78,6 +78,60 @@ def test_asr_normalizes_only_known_music_terms_and_preserves_the_raw_transcript(
         assert mic.recognize(body) == mic.recognize(body) == {}
         assert mic.recognize(body) == {"target":"keys","instruction":"保留四分之三拍。"}
 
+
+def test_studio_can_compare_speech_providers_without_fallback(monkeypatch):
+    from test_opening_mic import recording
+
+    xfyun, qwen = Mock(), Mock()
+    xfyun.transcribe.return_value = "嗨节奏组，加一点切分。"
+    qwen.transcribe.side_effect = ["嗨旋律组，试一下 Bossa Nova。", opening_mic.QwenRecognitionError("unavailable")]
+    monkeypatch.setattr(opening_mic.OpeningMic, "_create_transcriber", Mock(return_value=xfyun))
+    monkeypatch.setattr(opening_mic.OpeningMic, "_create_fallback_transcriber", Mock(return_value=qwen))
+    body = {"mode": "wake", "audio": recording()}
+    with closing(opening_mic.OpeningMic()) as mic:
+        assert mic.recognize(dict(body, asr_provider="xfyun"))["target"] == "drums"
+        result = mic.recognize(dict(body, asr_provider="qwen"))
+        assert result["target"] == "keys"
+        assert result["asr_provider"] == "qwen"
+        with pytest.raises(ValueError, match="unavailable"):
+            mic.recognize(dict(body, asr_provider="qwen"))
+    assert xfyun.transcribe.call_count == 1
+
+
+def test_mrt2_direct_can_open_with_style_only_and_an_explicit_meter(monkeypatch):
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    with closing(BrowserJamService()) as service:
+        view = service.dispatch("start", {"renderer": "mrt2_direct", "opening_mode": "cold",
+            "meter": "4/4", "opening": {"text": "bossa nova trio, nylon guitar, light percussion"}})
+        details = service.dispatch("debug", {"session": view["session"]})
+        assert view["next"]["pcm_frames"] > 0
+        assert details["opening"]["instruments"] == []
+        assert "bossa nova" in details["jam_state"]["arrangement"]["style"].casefold()
+
+
+def test_warm_opening_can_repair_invalid_provider_selection():
+    from types import SimpleNamespace
+    import json
+
+    from jammate.contracts.adapters import from_text
+    from jammate.orchestration.jam_opening import prepare_opening
+    from jammate.orchestration.llm_config import LLMConfig
+
+    valid = {"tempo_bpm": 96, "tonic": None, "mode": None, "chords": [],
+             "rhythm_steps": [0, 4, 8, 12], "instruments": ["drums"], "reason": "Jazz drums"}
+    provider = Mock()
+    provider.complete.side_effect = [
+        SimpleNamespace(text=json.dumps(dict(valid, rhythm_steps=[0, 0])), model="test", usage={}),
+        SimpleNamespace(text=json.dumps(valid), model="test", usage={}),
+    ]
+    event = from_text("适合在深夜练习的爵士节奏", session_id="warm-check")
+    state, opening = prepare_opening((event,), LLMConfig("test-key"), {}, provider=provider)
+    assert state.layer("drums").active and opening["model"] == "test"
+    first, second = provider.complete.call_args_list
+    assert "duplicate rhythm steps" in second.args[0][-1]["content"]
+    assert 0 < second.args[2] <= first.args[2]
+
+
 def test_playing_drum_only_jam_accepts_bossa_melody_without_requesting_a_key():
     with closing(BrowserJamService()) as service:
         opening = service.dispatch("start", {

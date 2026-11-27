@@ -1,0 +1,33 @@
+{
+	admin off
+}
+
+http://:8420 {
+	bind 127.0.0.1
+	route {
+		@plainHttp header X-Forwarded-Proto http
+		respond @plainHttp "Use HTTPS to open JamMate." 403
+
+		basic_auth {
+			{$JAMMATE_TEAM_USER:jamteam} {$JAMMATE_TEAM_PASSWORD_HASH}
+		}
+
+		header {
+			Cache-Control "private, no-store"
+			Referrer-Policy "no-referrer"
+			Permissions-Policy "microphone=(self), midi=(self), camera=()"
+		}
+		@assets path /assets/* /fonts/*
+		header @assets Cache-Control "private, max-age=3600"
+		encode gzip
+
+		redir / /jam.html
+		reverse_proxy /api/jam/mrt2-stream 127.0.0.1:4215 {
+			header_up -Authorization
+			flush_interval 20ms
+		}
+		reverse_proxy 127.0.0.1:4215 {
+			header_up -Authorization
+		}
+	}
+}

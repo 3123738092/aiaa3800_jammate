@@ -535,7 +535,7 @@ function mergeJMMusicState(previous, patch) {
   let transportPending=null, tempoPending=null, meterPending=null, sending=false, sendTicket=0, importing=false, toastTimer=0, hintTimer=0;
   let octave=4, whiteCount=14, melodyCapture=false, melodyStart=0, melodyEvents=[], melodyDown=new Map();
   let sounding=new Map(), notePointers=new Map(), typingHeld=new Map(), fileNotes=new Set();
-  let midiAccess=null, midiDevices=new Set(), micSession=null, micPending=false, waveId=0, micTimer=0, micLimit=0;
+  let midiAccess=null, midiDevices=new Set(), micSession=null, micPending=false, autoWakePending=false, waveId=0, micTimer=0, micLimit=0;
   let drafts=[], previewDraftId=null, previewGeneration=0, selectedDraftId=null, clarification=null, taps=[], swipe=null, wheelStamp=0;
   const focused = () => ids[mod(focusIndex)];
   const online = () => backend !== null;
@@ -1065,7 +1065,7 @@ function mergeJMMusicState(previous, patch) {
     controls.append(create('span','draft-status',sending?'正在提交':'待提交'));card.append(controls);root.append(card);root.querySelectorAll('select').forEach(el=>el.disabled=sending);
   }
   async function importFiles(files){
-    if(importing||!files.length)return;if(micSession||micPending){toast('请先结束录音，再添加文件');return}importing=true;$('attachBtn').disabled=true;syncComposer();
+    if(importing||!files.length)return;if(composerRecording()){toast('请先结束录音，再添加文件');return}importing=true;$('attachBtn').disabled=true;syncComposer();
     const targetAtImport=commandTarget,modeAtImport=inputMode;
     try{
       for(const file of files){
@@ -1078,14 +1078,15 @@ function mergeJMMusicState(previous, patch) {
       if(drafts.length)hint('素材已加入输入，可试听或补充一句要求',5000);
     }finally{importing=false;$('attachBtn').disabled=false;$('fileInput').value='';syncComposer()}
   }
-  function syncComposer(){const enabled=!!($('txt').value.trim()||drafts.length), recording=micSession&&!micSession.wake;$('sendText').disabled=!enabled||sending||importing||!!recording||micPending;$('sendText').setAttribute('aria-label',sending?'正在提交':'发送输入');$('sendText').title='发送输入';$('attachBtn').disabled=importing||!!recording||micPending;$('drafts').querySelectorAll('select').forEach(el=>el.disabled=sending)}
+  function composerRecording(){return Boolean(micSession&&!micSession.wake)||micPending&&!autoWakePending}
+  function syncComposer(){const enabled=!!($('txt').value.trim()||drafts.length), recording=composerRecording();$('sendText').disabled=!enabled||sending||importing||recording;$('sendText').setAttribute('aria-label',sending?'正在提交':'发送输入');$('sendText').title='发送输入';$('attachBtn').disabled=importing||recording;$('drafts').querySelectorAll('select').forEach(el=>el.disabled=sending)}
   function mediaPayload(d){
     const base={target:d.target,fileName:d.name,origin:d.origin};
     if(d.kind==='audio')return{...base,type:'input.audio',mode:d.mode,audio:d.blob||d.file,durationMs:d.durationMs??null};
     return{...base,type:'input.midi',events:selectedEvents(d).map(e=>({...e})),tempos:d.tempos||[],tempoProvided:!!d.tempoProvided,ppq:d.ppq??null,tracks:d.tracks||[],sourceBpm:d.tempoProvided?d.tempos?.find(t=>t.provided)?.bpm??null:null,...(d.file?{file:d.file}:{})};
   }
   async function sendInput(e){
-    e.preventDefault();if(sending||importing||(micSession&&!micSession.wake)||micPending)return;
+    e.preventDefault();if(sending||importing||composerRecording())return;
     const content=$('txt').value,text=content.trim(),saved=drafts.slice();if(!text&&!saved.length)return;
     const docs=saved.filter(d=>d.kind==='text').map(d=>({name:d.name,text:d.text,role:'user_context',target:commandTarget}));
     const media=saved.filter(d=>d.kind!=='text');
@@ -1222,6 +1223,7 @@ function mergeJMMusicState(previous, patch) {
     if (document.hidden || sending || importing || micSession || micPending) return;
     if (inputMode !== 'speech') setMode('speech');
     micPending = true;
+    autoWakePending = automatic;
     updateRecording();
     let capture;
     try {
@@ -1255,6 +1257,7 @@ function mergeJMMusicState(previous, patch) {
       log('mic_error', {message:error.message}, {level:'error'});
     } finally {
       micPending = false;
+      autoWakePending = false;
       updateRecording();
     }
   }

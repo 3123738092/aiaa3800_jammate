@@ -4,8 +4,9 @@ const $ = id => document.getElementById(id);
 const studio = window.JamMate;
 const wavPlayer = $('backend-preview');
 const exportButton = $('backend-export');
-const settings = [$('backend-agent'), $('backend-arranger'), $('backend-renderer')];
 const config = {bpm: studio.getConfig().bpm, meter: '4/4'};
+const requestedAsr = new URLSearchParams(location.search).get('asr');
+const asrProvider = ['xfyun', 'qwen'].includes(requestedAsr) ? requestedAsr : undefined;
 let tempoExplicit = false;
 const volume = {band: studio.getConfig().volumes.band};
 const requests = new Map();
@@ -98,22 +99,27 @@ function saveRequest(id, requestId) {
   if (requests.size > 72) requests.delete(requests.keys().next().value);
 }
 
+function studioProfile() {
+  return {agent: service?.llm_ready ? 'llm' : 'rule',
+    arranger: service?.llm_ready ? 'llm_all' : 'rule',
+    renderer: service?.mrt2 ? 'mrt2' : 'synth'};
+}
+
 function renderConnection() {
   const ready = service?.studio_v4 === true;
-  for (const control of settings) control.disabled = !ready || Boolean(live || preparing);
-  settings[0].options[1].disabled = settings[1].options[1].disabled = !service?.llm_ready;
-  for (const option of settings[2].options) {
-    option.disabled = !({synth: true, fluidsynth: service?.fluidsynth, mrt2: service?.mrt2,
-      mrt2_stream: service?.mrt2_stream, mrt2_direct: service?.mrt2_direct}[option.value]);
-  }
+  const profile = studioProfile();
+  $('backend-agent').textContent = !ready ? '未连接' : profile.agent === 'llm' ? '大模型 Agent' : '本地规则';
+  $('backend-arranger').textContent = !ready ? '未连接' : profile.arranger === 'llm_all' ? '大模型编排' : '本地规则';
+  $('backend-renderer').textContent = !ready ? '未连接' : profile.renderer === 'mrt2'
+    ? '内置伴奏 · MRT2 试听' : '内置合成器';
   $('backend-stop').disabled = !live?.id;
   const features = [
     service?.llm_ready ? (service.llm_model || '大模型') + ' 可用' : '大模型未配置',
     service?.speech_ready ? '语音可用' : '语音未配置',
-    service?.mrt2 ? 'MRT2 试听可用' : 'MRT2 环境不可用',
+    service?.release ? '后端 ' + service.release.slice(0, 7) : null,
   ];
   $('backend-note').textContent = !ready ? '尚未连上支持 Studio v4 的 JamMate 服务。'
-    : (live ? '结束会话后可更换后端。' : '') + features.join(' · ');
+    : features.filter(Boolean).join(' · ');
 }
 
 async function connect() {
@@ -121,7 +127,6 @@ async function connect() {
   try {
     service = await post('status', {});
     if (!service.studio_v4) throw new Error('Studio v4 API 未启用。');
-    if (service.llm_ready) settings[0].value = 'llm';
     studio.connect({
       label: 'JamMate',
       capabilities: {pause: true, tempo: true, meter: true, batchInput: true, independentMix: false,
@@ -340,12 +345,10 @@ async function launch(active, opening, requestId, ideaId) {
   state({phase: 'starting', key: null, chord: null, progression: null, progressionIndex: null,
     scheduledNotes: null, jamState: null, playbackReceipt: null, tracks: null});
   try {
-    const renderer = settings[2].value;
-    const useModel = settings[0].value === 'llm';
-    const openingMode = useModel && opening.text ? 'warm' : 'cold';
+    const profile = studioProfile();
+    const openingMode = profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
     const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm: tempoExplicit || opening.midi || opening.humming || opening.rhythm ? config.bpm : null,
-      meter: config.meter, renderer, agent: settings[0].value, arranger: settings[1].value,
-      allow_preview: renderer === 'mrt2', mrt2_audio_reference: renderer === 'mrt2_direct'}, 100_000);
+      meter: config.meter, ...profile, allow_preview: profile.renderer === 'mrt2'}, 100_000);
     if (live !== active) {
       release(view.session);
       throw new Error('会话已取消。');
@@ -416,7 +419,7 @@ async function prepareInput(action) {
       if (!mode) throw new Error('没有识别到可用的音乐或语音。请重录或指定输入模式。');
     }
     if (mode === 'speech') {
-      const recognized = await post('opening-mic', {...recording, mode: 'dictation'}, 48_000);
+      const recognized = await post('opening-mic', {...recording, mode: 'dictation', asr_provider: asrProvider}, 48_000);
       if (!recognized.instruction) throw new Error('没有转写出文字，请重录或改用文字输入。');
       send({type: 'transcript', requestId: action.requestId, text: recognized.instruction});
       trace(action.requestId, 'recognition', 'completed', recognized, action.requestId);
@@ -440,7 +443,8 @@ async function voiceTurn(action) {
     pcm[i] = Math.round(Math.max(-1, Math.min(1, action.samples[i])) * 32767);
   }
   const recording = await audioWave(wave(pcm, action.sampleRate), 13);
-  const result = await post('opening-mic', {...recording, mode: 'wake', wake_target: action.wakeTarget}, 52_000);
+  const result = await post('opening-mic', {...recording, mode: 'wake', wake_target: action.wakeTarget,
+    asr_provider: asrProvider}, 52_000);
   if (!action.current() || live !== previous) return {};
   if (result.target) send({type: 'voice.wake', target: result.target});
   if (!result.instruction) return result;

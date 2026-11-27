@@ -1,0 +1,85 @@
+import argparse
+from contextlib import contextmanager
+from http.client import HTTPConnection
+from http.server import ThreadingHTTPServer
+from threading import Thread
+from types import SimpleNamespace
+
+import pytest
+
+from jammate.input_server import Handler, https_origin
+
+
+PUBLIC_ORIGIN = "https://studio.example.com"
+
+
+@contextmanager
+def serve(public_origin=None, *, origin_file=None):
+    @contextmanager
+    def open_bar(session, index):
+        assert (session, index) == ("jam", 2)
+        yield 4, (chunk for chunk in [b"ab", b"cd"])
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+        server.public_origins = {public_origin} if public_origin else set()
+        server.public_origin_file = origin_file
+        server.remote_backend_url = ""
+        server.jam = SimpleNamespace(dispatch=lambda op, body: {"operation": op}, open_mrt2_bar=open_bar)
+        thread = Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            yield server.server_port
+        finally:
+            server.shutdown()
+            thread.join()
+
+
+def request(port, method, path, origin=None, *, fetch_site="same-origin"):
+    headers = {"Sec-Fetch-Site": fetch_site, "Content-Type": "application/json",
+               "X-Forwarded-Host": "untrusted.example.com"}
+    if origin is not None:
+        headers["Origin"] = origin
+    connection = HTTPConnection("127.0.0.1", port, timeout=3)
+    try:
+        connection.request(method, path, body="{}" if method == "POST" else None, headers=headers)
+        response = connection.getresponse()
+        return response.status, response.read()
+    finally:
+        connection.close()
+
+
+def test_local_inputs_work_without_a_public_origin():
+    with serve() as port:
+        assert request(port, "POST", "/api/jam/status", f"http://localhost:{port}")[0] == 200
+        assert request(port, "POST", "/api/jam/status")[0] == 200
+        assert request(port, "POST", "/api/jam/status", PUBLIC_ORIGIN)[0] == 403
+
+
+def test_exact_public_origin_accepts_api_calls_and_streams():
+    with serve(PUBLIC_ORIGIN) as port:
+        assert request(port, "POST", "/api/jam/status", PUBLIC_ORIGIN)[0] == 200
+        assert request(port, "POST", "/api/jam/status", "https://untrusted.example.com")[0] == 403
+        assert request(port, "POST", "/api/rhythm", fetch_site="cross-site")[0] == 403
+        stream = "/api/jam/mrt2-stream?session=jam&bar=2"
+        assert request(port, "GET", stream, PUBLIC_ORIGIN) == (200, b"abcd")
+        assert request(port, "GET", stream, fetch_site="cross-site")[0] == 403
+
+
+def test_rotating_origin_only_accepts_the_current_name(tmp_path):
+    origin_file = tmp_path / "origin"
+    first = "https://previous.example.com"
+    second = "https://current.example.com"
+    origin_file.write_text(first)
+    with serve(PUBLIC_ORIGIN, origin_file=origin_file) as port:
+        assert request(port, "POST", "/api/jam/status", first)[0] == 200
+        origin_file.write_text(second)
+        assert request(port, "POST", "/api/jam/status", first)[0] == 403
+        assert request(port, "POST", "/api/jam/status", second)[0] == 200
+        assert request(port, "POST", "/api/jam/status", PUBLIC_ORIGIN)[0] == 200
+
+
+@pytest.mark.parametrize("value", ["http://example.com", "https://", "https://example.com/",
+                                    "https://user@example.com", "https://example.com?x=1"])
+def test_misconfigured_origins_are_rejected(value):
+    with pytest.raises(argparse.ArgumentTypeError):
+        https_origin(value)

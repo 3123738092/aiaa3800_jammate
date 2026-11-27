@@ -31,23 +31,17 @@
 #backend-dialog::backdrop { background: #0b0b0ab5; backdrop-filter: blur(7px); }
 #backend-dialog header, .backend-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 #backend-dialog h2 { font-size: 19px; margin: 0; }
-#backend-dialog label {
+.backend-profile { margin: 14px 0 0; }
+.backend-profile > div {
   display: grid;
   grid-template-columns: minmax(5em, 1fr) minmax(0, 1.5fr);
   gap: 12px;
   align-items: center;
-  margin-top: 14px;
+  min-height: 38px;
   font-size: 14px;
 }
-#backend-dialog select {
-  width: 100%;
-  min-height: 38px;
-  padding: 6px 9px;
-  color: inherit;
-  background: #322b24;
-  border: 1px solid #51473b;
-  border-radius: 8px;
-}
+.backend-profile dt { color: #c3b6a4; }
+.backend-profile dd { margin: 0; }
 #backend-note { color: #c3b6a4; margin: 16px 0; font-size: 13px; }
 .backend-links { flex-wrap: wrap; }
 .backend-links a, #backend-output a { color: #e1c6ab; text-underline-offset: 3px; font-size: 13px; }

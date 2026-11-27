@@ -157,16 +157,18 @@ class OpeningMic:
     def _create_fallback_transcriber():
         return QwenASRTranscriber(QwenASRConfig.from_environment())
 
-    def _transcribe(self, pcm):
+    def _transcribe(self, pcm, provider=None):
         providers = [
-            ("讯飞", "_transcriber", self._create_transcriber, (XfyunConfigurationError, XfyunRecognitionError)),
-            ("百炼", "_fallback_transcriber", self._create_fallback_transcriber,
+            ("xfyun", "讯飞", "_transcriber", self._create_transcriber, (XfyunConfigurationError, XfyunRecognitionError)),
+            ("qwen", "百炼", "_fallback_transcriber", self._create_fallback_transcriber,
              (QwenConfigurationError, QwenRecognitionError)),
         ]
-        if os.getenv("JAMMATE_ASR_PRIMARY", "xfyun").lower() == "qwen":
+        if provider is not None:
+            providers = [entry for entry in providers if entry[0] == provider]
+        elif os.getenv("JAMMATE_ASR_PRIMARY", "xfyun").lower() == "qwen":
             providers.reverse()
         failures = []
-        for label, field, create, errors in providers:
+        for _, label, field, create, errors in providers:
             try:
                 transcriber = getattr(self, field)
                 if transcriber is None:
@@ -239,6 +241,9 @@ class OpeningMic:
     def recognize(self, body):
         mode = body.get("mode")
         encoded = body.get("audio")
+        provider = body.get("asr_provider")
+        if provider is not None and provider not in ("xfyun", "qwen"):
+            raise ValueError("请选择讯飞或 Qwen-Audio。")
         target = body.get("wake_target") if mode == "wake" else None
         if target is not None and target not in ("band", "drums", "keys"):
             raise ValueError("未知的语音唤醒目标。")
@@ -261,7 +266,7 @@ class OpeningMic:
             return {} if mode == "wake" else {"route": "KEEP_LISTENING"}
 
         try:
-            words = self._transcribe(pcm).strip()
+            words = self._transcribe(pcm, provider).strip()
         except (XfyunConfigurationError, XfyunRecognitionError, QwenConfigurationError,
                 QwenRecognitionError) as exc:
             raise ValueError(str(exc)) from exc
@@ -270,11 +275,13 @@ class OpeningMic:
         words = normalize_music_words(words)
         if mode == "wake":
             result = wake_command(words, target)
-            if result and words != raw_words:
-                result["raw_transcript"] = raw_words
-            return result
-        if mode == "dictation":
+            if not result:
+                return {}
+        elif mode == "dictation":
             result = {"route": "SEND_TEXT", "instruction": words} if words else {"route": "KEEP_LISTENING"}
+        if mode in ("wake", "dictation"):
+            if provider is not None:
+                result["asr_provider"] = provider
             if words != raw_words:
                 result["raw_transcript"] = raw_words
             return result
