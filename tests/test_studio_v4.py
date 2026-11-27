@@ -88,6 +88,72 @@ def test_studio_batches_live_midi_and_text_in_same_decision():
         assert session.debug()["turns"][0]["playback_receipt"]["bar"] == packet["bar"]
 
 
+def test_pad_recording_preserves_drum_sounds_and_uses_the_session_tempo():
+    with closing(BrowserJamService()) as service:
+        view = service.dispatch("start", {
+            "opening": {"rhythm": {"bpm": 100, "meter": "3/4", "hits": [
+                {"pad": 0, "timestampMs": 0}, {"pad": 2, "timestampMs": 0},
+                {"pad": 5, "timestampMs": 750}, {"pad": 3, "timestampMs": 1100},
+            ]}},
+            "opening_mode": "cold", "bpm": 120, "meter": "3/4",
+        })
+        session = service.sessions[view["session"]]
+        debug = session.debug()
+        event, = debug["opening"]["input_events"]
+        assert event["source"] == "rhythm" and event["event_type"] == "rhythm_seed"
+        assert event["provenance"]["producer"] == "studio_drum_pads"
+        rhythm = event["payload"]["rhythm"]
+        assert rhythm["drum_pitches"] == [[36, 42], [38], [75]]
+        assert rhythm["onset_beats"] == pytest.approx((0, 1.25, 11 / 6))
+        assert [n["pitch"] for n in debug["queued"]["notes"]] == [36, 42, 38, 75]
+        assert [n["start"] for n in debug["queued"]["notes"]] == pytest.approx([0, 0, 1.25, 11 / 6])
+        packet = view["next"]
+        audio, rate = sf.read(io.BytesIO(base64.b64decode(packet["wav"])))
+        assert (packet["end"] - packet["start"]) / rate == pytest.approx(1.5, abs=1 / rate)
+        assert len(audio) >= packet["end"] - packet["start"]
+        assert np.max(np.abs(audio)) > .001
+        session.poll(packet["bar"], packet["start"], packet["bar"])
+        assert session.debug()["opening"]["playback_receipt"]["bar"] == 0
+
+
+def test_live_pad_recording_replaces_groove_and_enables_drums_in_a_cold_melody_session():
+    with closing(BrowserJamService()) as service:
+        view = service.dispatch("start", {
+            "opening": {"midi": performance()}, "opening_mode": "cold", "bpm": 96, "meter": "4/4",
+        })
+        session_id = view["session"]
+        session = service.sessions[session_id]
+        packet = view["next"]
+        session.poll(packet["bar"], packet["start"], packet["bar"])
+        assert not session.manager.state.layer("drums").active
+        take = {"bpm": 96, "meter": "4/4", "hits": [{"pad": 3, "timestampMs": 0}]}
+        result = service.dispatch("studio-input", {"session": session_id, "input": {"rhythm": take}})
+        assert result["feedback"]["text"] == "鼓垫节奏"
+        event_id = result["feedback"]["id"]
+        session.future.result(timeout=3)
+        updated = session.poll(0, packet["end"] - 1, 0)["next"]
+        session.poll(updated["bar"], updated["start"], updated["bar"])
+        debug = session.debug()
+        assert debug["turns"][0]["input_event"]["event_id"] == event_id
+        assert debug["turns"][0]["playback_receipt"]["bar"] == updated["bar"]
+        assert [n["pitch"] for n in debug["current"]["notes"] if n["instrument"] == "drums"] == [75]
+        assert session.manager.state.tempo_bpm == 96
+
+
+def test_pad_stream_conditions_use_the_recorded_meter_after_the_first_bar():
+    from jammate.music import Note
+    from jammate.orchestration.realtime import PlaybackBar
+    from jammate.render.clock import BarTiming
+    from jammate.state import JamState
+    from mrt2_demo.browser_stream import bar_conditions
+
+    state = JamState(tempo_bpm=120, beats_per_bar=3)
+    bar = PlaybackBar(BarTiming(2, 144000, 216000, 120),
+                      (Note(38, 7., .1, 90, "drums"),), state=state)
+    _, drums = bar_conditions(bar, 38, 0)
+    assert np.flatnonzero(drums[:, 0]).tolist() == [12, 13]
+
+
 def test_studio_harmony_readout_waits_for_applied_bar():
     with closing(BrowserJamService()) as service:
         view = service.dispatch("start", {

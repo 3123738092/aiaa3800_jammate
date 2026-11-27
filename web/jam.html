@@ -25,7 +25,8 @@ ACTIONS:
   input.text {target,text,documents:[{name,text,role:'user_context',target}],phase}
   input.audio {target,mode,audio:Blob,durationMs,fileName,origin,instruction,documents,contextTarget,phase}
   input.midi {target,events,tempos,tempoProvided,ppq,tracks,sourceBpm,file?:File,fileName,origin,instruction,documents,contextTarget,phase}
-  input.bundle {target,inputs:[audio/midi input objects],instruction,documents,contextTarget,phase}
+  input.pads {target,hits:[{pad,timestampMs}],bpm,meter,instruction,contextTarget,phase}
+  input.bundle {target,inputs:[audio/midi/pads input objects],instruction,documents,contextTarget,phase}
     Only enabled when capabilities.batchInput === true.
   input.confirm {replyTo,choice}
   transport.start {config:{bpm,meter,tempoUnit}}, transport.pause, transport.resume

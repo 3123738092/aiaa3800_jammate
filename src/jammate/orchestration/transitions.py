@@ -19,7 +19,10 @@ def project(state: JamState, plan: BandPlan) -> JamState:
     if target.beats_per_bar != state.beats_per_bar:
         rhythm = state.rhythm
         beats = target.beats_per_bar
-        if beats == 2:
+        if rhythm and rhythm.drum_pitches:
+            rhythm = replace(rhythm, beats_per_bar=beats,
+                             onset_beats=tuple(b * beats / rhythm.beats_per_bar for b in rhythm.onset_beats))
+        elif beats == 2:
             rhythm = RhythmContext(target.tempo_bpm, tuple(i / 3 for i in range(6)),
                                    (1., .35, .4, .72, .35, .4), beats_per_bar=2)
         elif rhythm:

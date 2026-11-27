@@ -611,6 +611,25 @@
             },
             "confidence": {
               "$ref": "#/$defs/unit"
+            },
+            "drum_pitches": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    36,
+                    38,
+                    42,
+                    75
+                  ]
+                }
+              }
             }
           }
         }
@@ -684,6 +703,25 @@
               },
               "confidence": {
                 "$ref": "#/$defs/unit"
+              },
+              "drum_pitches": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      36,
+                      38,
+                      42,
+                      75
+                    ]
+                  }
+                }
               }
             }
           }

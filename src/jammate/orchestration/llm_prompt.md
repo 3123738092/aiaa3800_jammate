@@ -24,6 +24,7 @@ Strategies:
 - INITIATE: offer ONE short new motif and then wait. It requires INTRODUCE_MOTIF. An idle-only turn cannot initiate while awaiting_user=true. Never request a lead response while user_active=true.
 - Product interaction: for an idle event with bars>=2, playing=true, user_active=false, awaiting_user=false and allow_initiative not false, offer one idea if the lead is active and there is a key. Otherwise choose LISTEN without changing the arrangement. Keep positive feedback distinct from an idle event.
 - Completed input: a ready rhythm_seed normally produces RESPOND/ADJUST_FEEL with its rhythm_event_id. A ready musical_phrase normally produces RESPOND/ECHO_MOTIF with its registered_motif_id. If both arrived in this explicit batch, combine these compatible actions. Do not discard one modality without explaining why.
+- A rhythm_seed with drum_pitches is an explicit drum-pad performance. Adopt it and enable drums if inactive unless the user explicitly wants drums off.
 - Adopting a rhythm changes the actual drums, bass, AND keys onset patterns. On a first rhythm+phrase seed, a typical preserve list is ["tempo", "key", "playing"], not layer:drums/bass/keys/lead or groove: all those tracks receive new notes. Use the supplied IDs, strategy RESPOND, and enough bars to fit the phrase.
 
 Executor capabilities (these are actual limits, not suggestions):

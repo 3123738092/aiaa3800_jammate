@@ -16,6 +16,9 @@ from pathlib import Path
 from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
 
 
+PAD_DRUM_PITCHES = (36, 38, 42, 75)
+
+
 class RhythmMode(str, Enum):
     FOLLOW = "follow"
     VARY = "vary"
@@ -30,6 +33,7 @@ class RhythmContext:
     beat_origin_s: float = 0.0
     beats_per_bar: int = 4
     confidence: float = 1.0
+    drum_pitches: tuple[tuple[int, ...], ...] = ()
 
     def __post_init__(self) -> None:
         # Accept JSON lists but keep the shared state immutable.
@@ -53,6 +57,13 @@ class RhythmContext:
             raise ValueError("onset_beats must be strictly increasing without duplicates")
         if any(not math.isfinite(a) or not 0 < a <= 1 for a in self.accents):
             raise ValueError("accents must be within (0, 1]")
+        pitches = tuple(tuple(group) for group in self.drum_pitches)
+        if pitches and (len(pitches) != len(self.onset_beats) or any(
+                not group or len(set(group)) != len(group)
+                or any(type(pitch) is not int or pitch not in PAD_DRUM_PITCHES for pitch in group)
+                for group in pitches)):
+            raise ValueError("drum_pitches must give distinct pad sounds for each onset")
+        object.__setattr__(self, "drum_pitches", pitches)
         # DSP libraries return numpy scalars, which json.dumps cannot always
         # encode. Normalize at the shared interface, including logged events.
         object.__setattr__(self, "tempo_bpm", float(self.tempo_bpm))
@@ -63,7 +74,10 @@ class RhythmContext:
         object.__setattr__(self, "accents", tuple(float(a) for a in self.accents))
 
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        data = asdict(self)
+        if not self.drum_pitches:
+            del data["drum_pitches"]
+        return data
 
 
 def load_rhythm(path: str | Path) -> RhythmContext:

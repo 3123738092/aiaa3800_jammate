@@ -56,14 +56,19 @@ def rhythm_parts(chord: Chord | None, context: RhythmContext, mode: RhythmMode,
     # phrase ending while keeping every existing attack in place.
     color_ending = mode == RhythmMode.VARY and len(hits) == len(context.onset_beats) and bar_index % 4 == 3
     notes: list[Note] = []
+    pad_drums = dict(zip(context.onset_beats, context.drum_pitches))
     for i, (beat, accent) in enumerate(hits):
         next_beat = hits[i + 1][0] if i + 1 < len(hits) else float(context.beats_per_bar)
         duration = min(next_beat - beat, .75 if i + 1 < len(hits) else context.beats_per_bar - beat)
         velocity = min(127, round((55 + 15 * energy) * (0.45 + 0.55 * accent)))
-        drum = KICK if i % 2 == 0 else SNARE
-        notes.append(Note(drum, beat, min(0.125, duration), velocity, "drums"))
-        hat = OPEN_HAT if color_ending and i == len(hits) - 1 else CLOSED_HAT
-        notes.append(Note(hat, beat, min(0.125, duration), max(1, velocity - 25), "drums"))
+        drum_length = min(.125, duration)
+        if beat in pad_drums:
+            notes.extend(Note(pitch, beat, drum_length, velocity, "drums") for pitch in pad_drums[beat])
+        else:
+            drum = KICK if i % 2 == 0 else SNARE
+            notes.append(Note(drum, beat, drum_length, velocity, "drums"))
+            hat = OPEN_HAT if color_ending and i == len(hits) - 1 else CLOSED_HAT
+            notes.append(Note(hat, beat, drum_length, max(1, velocity - 25), "drums"))
         if chord is not None:
             notes.append(Note(root if i % 2 == 0 else fifth, beat, duration, velocity, "bass"))
             notes.extend(Note(p, beat, min(duration, 0.5), max(1, velocity - 25), "keys") for p in voicing)

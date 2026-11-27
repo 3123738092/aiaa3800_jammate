@@ -108,6 +108,8 @@ def _cross_validate(data: dict[str, Any]) -> None:
             raise InputEventError("payload.rhythm: onset_beats and accents lengths differ")
         if any(a >= b for a, b in zip(beats, beats[1:])):
             raise InputEventError("payload.rhythm.onset_beats: must be strictly increasing")
+        if "drum_pitches" in rhythm and len(rhythm["drum_pitches"]) != len(beats):
+            raise InputEventError("payload.rhythm.drum_pitches: must match onset_beats")
         expected = "ready" if beats else "no_onsets"
         if payload["status"] != expected:
             raise InputEventError(f"payload.status: expected {expected}")

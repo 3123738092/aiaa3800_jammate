@@ -181,7 +181,8 @@ class BrowserMRT2Stream:
 def bar_conditions(bar, frames, carry):
     """Project clip-relative notes on the 25 Hz grid without restarting that grid."""
     timing = bar.timing
-    bar_beat = timing.bar_index * BEATS_PER_BAR
+    beats_per_bar = bar.state.beats_per_bar if bar.state is not None else BEATS_PER_BAR
+    bar_beat = timing.bar_index * beats_per_bar
     samples_per_beat = SAMPLE_RATE * 60 / timing.tempo_bpm
     pitches, drums = [], []
     for note in bar.notes:

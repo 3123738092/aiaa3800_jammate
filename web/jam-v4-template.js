@@ -318,7 +318,7 @@ function mergeJMMusicState(previous, patch) {
     render:'声音生成', schedule:'音符排程', scheduler:'音符排程', playback:'播放回执', harmony_intent:'和声意图', harmony_plan:'和声编排', harmony_applied:'和声生效回执', state:'音乐状态回执', 'agent.reply':'乐队回应', error:'错误'
   };
   const browserNames = {
-    target_select:'切换交互目标', 'target.selected':'切换交互目标', pad_hit:'触发鼓垫', note_on:'按下琴键', note_off:'松开琴键',
+    target_select:'切换交互目标', 'target.selected':'切换交互目标', pad_hit:'触发鼓垫', pad_capture_start:'开始录入鼓型', pad_capture_stop:'完成鼓型录入', note_on:'按下琴键', note_off:'松开琴键',
     volume:'调整音量', bpm_change:'调整速度', bpm:'调整速度', tempo_change:'调整速度', transport:'播放控制',
     mic_start:'开始录音', mic_stop:'结束录音', mic_error:'麦克风错误', mic_permission:'请求麦克风权限',
     command_text:'文字指令', command_not_sent:'指令未发送', command_error:'指令发送失败',
@@ -533,6 +533,7 @@ function mergeJMMusicState(previous, patch) {
   let localBpm=96, localMeter='4/4', previewStarted=false, backend=null, backendEpoch=0, unsubscribe=null, state={}, capabilities={};
   let wheelTempoDraft=null,wheelTempoTimer=0;
   let transportPending=null, tempoPending=null, meterPending=null, sending=false, sendTicket=0, importing=false, toastTimer=0, hintTimer=0;
+  let padCapture=null, padTake=null, padTimer=0;
   let octave=4, whiteCount=14, melodyCapture=false, melodyStart=0, melodyEvents=[], melodyDown=new Map();
   let sounding=new Map(), notePointers=new Map(), typingHeld=new Map(), fileNotes=new Set();
   let midiAccess=null, midiDevices=new Set(), micSession=null, micPending=false, autoWakePending=false, waveId=0, micTimer=0, micLimit=0;
@@ -723,7 +724,7 @@ function mergeJMMusicState(previous, patch) {
     getState(){return{source:online()?'backend':'local-preview',focusedInstrument:focused(),target:commandTarget,inputMode,...(online()?state:audio.getPreviewState()),bpm:online()?state.bpm:localBpm,meter:online()?state.meter:localMeter,tempoUnit:online()?(state.tempoUnit||(meterValid(state.meter)?tempoUnit(state.meter):undefined)):tempoUnit(localMeter),tempoPending:tempoPending?.bpm??null,meterPending:meterPending?.meter??null}},
     getConfig(){return{bpm:localBpm,meter:localMeter,tempoUnit:tempoUnit(localMeter),target:commandTarget,focusedInstrument:focused(),inputMode,theme:document.documentElement.dataset.theme,volumes:{...volumes}}},
     isPerforming(){return Boolean((micSession && (!micSession.wake || micSession.busy || micSession.hearing || micSession.target))
-      ||micPending||melodyCapture||sounding.size||importing||sending||previewDraftId)},
+      ||micPending||melodyCapture||padCapture||sounding.size||importing||sending||previewDraftId)},
     getRecordedMelody(){return melodyEvents.map(e=>({...e}))},
     getDrafts(){return drafts.map(d=>({id:d.id,name:d.name,kind:d.kind,target:d.target,mode:d.mode,size:d.size,durationMs:d.durationMs}))}};
   window.JamMate=api;window.JamAdapter=api;
@@ -754,6 +755,7 @@ function mergeJMMusicState(previous, patch) {
   }
   function moveTo(index,chooseTarget=true){
     if(!Number.isFinite(index))return;
+    if(ids[mod(Math.round(index))]!=='drums')finishPadCapture();
     releaseScreenNotes();focusIndex=Math.round(index);
     for(const id of ids){
       const active=id===focused(),el=objects[id];el.classList.toggle('active',active);el.tabIndex=active?-1:0;el.setAttribute('role',active?'group':'button');el.setAttribute('aria-label',active?names[id]:'选择'+names[id]);
@@ -843,22 +845,88 @@ function mergeJMMusicState(previous, patch) {
       el.addEventListener('keydown',e=>{if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();moveTo(nearest(id))}});
     }
     objects.keys.innerHTML='<div class="instrument-head"><div class="key-left"><button type="button" class="device-control" id="melodyRecord" aria-pressed="false"><span class="record-dot"></span><span id="melodyRecordLabel">录入旋律</span></button><button type="button" class="device-control" id="midiConnect">连接 MIDI</button></div><div class="key-right"><span id="melodyCount"></span><button type="button" class="device-control" id="melodySend" hidden>加入输入</button><div class="octave-controls"><button type="button" class="device-control" id="octaveDown" aria-label="降低八度">−</button><span class="octave-label">C4</span><button type="button" class="device-control" id="octaveUp" aria-label="提高八度">+</button></div></div></div><div class="instrument-body">'+channelMarkup('keys')+'<div class="keyboard"></div></div>';
-    objects.drums.innerHTML='<div class="instrument-head"><label>节奏组</label><div class="meter-selector" role="group" aria-label="拍号">'+['4/4','3/4','6/8'].map(m=>'<button type="button" data-meter="'+m+'" aria-pressed="'+(m===localMeter)+'" aria-label="'+m+' 拍">'+m+'</button>').join('')+'</div></div><div class="instrument-body">'+channelMarkup('drums')+'<div class="pad-grid">'+Array.from({length:16},(_,i)=>'<button class="pad" type="button" data-pad="'+i+'" aria-label="'+['底鼓','军鼓','踩镲','打击乐'][i%4]+' '+(Math.floor(i/4)+1)+'"><span>'+(['KICK','SNARE','HAT','PERC'][i%4])+'</span></button>').join('')+'</div></div>';
+    objects.drums.innerHTML='<div class="instrument-head"><div class="drum-capture"><button id="padRecord" type="button" class="device-control" aria-pressed="false" title="从第一次敲击开始录一小节"><span class="record-dot"></span><span id="padRecordLabel">录入鼓型</span></button><button id="padAdd" type="button" class="device-control" hidden>加入输入</button><span id="padCount" role="status"></span></div><div class="meter-selector" role="group" aria-label="拍号">'+['4/4','3/4','6/8'].map(m=>'<button type="button" data-meter="'+m+'" aria-pressed="'+(m===localMeter)+'" aria-label="'+m+' 拍">'+m+'</button>').join('')+'</div></div><div class="instrument-body">'+channelMarkup('drums')+'<div class="pad-grid">'+Array.from({length:16},(_,i)=>'<button class="pad" type="button" data-pad="'+i+'" aria-label="'+['底鼓','军鼓','踩镲','打击乐'][i%4]+' '+(Math.floor(i/4)+1)+'"><span>'+(['KICK','SNARE','HAT','PERC'][i%4])+'</span></button>').join('')+'</div></div>';
     objects.harmony.innerHTML='<div class="harmony-display" aria-label="和声状态"><div class="harmony-top"><span>调性</span><span class="harmony-key" id="harmonyKey"></span></div><div class="harmony-current"><span>当前和弦</span><strong class="harmony-chord" id="harmonyChord"></strong></div><div class="harmony-progression"><span>和弦进行</span><div class="harmony-sequence" id="harmonySequence"></div></div><span id="harmonySource" class="harmony-source">尚未连接乐队</span></div>';
     for(const el of document.querySelectorAll('[data-volume]')){el.addEventListener('input',()=>{setVolume(el.dataset.volume,+el.value)});el.addEventListener('change',()=>setVolume(el.dataset.volume,+el.value))}
     for(const el of document.querySelectorAll('[data-mute]'))el.onclick=()=>{const id=el.dataset.mute,v=volumes[id];if(validGain(v))setVolume(id,v===0?(lastVolumes[id]||.8):0)};
     document.querySelectorAll('[data-meter]').forEach(b=>b.onclick=()=>applyMeter(b.dataset.meter));
     for(const pad of objects.drums.querySelectorAll('.pad')){
-      const hit=async()=>{if(focused()!=='drums')return;try{await audio.ensure();const index=+pad.dataset.pad;audio.drum(index%4);flashPad(index);log('pad_hit',{pad:index,sound:['kick','snare','hat','perc'][index%4],source:'local-preview'})}catch(error){toast('浏览器音频不可用')}};
+      const hit=async()=>{
+        if(focused()!=='drums')return;
+        const index=Number(pad.dataset.pad);
+        recordPadHit(index);
+        try{
+          await audio.ensure();audio.drum(index%4);flashPad(index);
+          log('pad_hit',{pad:index,sound:['kick','snare','hat','perc'][index%4],source:'local-preview'});
+        }catch(error){toast('浏览器音频不可用')}
+      };
       pad.addEventListener('pointerdown',e=>{if(e.button>0)return;e.preventDefault();hit()});pad.addEventListener('click',e=>{if(e.detail===0)hit()});
     }
     bindKnob($('masterKnob'),'band');
+    $('padRecord').onclick=togglePadCapture;$('padAdd').onclick=addCapturedPads;
     $('melodyRecord').onclick=toggleMelody;$('melodySend').onclick=addCapturedMelody;$('midiConnect').onclick=connectMidi;
     $('octaveDown').onclick=()=>changeOctave(-1);$('octaveUp').onclick=()=>changeOctave(1);
     whiteCount=$('stage').clientWidth<560?7:14;keyboardMarkup();
     for(const id of Object.keys(volumes))setVolume(id,volumes[id]);
     moveTo(1,false);renderStage();
   }
+  function updatePadCapture(){
+    const count=(padCapture??padTake)?.hits.length??0;
+    $('padRecord').classList.toggle('recording',Boolean(padCapture));
+    $('padRecord').setAttribute('aria-pressed',String(Boolean(padCapture)));
+    $('padRecordLabel').textContent=padCapture?'完成':count?'重新录入':'录入鼓型';
+    $('padAdd').hidden=Boolean(padCapture)||!count;
+    $('padCount').textContent=count?count+' 击':padCapture?'等第一击':'';
+    syncComposer();
+  }
+
+  function finishPadCapture(){
+    if(!padCapture)return;
+    clearTimeout(padTimer);
+    padTake=padCapture.hits.length?padCapture:null;
+    padCapture=null;
+    log('pad_capture_stop',{hits:padTake?.hits.length??0});
+    updatePadCapture();
+  }
+
+  function togglePadCapture(){
+    if(padCapture){finishPadCapture();return}
+    if(composerRecording()||melodyCapture){toast('请先结束当前录入');return}
+    const view=api.getState();
+    const bpm=bpmValid(view.bpm)?view.bpm:localBpm;
+    const meter=meterValid(view.meter)?view.meter:localMeter;
+    const beats={'4/4':4,'3/4':3,'6/8':2}[meter];
+    padTake=null;
+    padCapture={bpm,meter,start:null,durationMs:beats*60000/bpm,hits:[]};
+    log('pad_capture_start',{bpm,meter});
+    updatePadCapture();
+  }
+
+  function recordPadHit(pad){
+    if(!padCapture)return;
+    const take=padCapture, now=performance.now();
+    if(take.start===null){
+      take.start=now;
+      padTimer=setTimeout(finishPadCapture,take.durationMs);
+    }
+    const timestampMs=now-take.start;
+    if(timestampMs>=take.durationMs){finishPadCapture();return}
+    take.hits.push({pad,timestampMs});
+    if(take.hits.length===64){finishPadCapture();return}
+    $('padCount').textContent=take.hits.length+' 击';
+  }
+
+  function addCapturedPads(){
+    if(!padTake)return;
+    if(drafts.length>=4){toast('一次最多添加 4 份素材');return}
+    const {hits,bpm,meter,durationMs}=padTake;
+    addDraft({kind:'pads',origin:'drum_pads',name:'鼓垫节奏',hits,bpm,meter,durationMs,target:'drums',
+      summary:hits.length+' 击 · '+meter+' · '+bpm+' BPM'});
+    padTake=null;
+    updatePadCapture();
+    hint('鼓型已加入输入，可附一句说明再发送',5000);
+  }
+
   function recordNote(kind,note,velocity,source){
     if(!melodyCapture)return;const key=source+':'+note;if(kind==='note_off'&&!melodyDown.has(key))return;
     if(melodyEvents.length>=10000){finishMelody();toast('本段旋律已达到记录上限');return}
@@ -1059,6 +1127,7 @@ function mergeJMMusicState(previous, patch) {
     }
     const controls=create('div','draft-routing');
     if(d.kind==='text')controls.append(create('span','draft-text-target','文字提示 · 跟随输入对象：'+names[commandTarget]));
+    else if(d.kind==='pads')controls.append(create('span','','给节奏组'));
     else controls.append(create('span','','给'),targetSelect(d));
     if(d.kind==='audio'){
       const select=create('select');select.setAttribute('aria-label',d.name+'的用途');
@@ -1080,11 +1149,12 @@ function mergeJMMusicState(previous, patch) {
       if(drafts.length)hint('素材已加入输入，可试听或补充一句要求',5000);
     }finally{importing=false;$('attachBtn').disabled=false;$('fileInput').value='';syncComposer()}
   }
-  function composerRecording(){return Boolean(micSession&&!micSession.wake)||micPending&&!autoWakePending}
+  function composerRecording(){return Boolean(padCapture||micSession&&!micSession.wake)||micPending&&!autoWakePending}
   function syncComposer(){const enabled=!!($('txt').value.trim()||drafts.length), recording=composerRecording();$('sendText').disabled=!enabled||sending||importing||recording;$('sendText').setAttribute('aria-label',sending?'正在提交':'发送输入');$('sendText').title='发送输入';$('attachBtn').disabled=importing||recording;$('drafts').querySelectorAll('select').forEach(el=>el.disabled=sending)}
   function mediaPayload(d){
     const base={target:d.target,fileName:d.name,origin:d.origin};
     if(d.kind==='audio')return{...base,type:'input.audio',mode:d.mode,audio:d.blob||d.file,durationMs:d.durationMs??null};
+    if(d.kind==='pads')return{...base,type:'input.pads',hits:d.hits,bpm:d.bpm,meter:d.meter};
     return{...base,type:'input.midi',events:selectedEvents(d).map(e=>({...e})),tempos:d.tempos||[],tempoProvided:!!d.tempoProvided,ppq:d.ppq??null,tracks:d.tracks||[],sourceBpm:d.tempoProvided?d.tempos?.find(t=>t.provided)?.bpm??null:null,...(d.file?{file:d.file}:{})};
   }
   async function sendInput(e){
@@ -1251,6 +1321,7 @@ function mergeJMMusicState(previous, patch) {
   }
 
   async function toggleMic(){
+    if(padCapture){toast('请先完成鼓型录入');return}
     if(micPending)return;
     if(micSession?.wake){wakeDisabled=true;closeWakeMic(micSession);return}
     if(micSession){stopRecording();return}
@@ -1324,7 +1395,7 @@ function mergeJMMusicState(previous, patch) {
   });
   document.addEventListener('keyup',e=>{const key=e.key.toLowerCase(),note=typingHeld.get(key);if(note!==undefined){noteOff(note,'typing:'+key);typingHeld.delete(key)}});
   window.addEventListener('blur',()=>{releaseAllNotes();swipe=null});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});if(micSession.wake)closeWakeMic(micSession);else stopRecording()}}else void autoStartWake()});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){finishPadCapture();releaseAllNotes();stopMidiPreview();if(micSession){log('mic_background_stop',{});if(micSession.wake)closeWakeMic(micSession);else stopRecording()}}else void autoStartWake()});
   const resize=()=>{const n=$('stage').clientWidth<560?7:14;if(n!==whiteCount){releaseScreenNotes();whiteCount=n;keyboardMarkup()}renderStage()};
   window.addEventListener('resize',resize);
   if(window.ResizeObserver)new ResizeObserver(resize).observe($('stage'));

@@ -57,12 +57,18 @@ def _metal(sr: int, length_s: float, decay: float, seed: int) -> np.ndarray:
     return 0.4 * bright * np.exp(-t * decay)
 
 
+def _claves(sr: int) -> np.ndarray:
+    t = _time(.09, sr)
+    return 0.55 * np.sin(2 * np.pi * 740 * t) * np.exp(-65 * t)
+
+
 _DRUMS: dict[int, Callable[[int], np.ndarray]] = {
     36: _kick,
     38: _snare,
     42: lambda sr: _metal(sr, 0.06, 60.0, 42),
     46: lambda sr: _metal(sr, 0.35, 9.0, 46),
     49: lambda sr: 0.6 * _metal(sr, 1.2, 3.0, 49),
+    75: _claves,
 }
 
 

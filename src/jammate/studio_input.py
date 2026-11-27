@@ -1,11 +1,14 @@
-"""Translate Studio keyboard and routing data into the shared InputEvent contract."""
+"""Translate Studio recordings and routing data into the shared InputEvent contract."""
 from collections import defaultdict, deque
 from math import isfinite
 from uuid import uuid4
 
 from jammate.contracts import InputEvent
-from jammate.contracts.adapters import from_humming, from_text
+from jammate.contracts.adapters import from_humming, from_rhythm, from_text
+from jammate.music import MAX_TEMPO_BPM, MIN_TEMPO_BPM
 from jammate.orchestration.agent import _clauses
+from jammate.orchestration.meter_intent import METERS
+from jammate.rhythm import PAD_DRUM_PITCHES, RhythmContext
 
 
 STUDIO_TARGETS = {"band", "drums", "keys", "harmony", "bass"}
@@ -38,6 +41,41 @@ def studio_text(text, target, *, session_id, source="text"):
     data = from_text(routed, session_id=session_id, source=source).to_dict()
     data["provenance"].update(target=target, original_text=original)
     return InputEvent(data)
+
+
+def pad_rhythm(data, *, session_id, beats_per_bar=None):
+    """Map one bar of timestamped pad strikes onto the captured tempo grid."""
+    hits, bpm, meter = (data.get(key) for key in ("hits", "bpm", "meter"))
+    if type(bpm) not in (int, float) or not MIN_TEMPO_BPM <= bpm <= MAX_TEMPO_BPM:
+        raise ValueError("鼓垫录入的 BPM 无效。")
+    if not isinstance(meter, str) or meter not in METERS:
+        raise ValueError("鼓垫录入的拍号无效。")
+    beats = METERS[meter]
+    if beats_per_bar is not None and beats != beats_per_bar:
+        raise ValueError("鼓垫录入的拍号与当前拍号不同，请按当前拍号重新录入。")
+    if not isinstance(hits, list) or not 1 <= len(hits) <= 64:
+        raise ValueError("请录入一小节鼓垫，包含 1–64 次敲击。")
+
+    bar_ms = beats * 60000 / bpm
+    drums = {}
+    previous = 0.
+    for hit in hits:
+        if not isinstance(hit, dict):
+            raise ValueError("鼓垫敲击记录无效。")
+        pad, timestamp = hit.get("pad"), hit.get("timestampMs")
+        if (type(pad) is not int or not 0 <= pad < 16 or type(timestamp) not in (int, float)
+                or not previous <= timestamp < bar_ms):
+            raise ValueError("鼓垫编号或起音时间无效。")
+        previous = timestamp
+        beat = timestamp / bar_ms * beats
+        drums.setdefault(beat, set()).add(PAD_DRUM_PITCHES[pad % len(PAD_DRUM_PITCHES)])
+
+    context = RhythmContext(bpm, tuple(drums), (1.,) * len(drums), beats_per_bar=beats,
+                            drum_pitches=tuple(tuple(sorted(group)) for group in drums.values()))
+    event = from_rhythm(context, session_id=session_id, audio_duration_s=bar_ms / 1000,
+                        tempo_source="session", confidence_kind="manual").to_dict()
+    event["provenance"].update(producer="studio_drum_pads", target="drums")
+    return InputEvent(event)
 
 
 def midi_phrase(data, *, session_id):

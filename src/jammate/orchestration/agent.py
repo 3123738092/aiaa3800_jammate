@@ -199,6 +199,10 @@ class RuleAgent:
                 event, payload = rhythms[-1], rhythms[-1].payload
                 context = payload["rhythm"]
                 if payload["status"] == "ready" and context["confidence"] >= .65:
+                    if (context.get("drum_pitches") and not state.layer("drums").active
+                            and not any(a["scope"] == "drums" and a["action"] in {"ADD_LAYER", "REMOVE_LAYER"}
+                                        for a in actions)):
+                        actions.append(_action("ADD_LAYER", "drums"))
                     actions.append(_action("ADJUST_FEEL", rhythm_event_id=event.event_id))
                     strategy = "RESPOND" if strategy != "INITIATE" else strategy
                     reasons.append("Adopt rhythmic onsets at the existing session tempo")

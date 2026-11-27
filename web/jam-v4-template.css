@@ -94,7 +94,13 @@ body #ins .ins-empty button{color:color-mix(in srgb,var(--accent-light) 60%,#f4e
 
 /* A quiet, tactile time-signature switch on the rhythm instrument. */
 .instrument.drums .instrument-head{min-height:36px;margin-bottom:12px;gap:10px}
-.instrument.drums .instrument-head>label{flex:none;white-space:nowrap}
+.drum-capture{display:flex;align-items:center;gap:6px;min-width:0}
+.drum-capture [hidden]{display:none}
+#padCount{white-space:nowrap;font-size:11px}
+@container studio (max-width:560px){
+ .drum-capture .device-control{min-height:28px;padding:4px 6px}
+ .drum-capture:has(#padAdd:not([hidden])) #padCount{display:none}
+}
 .instrument.drums.active .instrument-body{height:calc(100% - 48px)}
 .meter-selector{display:inline-flex;align-items:center;flex:none;gap:2px;padding:2px;min-height:36px;border:1px solid #b8ad9a99;border-radius:10px;background:linear-gradient(180deg,#cdc3b1,#dfd5c4);box-shadow:inset 0 1px 3px #796c5140,0 1px 0 #fff8edbf}
 .meter-selector button{position:relative;display:flex;align-items:center;justify-content:center;min-width:40px;min-height:30px;margin:0;padding:3px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:#756b5a;font-size:11px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap;box-shadow:none;transition:background .16s,color .16s,box-shadow .16s,transform .12s}

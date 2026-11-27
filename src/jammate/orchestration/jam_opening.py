@@ -154,6 +154,12 @@ def _object(properties):
             "required": list(properties), "additionalProperties": False}
 
 
+def _recorded_rhythm_source(rhythm):
+    if rhythm is None:
+        return None
+    return "drum_pads" if rhythm.drum_pitches else "claps"
+
+
 def _cold_opening(events, sources, tempo, tempo_source, key, key_source, beats, claps):
     bpm = tempo if tempo is not None else JamState.tempo_bpm
     if beats:
@@ -193,7 +199,7 @@ def _cold_opening(events, sources, tempo, tempo_source, key, key_source, beats, 
         "instruments": [{"name": name, "label": label} for name, label in labels.items()],
         "settings": {"tempo_bpm": bpm, "tempo_source": tempo_source,
                      "key": key.name if key else None, "key_source": key_source,
-                     "rhythm_source": "text" if beats else "claps" if claps else None,
+                     "rhythm_source": "text" if beats else _recorded_rhythm_source(claps),
                      "rhythm_beats_zero_based": list(rhythm.onset_beats) if rhythm else []},
         "reason": ("冷启动使用已提供的音乐素材。哼唱使用一个主奏音色。" if "lead" in labels else
                    "冷启动使用已提供的音乐素材。" if labels else "已设置开场参数，等待拍手或哼唱。"),
@@ -248,7 +254,7 @@ def _humming_opening(events, event, text, tempo, tempo_source, key, key_source, 
         "mode": "humming", "model": None,
         "instruments": [{"name": name, "label": label} for name, label in labels.items()],
         "settings": {"tempo_bpm": tempo, "tempo_source": tempo_source, "key": key.name, "key_source": key_source,
-                     "rhythm_source": "text" if beats else "claps" if claps else None,
+                     "rhythm_source": "text" if beats else _recorded_rhythm_source(claps),
                      "rhythm_beats_zero_based": list(rhythm.onset_beats) if rhythm else []},
         "reason": "主奏在相近音区接续句尾，键盘、贝斯和轻弦乐继续参考哼唱。",
     }
@@ -261,9 +267,9 @@ def cold_audio_plan(request):
     actions, bars = [], 1
     for event in events:
         if event.source == "rhythm" and event.payload["rhythm"]["onset_beats"]:
-            if not state.layer("drums").active and not state.interaction.allow_initiative:
-                continue
             if not state.layer("drums").active:
+                if not state.interaction.allow_initiative and not event.payload["rhythm"].get("drum_pitches"):
+                    continue
                 actions.append({"action": "ADD_LAYER", "scope": "drums", "strength": .5, "parameters": {}})
             actions.append({"action": "ADJUST_FEEL", "scope": "band", "strength": .5,
                             "parameters": {"rhythm_event_id": event.event_id}})
@@ -296,9 +302,10 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
     if tempo is not None and not MIN_TEMPO_BPM <= tempo <= MAX_TEMPO_BPM:
         raise ValueError(f"开场速度需在 {MIN_TEMPO_BPM:g}–{MAX_TEMPO_BPM:g} BPM 之间。")
     claps = RhythmContext(**rhythm_event.payload["rhythm"]) if rhythm_event else None
+    input_rhythm = _recorded_rhythm_source(claps)
     locked_tempo = tempo if tempo is not None else claps.tempo_bpm if claps else None
     tempo_source = ("manual" if tempo_override is not None else "text" if text_bpm is not None else
-                    "claps" if claps else "clock" if mode == "cold" else "model")
+                    input_rhythm or ("clock" if mode == "cold" else "model"))
     focus = opening_focus(text_event, {} if renderer == "mrt2_direct" else programs)
     if renderer == "mrt2_direct" or (mode != "humming" and focus):
         state, selection = _cold_opening(events, by_source, locked_tempo,
@@ -373,7 +380,7 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
     if text_event is None and humming_event is None and claps is not None:
         state, selection = _cold_opening(events, by_source, locked_tempo, tempo_source, None, None, None, claps)
         state = state.with_updates(interaction=replace(state.interaction, allow_initiative=False))
-        return state, {**selection, "mode": "warm", "reason": "沿用拍手节奏，保持纯鼓开场。"}
+        return state, {**selection, "mode": "warm", "reason": "沿用录入的节奏，保持纯鼓开场。"}
     if text_event is None and humming_event is not None and claps is None:
         state, selection = _humming_opening(events, humming_event, None, locked_tempo, tempo_source,
                                              None, None, None, None)
@@ -437,7 +444,7 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
     key = text_key or (Key(data["tonic"], data["mode"]) if data["tonic"] is not None else None)
     if claps is not None and text_beats is None:
         rhythm = replace(claps, tempo_bpm=bpm)
-        rhythm_source = "claps"
+        rhythm_source = input_rhythm
     else:
         beats = text_beats or tuple(step / 4 for step in sorted(data["rhythm_steps"]))
         rhythm = RhythmContext(bpm, beats, (1.0,) * len(beats), beats_per_bar=beats_per_bar) if beats else None

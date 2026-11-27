@@ -263,7 +263,7 @@ async function inspect(active) {
     if (data.opening.model) trace(id, 'model_response', 'completed', {
       model: data.opening.model, reason: data.opening.reason, response: data.opening.reply,
     });
-    trace(id, 'band_plan', 'scheduled', data.opening.melody_replay_plan ?? data.opening.mrt2_plan ?? data.opening.solo_plan);
+    trace(id, 'band_plan', 'scheduled', data.opening.melody_replay_plan ?? data.opening.mrt2_plan ?? data.opening.solo_plan ?? data.opening.rhythm_plan);
     trace(id, 'render', data.opening.mrt2_preview?.status, data.opening.mrt2_preview);
     trace(id, 'playback', 'applied', data.opening.playback_receipt);
   }
@@ -405,7 +405,8 @@ async function launch(active, opening, requestId, ideaId) {
   try {
     const profile = studioProfile();
     const openingMode = profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
-    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm: tempoExplicit || opening.midi || opening.humming || opening.rhythm ? config.bpm : null,
+    const useConfiguredTempo = tempoExplicit || opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
+    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm: useConfiguredTempo ? config.bpm : null,
       meter: config.meter, ...profile, allow_preview: profile.renderer === 'mrt2'}, 100_000);
     if (live !== active) {
       release(view.session);
@@ -468,6 +469,11 @@ async function prepareInput(action) {
   if (action.type === 'input.text' && action.source === 'speech') input.source = 'speech';
   const materials = action.type === 'input.bundle' ? action.inputs : action.type === 'input.text' ? [] : [action];
   for (const item of materials) {
+    if (item.type === 'input.pads') {
+      if (input.rhythm) throw new Error('拍手和鼓垫节奏请分开提交。');
+      input.rhythm = {hits: item.hits, bpm: item.bpm, meter: item.meter};
+      continue;
+    }
     if (item.type === 'input.midi') {
       if (input.midi || input.humming) throw new Error('请逐段提交键盘旋律和哼唱。');
       input.midi = {events: item.events, source_bpm: item.sourceBpm, origin: item.origin, target: item.target};
@@ -591,6 +597,7 @@ async function dispatch(action) {
       return;
     case 'input.text':
     case 'input.midi':
+    case 'input.pads':
     case 'input.audio':
     case 'input.bundle':
       break;

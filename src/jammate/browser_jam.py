@@ -61,7 +61,7 @@ from jammate.render.soundfont import SoundFontRenderer
 from jammate.render.runtime import create_runtime
 from jammate.rhythm import RhythmContext
 from jammate.state import JamState, MAX_TEMPO_BPM, MIN_TEMPO_BPM
-from jammate.studio_input import midi_phrase, studio_text, with_studio_target
+from jammate.studio_input import midi_phrase, pad_rhythm, studio_text, with_studio_target
 
 
 BUFFER_SECONDS = .62
@@ -162,6 +162,10 @@ class BrowserJam:
                      "parameters": {"motif_id": f"motif_opening_{self.id}"}},
                 ], [], {}, 2, selection["reason"], [])
                 self.opening["solo_plan"] = opening_plan.to_dict()
+            if opening_plan is None and state.rhythm and state.rhythm.drum_pitches and state.layer("drums").active:
+                opening_plan = make_plan(self.manager.state, events, f"opening_{self.id}", "FOLLOW",
+                                         [], [], {}, 1, selection["reason"], [])
+                self.opening["rhythm_plan"] = opening_plan.to_dict()
             if self.direct_mrt2:
                 if opening_plan is None:
                     opening_plan = make_plan(self.manager.state, events, f"opening_{self.id}", "FOLLOW",
@@ -176,7 +180,7 @@ class BrowserJam:
             settings = selection.get("settings", {}) if selection else {}
             self.mrt2_stream = BrowserMRT2Stream(style, os.environ.get("JAMMATE_MRT2_MODEL", "mrt2_small"),
                                                 direct=self.direct_mrt2,
-                                                tempo=settings.get("tempo_source") in {"manual", "text", "claps"},
+                                                tempo=settings.get("tempo_source") in {"manual", "text", "claps", "drum_pads"},
                                                 key=settings.get("key_source") in {"manual", "text"})
         budget = arrangement_config.timeout_s if arrangement_config and renderer != "mrt2_direct" else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
@@ -414,7 +418,7 @@ class BrowserJam:
                 if bar.started is not None:
                     self.last_applied = {"bar": started, "plan": bar.started.plan_id}
                     if self.opening and any(self.opening.get(key, {}).get("plan_id") == bar.started.plan_id
-                                            for key in ("melody_replay_plan", "mrt2_plan", "solo_plan")):
+                                            for key in ("melody_replay_plan", "mrt2_plan", "solo_plan", "rhythm_plan")):
                         self.opening = {**self.opening, "playback_receipt": asdict(bar.started)}
                     for event_id, row in self.debug_turns.items():
                         if row.get("bound_plan", {}).get("plan_id") == bar.started.plan_id:
@@ -496,7 +500,10 @@ class BrowserJam:
             if saved := self.debug_turns.get(event.event_id):
                 return saved["feedback"]
             self.suggestion_offer = None
-            label = suggestion["message"] if suggestion else labels.get(event.source) or event.payload["text"]
+            if event.provenance.get("producer") == "studio_drum_pads":
+                label = "鼓垫节奏"
+            else:
+                label = suggestion["message"] if suggestion else labels.get(event.source) or event.payload["text"]
             current_bar = self.playing.timing.bar_index if self.playing else -1
             self.target = target_position(label, current_bar)
             self.turn_timing = None
@@ -989,8 +996,13 @@ class BrowserJamService:
                 text_event = InputEvent(raw)
         beats_per_bar = beats or text_beats_per_bar(text_event)
         events = []
-        if body.get("rhythm") is not None:
-            clap, clap_rate = self.decode_recording(body["rhythm"], MAX_OPENING_SECONDS)
+        rhythm_input = body.get("rhythm")
+        if isinstance(rhythm_input, dict) and "hits" in rhythm_input:
+            named_meter = requested_meter(text_event.payload["text"]) if text_event else None
+            events.append(pad_rhythm(rhythm_input, session_id=session_id,
+                                     beats_per_bar=METERS.get(named_meter, beats)))
+        elif rhythm_input is not None:
+            clap, clap_rate = self.decode_recording(rhythm_input, MAX_OPENING_SECONDS)
             timing = body.get("rhythm_timing", "strict")
             if timing not in {"strict", "feel"}:
                 raise ValueError("请选择精确定速或节奏草图。")
@@ -1227,8 +1239,9 @@ class BrowserJamService:
             programs = self.soundfont.programs if self.soundfont else {}
             state, selection = prepare_opening(events, config, programs, tempo_override=bpm_override,
                                                key_override=opening.get("key"), mode=mode, renderer=renderer, beats_override=beats)
-            state = state.with_updates(beats_per_bar=beats or text_beats_per_bar(
-                next((event for event in events if event.event_type == "speech"), None)))
+            state = state.with_updates(beats_per_bar=beats or (
+                state.rhythm.beats_per_bar if state.rhythm and state.rhythm.drum_pitches else text_beats_per_bar(
+                    next((event for event in events if event.event_type == "speech"), None))))
             # Compound meter is two dotted beats. Provide a triplet groove for
             # the default backing; explicit input rhythm keeps its real onsets.
             if idea:
