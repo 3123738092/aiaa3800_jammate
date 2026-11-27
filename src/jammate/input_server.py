@@ -79,6 +79,7 @@ class Handler(SimpleHTTPRequestHandler):
                 pending = self.server.pending_starts
             drain = self.server.drain_file
             available = None
+            deployment = None
             if drain:
                 try:
                     value = drain.with_name("deploy-available").read_text(encoding="ascii").strip()
@@ -86,9 +87,18 @@ class Handler(SimpleHTTPRequestHandler):
                         available = value
                 except (OSError, UnicodeError):
                     pass
+                try:
+                    progress = json.loads(drain.with_name("deploy-status.json").read_text(encoding="ascii"))
+                    if (isinstance(progress, dict) and isinstance(progress.get("release"), str)
+                            and re.fullmatch(r"[a-f0-9]{40}", progress["release"])
+                            and progress.get("phase") in ("preparing", "delayed")):
+                        deployment = {"release": progress["release"], "phase": progress["phase"]}
+                except (OSError, ValueError):
+                    pass
             self.json_response(200, {"service": SERVICE_ID, "root": str(ROOT.parent),
                                      "implementation": self.server.reference.implementation,
                                      "release": os.getenv("JAMMATE_RELEASE"),
+                                     "deployment": deployment,
                                      "available_release": available,
                                      "updating": bool(drain and drain.is_file()),
                                      "active_sessions": active, "pending_starts": pending})

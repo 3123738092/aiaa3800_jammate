@@ -146,6 +146,11 @@ function showRelease() {
   } else if (pending) {
     text = '新版本已就绪，等当前会话结束后自动发布。';
     if (live && !preparing && !studio.isPerforming()) label = '结束会话';
+  } else if (status?.deployment?.release && status.deployment.release !== status.release) {
+    const version = status.deployment.release.slice(0, 7);
+    text = status.deployment.phase === 'delayed'
+      ? '更新 ' + version + ' 准备遇到问题，将自动重试。'
+      : '发现新版本 ' + version + '，正在准备更新。';
   }
   if (message.textContent !== text) message.textContent = text;
   if (action.textContent !== label) action.textContent = label;
@@ -652,7 +657,9 @@ $('suggestion-skip').onclick = () => activity(false);
 $('txt').addEventListener('input', () => activity());
 window.addEventListener('jammate:studio-activity', () => activity());
 document.addEventListener('visibilitychange', () => { activity(false); void checkRelease(); });
-setInterval(checkRelease, 10000);
+window.addEventListener('focus', checkRelease);
+window.addEventListener('pageshow', checkRelease);
+setInterval(checkRelease, 5000);
 const idleTimer = setInterval(checkIdle, 500);
 $('backend-settings').onclick = () => {
   activity(false);

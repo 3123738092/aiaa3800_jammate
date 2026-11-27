@@ -87,8 +87,17 @@ def test_rotating_origin_only_accepts_the_current_name(tmp_path):
 def test_release_notice_and_drain_are_independent(tmp_path, monkeypatch):
     drain = tmp_path / "deploy-drain"
     available = tmp_path / "deploy-available"
+    progress = tmp_path / "deploy-status.json"
     monkeypatch.setenv("JAMMATE_RELEASE", "a" * 40)
     with serve(drain_file=drain) as port:
+        for phase in ("preparing", "delayed"):
+            progress.write_text(json.dumps({"release": "b" * 40, "phase": phase}))
+            ready = json.loads(request(port, "GET", "/api/ready")[1])
+            assert ready["deployment"] == {"release": "b" * 40, "phase": phase}
+            assert ready["available_release"] is None
+            assert not ready["updating"]
+            assert request(port, "POST", "/api/jam/start")[0] == 200
+
         available.write_text("b" * 40)
         status, body = request(port, "GET", "/api/ready")
         assert status == 200

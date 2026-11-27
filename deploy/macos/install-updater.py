@@ -33,9 +33,11 @@ def main():
     for source in ("run-api.sh", "update.py"):
         shutil.copyfile(HERE / source, BASE / "bin" / source)
     AGENTS.mkdir(exist_ok=True)
+    # Smart Git requests don't consume GitHub's anonymous REST API allowance.
+    interval = 20 if (BASE / "bin/release-deps/dulwich").is_dir() else 90
     install("com.jammate.team.update",
             [str(BASE / "python/bin/python3.12"), str(BASE / "bin/update.py")],
-            RunAtLoad=True, StartInterval=90, ProcessType="Background")
+            RunAtLoad=True, StartInterval=interval, ProcessType="Background")
 
 
 if __name__ == "__main__":

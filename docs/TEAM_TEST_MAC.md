@@ -6,9 +6,11 @@
 
 - 每个成员在自己的分支修改 `web/`，从仓库根目录运行 `python scripts/team_frontend.py`。在终端粘贴固定团队邀请链接，再打开 [本地 Studio](http://127.0.0.1:4188/jam.html)。修改前端文件后刷新页面。该程序只提供本机页面与转发 API，无需安装音频模型或保存供应商密钥。也可传 `--port 4190` 或 `--invite-file <团队邀请文本>`。
 - 本地页面的「设置」展示 Mac 当前后端提交号。团队共享 Mac 上的最新通过检查版本。需要联调尚未合入 `main` 的后端改动时，应在单独的服务环境测试。
-- 代码进入 GitHub `main` 后，Mac 大约每 90 秒检查一次。更新器按完整提交号下载源码，使用独立端口验证候选服务，检查可用能力并合成开场。候选版本就绪时，Studio 会提示正在测试的成员，可以结束会话，也可以继续演奏。全部会话结束后自动发布，启动失败自动恢复上一版本。网页提示刷新时，可保存当前演奏后手动刷新。本地联调的前端文件随自己的 Git 检出更新。邀请链接、数据和模型缓存留在部署账户中。
+- 代码进入 GitHub `main` 后，配有 Git 缓存的 Mac 每 20 秒检查一次，只拉取缺少的 Git 对象。前台网页每 5 秒检查发布状态，切回标签页会立刻检查。发现提交后显示「正在准备更新」，失败时保留旧版本并提示自动重试。候选版本在独立端口检查并合成开场。已有会话可以继续演奏，全部结束后自动切换，启动失败自动恢复上一版本。网页提示刷新时，可保存当前演奏后手动刷新。本地联调的前端文件随自己的 Git 检出更新。
 
 Mac 管理者在已有 `~/jammate-team` 安装上，从仓库运行 `~/jammate-team/python/bin/python3.12 deploy/macos/install-updater.py` 注册发布任务。发布与候选检查日志位于 `~/jammate-team/logs/com.jammate.team.update.{out,err}.log` 及 `candidate.log`。手动回退运行 `~/jammate-team/python/bin/python3.12 ~/jammate-team/bin/update.py --rollback`。回退会暂停自动发布。解决问题后删除 `~/jammate-team/config/deploy-paused` 即可恢复。
+
+安装发布用的 Git 客户端后重新运行注册脚本。`~/jammate-team/bin/uv pip install --target ~/jammate-team/bin/release-deps dulwich==1.2.17`。第一次拉取会创建 `deploy-source.git`，已有的浅克隆缓存也可以直接使用。如果 Mac 默认解析到的 GitHub 节点不可达，可在 `config/github-addresses` 按顺序填写实测可用的 GitHub IPv4，每行一个。连接继续校验 github.com 的 TLS 证书。没有安装 Git 客户端的环境沿用每 90 秒查询及整包下载。
 
 ## Mac 运行环境
 

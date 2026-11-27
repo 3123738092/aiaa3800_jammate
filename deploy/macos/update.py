@@ -2,6 +2,8 @@
 import argparse
 from datetime import datetime
 import fcntl
+from http.client import HTTPException
+from ipaddress import IPv4Address
 import json
 import os
 from pathlib import Path
@@ -9,6 +11,7 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 from tempfile import TemporaryDirectory
 from time import monotonic, sleep
@@ -18,6 +21,9 @@ from urllib.request import Request, urlopen
 
 BASE = Path.home() / "jammate-team"
 REPO = "3123738092/aiaa3800_jammate"
+GIT_HOST = "github.com"
+GIT_PATH = f"/{REPO}.git"
+MAIN_REF = b"refs/heads/main"
 API = f"https://api.github.com/repos/{REPO}/git/ref/heads/main"
 SERVICE = f"gui/{os.getuid()}/com.jammate.team.api"
 API_PORT = 4215
@@ -32,6 +38,54 @@ def report(message):
 
 def fetch(url, timeout=30):
     return urlopen(Request(url, headers=HEADERS), timeout=timeout)
+
+
+def main_revision(base):
+    dependencies = base / "bin/release-deps"
+    if not (dependencies / "dulwich").is_dir():
+        with fetch(API, timeout=10) as response:
+            return json.load(response)["object"]["sha"], None
+
+    sys.path.insert(0, str(dependencies))
+    from dulwich.client import Urllib3HttpGitClient
+    from dulwich.errors import GitProtocolError
+    from urllib3 import PoolManager, Timeout
+
+    config = base / "config/github-addresses"
+    addresses = [str(IPv4Address(value)) for value in config.read_text().split()] if config.is_file() else []
+    for address in [*addresses, GIT_HOST]:
+        # Keep GitHub's HTTP host, TLS SNI, and certificate checks when overriding DNS.
+        pool = PoolManager(server_hostname=GIT_HOST, assert_hostname=GIT_HOST, headers={"Host": GIT_HOST},
+                           retries=False, timeout=Timeout(connect=4, read=35))
+        client = Urllib3HttpGitClient(f"https://{address}", pool_manager=pool)
+        try:
+            refs = client.get_refs(GIT_PATH, ref_prefix=[MAIN_REF], protocol_version=0)
+            return refs.refs[MAIN_REF].decode("ascii"), client
+        except (GitProtocolError, OSError, KeyError) as error:
+            pool.clear()
+            last_error = error
+    raise RuntimeError("无法查询 GitHub main。") from last_error
+
+
+def archive_revision(base, sha, client, output):
+    from dulwich.porcelain import archive
+    from dulwich.repo import Repo
+
+    cache = base / "deploy-source.git"
+    commit = sha.encode("ascii")
+    with (Repo(str(cache)) if cache.exists() else Repo.init_bare(str(cache), mkdir=True)) as repo:
+        if commit not in repo.object_store:
+            client.fetch(GIT_PATH, repo, determine_wants=lambda refs, depth: [commit], depth=1,
+                         ref_prefix=[MAIN_REF])
+        with output.open("wb") as stream:
+            archive(repo, commit, outstream=stream)
+        repo.refs[MAIN_REF] = commit
+
+
+def publish_progress(path, sha, phase):
+    pending = path.with_suffix(".new")
+    pending.write_text(json.dumps({"release": sha, "phase": phase}), encoding="ascii")
+    pending.replace(path)
 
 
 def backend(port, path="/api/ready", payload=None):
@@ -62,7 +116,7 @@ def wait_for(port, sha, process=None):
     raise RuntimeError(f"后端未能报告预期版本 {sha}。")
 
 
-def download_release(base, sha):
+def download_release(base, sha, client):
     root = base / "releases"
     root.mkdir(exist_ok=True)
     release = root / sha
@@ -70,13 +124,17 @@ def download_release(base, sha):
         return release
     with TemporaryDirectory(prefix="checkout-", dir=root) as temp:
         working = Path(temp)
-        archive = working / "source.tar.gz"
-        url = f"https://codeload.github.com/{REPO}/tar.gz/{sha}"
-        with fetch(url, timeout=90) as response, archive.open("wb") as output:
-            shutil.copyfileobj(response, output)
-        with tarfile.open(archive, "r:gz") as bundle:
-            bundle.extractall(working, filter="data")
-        checkout = working / f"{REPO.split('/')[1]}-{sha}"
+        source = working / "source.tar"
+        checkout = working / "source"
+        if client is None:
+            url = f"https://codeload.github.com/{REPO}/tar.gz/{sha}"
+            with fetch(url, timeout=90) as response, source.open("wb") as output:
+                shutil.copyfileobj(response, output)
+            checkout = working / f"{REPO.split('/')[1]}-{sha}"
+        else:
+            archive_revision(base, sha, client, source)
+        with tarfile.open(source, "r:*") as bundle:
+            bundle.extractall(working if client is None else checkout, filter="data")
         if not (checkout / "web/jam.html").is_file() or not (checkout / "src/jammate/input_server.py").is_file():
             raise RuntimeError("GitHub 下载的提交缺少 Studio 文件。")
         (checkout / ".release").write_text(sha + "\n")
@@ -217,6 +275,7 @@ def main():
     base = BASE
     pause = base / "config/deploy-paused"
     available = base / "config/deploy-available"
+    progress = base / "config/deploy-status.json"
     with (base / "config/deploy.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -226,36 +285,45 @@ def main():
         (base / "config/deploy-drain").unlink(missing_ok=True)
         if args.rollback:
             available.unlink(missing_ok=True)
+            progress.unlink(missing_ok=True)
             if activate(base, (base / "previous").resolve(strict=True)):
                 pause.touch()
             return
         if pause.exists():
             available.unlink(missing_ok=True)
+            progress.unlink(missing_ok=True)
             return
-        with fetch(API) as response:
-            sha = json.load(response)["object"]["sha"]
+        sha, client = main_revision(base)
         if not re.fullmatch(r"[a-f0-9]{40}", sha):
             raise RuntimeError("main 的提交号无效。")
         current = (base / "current").resolve(strict=True)
         if committed_release(current) == sha:
             available.unlink(missing_ok=True)
+            progress.unlink(missing_ok=True)
             return
         if available.exists() and available.read_text().strip() != sha:
             available.unlink()
-        release = download_release(base, sha)
-        prepare_runtime(base, current, release)
-        checked = release / ".checked"
-        if not checked.exists():
-            check_candidate(base, release, sha)
-            checked.touch()
+        release = base / "releases" / sha
+        if not (release / ".checked").exists():
+            publish_progress(progress, sha, "preparing")
+            try:
+                release = download_release(base, sha, client)
+                prepare_runtime(base, current, release)
+                check_candidate(base, release, sha)
+                (release / ".checked").touch()
+            except Exception:
+                publish_progress(progress, sha, "delayed")
+                raise
         pending = available.with_suffix(".new")
         pending.write_text(sha + "\n")
         pending.replace(available)
         try:
             if activate(base, release):
                 available.unlink(missing_ok=True)
-        except (RuntimeError, OSError, subprocess.CalledProcessError):
+            progress.unlink(missing_ok=True)
+        except (RuntimeError, OSError, subprocess.CalledProcessError, HTTPException):
             available.unlink(missing_ok=True)
+            publish_progress(progress, sha, "delayed")
             raise
 
 
