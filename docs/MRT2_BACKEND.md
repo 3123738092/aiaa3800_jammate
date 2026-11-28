@@ -4,9 +4,9 @@
 
 ## 运行路径与职责
 
-Mac 团队 Studio 的主输出是带音符和鼓条件的 MRT2 流式伴奏。可执行的 BandPlan 先编排成小节音符，再打包为 25 Hz 条件，MRT2 保留会话上下文并生成 48 kHz 双声道 PCM。支持 FLAC 的浏览器按小节接收无损压缩音频，其余浏览器接收原始 PCM。FluidSynth 则按 MIDI 的音符、力度和 SoundFont 音色合成，适合检查精确的 MIDI 执行。以下 KevinRuntime／MRT2Runtime 的比较讨论的是离线导出和试听路径。
+Mac 团队 Studio 的主输出是带音符和鼓条件的 MRT2 流式伴奏。可执行的 BandPlan 先编排成小节音符，再打包为 25 Hz 条件。跨小节的延音会继续写入条件。MRT2 保留会话上下文并生成 48 kHz 双声道 PCM。浏览器优先接收 Opus，其次使用 FLAC，最后使用原始 PCM。FluidSynth 则按 MIDI 的音符、力度和 SoundFont 音色合成，适合检查精确的 MIDI 执行。以下 KevinRuntime／MRT2Runtime 的比较讨论的是离线导出和试听路径。
 
-Studio 预取两个待播小节，用浏览器实际起拍确认播放。准备好的音频保持原排程，新指令从尚可改动的小节生效。
+Studio 根据小节时长预取 2 至 6 个待播小节，以 3.5 秒为缓冲目标。压缩音频传输短暂失败时，浏览器可以重取已生成的同一小节。播放回执由浏览器实际起拍确认。准备好的音频保持原排程，新指令从尚可改动的小节生效。回执能确认小节已播以及使用的计划。最终混音里乐器和动机的可辨性需要听评。
 
 ```text
 InputEvent + JamState + history
