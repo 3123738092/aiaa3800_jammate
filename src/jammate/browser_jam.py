@@ -64,8 +64,8 @@ from jammate.state import JamState, MAX_TEMPO_BPM, MIN_TEMPO_BPM
 from jammate.studio_input import midi_phrase, pad_rhythm, studio_text, with_studio_target
 
 
-BUFFER_SECONDS = .62
-MRT2_BUFFER_SECONDS = .28
+BUFFER_SECONDS = 1.0
+MRT2_BUFFER_SECONDS = 1.3
 MRT2_STREAM_RENDERERS = {"mrt2_stream", "mrt2_direct"}
 VOICE_LIMIT = 2 * 1024 * 1024
 DEBUG_HISTORY = 12

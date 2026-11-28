@@ -6,6 +6,9 @@ import {initJamInputs} from './jam-inputs.js?v=studio-v4';
 import {analyzeJamHumming} from './jam-humming.js';
 import {addressedCommand, initNodConfirmation} from './jam-nod.js?v=2';
 
+const MRT2_START_BUFFER_FRAMES = Math.round(.8 * MRT2_RATE);
+const MRT2_SCHEDULE_AHEAD_S = .32;
+
 const byId = id => document.getElementById(id);
 const play = byId('jam-start'), stop = byId('jam-stop');
 const completeHumming = byId('jam-complete-humming');
@@ -259,6 +262,7 @@ function show(view, live) {
   window.dispatchEvent(new CustomEvent('jammate:playback-metrics', {detail: {
     session: live.id, gaps: live.gaps, failures: live.failures,
     bar: view.current_bar, contextState: live.clock.state,
+    boundaryGaps: live.boundaryGaps, withinBarGaps: live.gaps - live.boundaryGaps,
   }}));
   if (view.current_bar !== null && !live.exportReady) {
     live.exportReady = true;
@@ -344,7 +348,8 @@ function show(view, live) {
     view.current_bar == null ? '等待起拍' : !view.playing ? '演奏已停止' :
     live.mrt2Stream ? 'MRT2 流式 PCM' : '实时伴奏',
     preview_id: previewPlaying() ? live.previewId : playingAuto ? live.autoClip.id : null,
-    bar: view.current_bar, buffer_reconnections: live.gaps});
+    bar: view.current_bar, buffer_reconnections: live.gaps,
+    bar_boundary_reconnections: live.boundaryGaps, within_bar_reconnections: live.gaps - live.boundaryGaps});
   debug.refresh();
 }
 
@@ -430,26 +435,43 @@ async function loadPreview(live, id) {
   }
 }
 
-function queueMrt2Bar(live, packet) {
+function failMrt2Stream(live, error) {
+  if (run !== live) return;
+  debug.error('MRT2 流式播放', error);
+  end(error.message || '本地 MRT2 音频流已中断。');
+}
+
+function scheduleMrt2Audio(live) {
   const stream = live.mrt2Stream;
-  live.buffered = packet.bar;
-  stream.pending = stream.pending.then(() => readMrt2Bar(live.id, packet, stream.controller.signal,
-    async (pcm, offset) => {
+  if (run !== live || stream.scheduleTimer !== null || !stream.ready.length) return;
+  const head = stream.ready[0];
+  if (live.epoch === null) {
+    const tail = stream.ready.at(-1);
+    const receivedFrames = tail.offset + tail.pcm.byteLength / (2 * Int16Array.BYTES_PER_ELEMENT);
+    if (receivedFrames < Math.min(MRT2_START_BUFFER_FRAMES, head.packet.pcm_frames)) return;
+    live.epoch = live.clock.currentTime + .05 - head.packet.start / live.rate;
+  }
+
+  try {
+    while (stream.ready.length) {
+      const {packet, pcm, offset} = stream.ready[0];
       const planned = packet.start / live.rate + offset / MRT2_RATE;
-      // Keep the Web Audio queue short so stale audio cannot accumulate.
-      while (run === live && live.epoch !== null
-          && live.epoch + planned - live.clock.currentTime > .32) {
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      if (run !== live) return;
       const now = live.clock.currentTime;
-      if (live.epoch === null) live.epoch = now + .12 - planned;
       let at = live.epoch + planned;
+      if (at - now > MRT2_SCHEDULE_AHEAD_S) {
+        stream.scheduleTimer = setTimeout(() => {
+          stream.scheduleTimer = null;
+          scheduleMrt2Audio(live);
+        }, 20);
+        return;
+      }
       if (at < now + .008) {
         live.gaps += 1;
+        if (offset === 0) live.boundaryGaps += 1;
         at = now + .05;
         live.epoch = at - planned;
       }
+      stream.ready.shift();
       const node = live.clock.createBufferSource();
       node.buffer = stereoPcmBuffer(live.clock, pcm);
       node.connect(live.output);
@@ -458,11 +480,23 @@ function queueMrt2Bar(live, packet) {
       stream.end = at + node.buffer.duration;
       if (offset === 0) live.markers.push({bar: packet.bar, at});
       live.streamRecording.append(packet.bar, at, pcm);
-    })).catch(error => {
+    }
+  } catch (error) {
+    failMrt2Stream(live, error);
+  }
+}
+
+function queueMrt2Bar(live, packet) {
+  const stream = live.mrt2Stream;
+  live.buffered = packet.bar;
+  // The server offers one reserved bar. Let its bytes arrive independently
+  // of the short Web Audio queue while keeping model requests in bar order.
+  stream.pending = stream.pending.then(() => readMrt2Bar(live.id, packet, stream.controller.signal,
+    (pcm, offset) => {
       if (run !== live) return;
-      debug.error('MRT2 流式播放', error);
-      end(error.message || '本地 MRT2 音频流已中断。');
-    });
+      stream.ready.push({packet, pcm, offset});
+      scheduleMrt2Audio(live);
+    })).catch(error => failMrt2Stream(live, error));
 }
 
 async function enqueue(live, packet) {
@@ -481,6 +515,7 @@ async function enqueue(live, packet) {
     // A delayed tab or request can miss its write deadline. Continue from
     // the same musical bar using a new clock origin instead of skipping it.
     live.gaps += 1;
+    live.boundaryGaps += 1;
     stopAutoPreview(live);
     at = now + .065;
     live.epoch = at - packet.start / live.rate;
@@ -537,7 +572,11 @@ function end(message = '会话已结束。') {
   stopAutoPreview(live);
   lastPerformance = performanceSnapshot(live) ?? lastPerformance;
   run = null;
-  live.mrt2Stream?.controller.abort();
+  if (live.mrt2Stream) {
+    clearTimeout(live.mrt2Stream.scheduleTimer);
+    live.mrt2Stream.controller.abort();
+    live.mrt2Stream.ready.length = 0;
+  }
   manual.stop(live.started);
   debug.stop();
   clearTimeout(live.timer);
@@ -593,10 +632,12 @@ async function startJam(mode) {
     return;
   }
   const live = {clock, mode, id: null, rate: 0, epoch: null, buffered: -1,
-    markers: [], recorded: [], autoRecorded: [], gaps: 0, failures: 0, sending: false,
+    markers: [], recorded: [], autoRecorded: [], gaps: 0, boundaryGaps: 0, failures: 0, sending: false,
     directMrt2: renderer.value === 'mrt2_direct'};
   if (live.directMrt2 || renderer.value === 'mrt2_stream') {
-    live.mrt2Stream = {controller: new AbortController(), pending: Promise.resolve(), end: 0};
+    live.mrt2Stream = {
+      controller: new AbortController(), pending: Promise.resolve(), ready: [], scheduleTimer: null, end: 0,
+    };
     live.streamRecording = new StreamRecording();
   }
   live.output = live.clock.createGain();

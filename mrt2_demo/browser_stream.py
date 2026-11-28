@@ -20,7 +20,7 @@ from .plan_conditioning import band_plan_style
 
 CHANNELS = 2
 SAMPLE_BYTES = CHANNELS * 2
-STREAM_LEAD_S = .20
+STREAM_LEAD_S = .85
 # MLX streams are thread-local. HTTP handlers can change between bars.
 _mlx_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jam-mrt2-mlx")
 _mlx_cache = local()
