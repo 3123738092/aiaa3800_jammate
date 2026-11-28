@@ -24,17 +24,28 @@ def part_name(scope):
     return program_to_instrument_name(program).lower() if program is not None else PARTS.get(scope, scope)
 
 
-def score_stream_style(style, state, *, lead_voice=None):
+def _described_part(part, name):
+    level = "prominent " if part.level >= .65 else "soft " if part.level < .4 else ""
+    density = "sparse " if part.density < .8 else ""
+    return level + density + name
+
+
+def score_stream_style(style, state, *, lead_voice=None, guitar_riff=False):
     """Describe the current audible lineup before any background style cues."""
     active = [part for part in state.layers if part.active and part.level > 0 and part.density > 0]
+    if guitar_riff and (style or "").strip().casefold() in {"", "solo drum groove", "drum groove"}:
+        # The neutral kit and bass setup already has a clean electric lead in the score.
+        roles = {"gm_27": "clean electric lead guitar playing a clear melodic riff",
+                 "bass": "fingered electric bassline underneath", "drums": "steady acoustic drums"}
+        players = {part.name: part for part in active}
+        return english_style(", ".join(_described_part(players[name], role) for name, role in roles.items()))
     names = [part_name(lead_voice if part.name == "lead" and lead_voice else part.name) for part in active]
     joined = ", ".join(names)
     families = {part.name for part in active}
     for family, pattern in _PART_WORDS.items():
         if re.search(pattern, joined, re.I):
             families.add(family)
-    pieces = [("solo " if len(active) == 1 else "") + (("prominent " if part.level >= .65 else
-               "soft " if part.level < .4 else "") + ("sparse " if part.density < .8 else "") + name)
+    pieces = [("solo " if len(active) == 1 else "") + _described_part(part, name)
               for part, name in zip(active, names)]
     for cue in re.split(r"[,;]", style or ""):
         cue = cue.strip()

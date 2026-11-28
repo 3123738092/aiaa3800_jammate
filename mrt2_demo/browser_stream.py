@@ -9,6 +9,7 @@ from time import monotonic
 
 import numpy as np
 
+from jammate.instruments import gm_program
 from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.backend_arrangement import MRTArrangement
 from jammate.render.mrt2_style import english_style
@@ -23,6 +24,7 @@ SAMPLE_BYTES = CHANNELS * 2
 STREAM_LEAD_S = .85
 SCORE_STREAM_LEAD_S = 2.6
 ENCODED_REPLAY_BARS = 6
+BRIDGE_FRAMES = round(.006 * SAMPLE_RATE)
 # MLX streams are thread-local. HTTP handlers can change between bars.
 _mlx_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jam-mrt2-mlx")
 _mlx_cache = local()
@@ -33,6 +35,14 @@ def _load_stream_model(size):
         _mlx_cache.model = create_mlxfn_model(size)
         _mlx_cache.size = size
     return _mlx_cache.model
+
+
+def _bridge_start(block, previous_sample):
+    pcm = np.frombuffer(block, dtype="<i2").reshape(-1, CHANNELS).copy()
+    edge = np.frombuffer(previous_sample, dtype="<i2")
+    fade = (.5 - .5 * np.cos(np.linspace(0., math.pi, BRIDGE_FRAMES)))[:, None]
+    pcm[:BRIDGE_FRAMES] = np.rint(edge + fade * (pcm[:BRIDGE_FRAMES].astype(float) - edge))
+    return pcm.tobytes()
 
 
 class BrowserMRT2Stream:
@@ -46,6 +56,10 @@ class BrowserMRT2Stream:
         self._encoded_prompt = None
         self._engine = self._style = self._state = None
         self._tail = b""
+        self._last_sample = None
+        self._previous_score = None
+        self._backing = None
+        self._guitar_riff = False
         self._held_pitches = {}
         self._buffered_bars = {}
         self._next_bar = 0
@@ -65,6 +79,29 @@ class BrowserMRT2Stream:
                 self._rendering.notify_all()
             finally:
                 self._rendering.release()
+
+    def _continue_score(self, state, layers, prompt):
+        previous = self._previous_score
+        names = {layer.name for layer in layers}
+        settings = (layers, state.tempo_bpm, state.beats_per_bar, state.key, state.chord_cycle,
+                    state.progression_variant, state.rhythm, state.texture, prompt)
+        self._previous_score = (names, settings)
+        if previous is None or self._state is None:
+            return False
+        previous_names, previous_settings = previous
+        added = names - previous_names
+        if previous_names and previous_names < names and len(added) == 1:
+            guitar, = added
+            program = gm_program(guitar)
+            if program is not None and 26 <= program <= 31:
+                self._backing = (guitar, previous_settings, self._state)
+        if self._backing and self._backing[0] not in names:
+            _, saved_settings, saved_state = self._backing
+            self._backing = None
+            if settings == saved_settings:
+                self._state = saved_state
+                return True
+        return False
 
     def diagnostics(self):
         with self._report_lock:
@@ -143,12 +180,28 @@ class BrowserMRT2Stream:
             prompt = band_plan_style(self.prompt, bar.state, bar.plan, tempo=self.explicit_tempo,
                                      key=self.explicit_key)
         else:
-            audible = {layer.name for layer in bar.state.layers
-                       if bar.state.playing and layer.active and layer.level > 0 and layer.density > 0}
+            layers = tuple(layer for layer in bar.state.layers
+                           if bar.state.playing and layer.active and layer.level > 0 and layer.density > 0)
+            audible = {layer.name for layer in layers}
             self._held_pitches = {key: length for key, length in self._held_pitches.items() if key[0] in audible}
-            prompt = (score_stream_style(bar.state.style or self.prompt, bar.state, lead_voice=self.lead_voice)
+            if audible != {"drums", "bass", "gm_27"}:
+                self._guitar_riff = False
+            else:
+                guitar = sorted((note for note in bar.notes if note.instrument == "gm_27"), key=lambda note: note.start)
+                if len(guitar) >= 2:
+                    self._guitar_riff = (len({note.pitch for note in guitar}) >= 2
+                                         and all(left.end <= right.start + 1e-9 for left, right in zip(guitar, guitar[1:])))
+            prompt = (score_stream_style(bar.state.style or self.prompt, bar.state, lead_voice=self.lead_voice,
+                                         guitar_riff=self._guitar_riff)
                       if bar.notes or self._held_pitches else None)
         active = prompt is not None or reference is not None
+        restored = False
+        if active and not self.direct and not reference:
+            restored = self._continue_score(bar.state, layers, prompt)
+        else:
+            self._previous_score = self._backing = None
+            self._guitar_riff = False
+        boundary_sample = self._tail[-SAMPLE_BYTES:] or self._last_sample
         source = ("audio", reference[0]) if reference else ("text", prompt)
         change = active and source != self._encoded_prompt
         if change:
@@ -174,6 +227,7 @@ class BrowserMRT2Stream:
                                    else "text" if self.direct else "text_pitch_drum"),
                   "first_model_pcm_ms": None}
         if active and not self.direct:
+            report["backing_context_restored"] = restored
             report["grid"] = {"frame_rate": SAMPLE_RATE // FRAME_SAMPLES, "frames": count,
                               "pitch_cells": int(np.count_nonzero(notes)), "drum_frames": int(np.count_nonzero(drums)),
                               "held_pitches": len(self._held_pitches)}
@@ -197,6 +251,8 @@ class BrowserMRT2Stream:
                 block = _mlx_worker.submit(self._render, conditioning).result()
                 if block is None:
                     return
+                if restored and frame == 0 and boundary_sample is not None:
+                    block = _bridge_start(block, boundary_sample)
                 elapsed_frames.append(monotonic() - frame_start)
                 if report["first_model_pcm_ms"] is None:
                     report["first_model_pcm_ms"] = round((monotonic() - received) * 1000, 3)
@@ -206,6 +262,8 @@ class BrowserMRT2Stream:
             size = take * SAMPLE_BYTES
             self._tail = block[size:] if active else b""
             remaining -= take
+            if not remaining:
+                self._last_sample = block[size - SAMPLE_BYTES:size]
             yield block[:size]
         late_frames = sum(time > .04 for time in elapsed_frames)
         report.update(frames=len(elapsed_frames), frames_over_40ms=late_frames,

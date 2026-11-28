@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from dataclasses import replace
 from threading import get_ident
 from types import SimpleNamespace
 
@@ -6,6 +7,7 @@ import numpy as np
 import pytest
 
 from jammate.browser_jam import BrowserJam, BrowserJamService
+from jammate.interaction import Layer
 from jammate.music import Note
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.realtime import PlaybackBar
@@ -71,6 +73,43 @@ def test_preserves_model_state_and_fractional_frame_between_bars(model):
     assert model.frames[63][0][DRUM_KEY] == [1] and model.frames[63][1] == 63
     assert np.array_equal(pcm1[:960], np.tile(pcm0[-1], (960, 1)))
     assert len(model.prompts) == 1 and "warm band" in model.prompts[0] and len(model.threads) == 1
+
+
+@pytest.mark.parametrize("removal_tempo", [96, 100])
+def test_removing_electric_guitar_resumes_only_compatible_backing(model, removal_tempo):
+    clock = BarClock(SR)
+    backing = JamState(tempo_bpm=96, layers=(Layer("drums"), Layer("bass"),
+        Layer("keys", active=False), Layer("lead", active=False)))
+    full = replace(backing, layers=(*backing.layers, Layer("gm_27")))
+    playback = stream.BrowserMRT2Stream("solo drum groove", "mrt2_small")
+
+    for index, state in enumerate((backing, full, replace(backing, tempo_bpm=removal_tempo))):
+        notes = (Note(38, 4 * index, 1., instrument="bass"),)
+        if state is full:
+            notes += (Note(69, 4 * index, .5, instrument="gm_27"),
+                      Note(72, 4 * index + .5, .5, instrument="gm_27"))
+        rendered = consume(playback.open_bar(PlaybackBar(clock.reserve(state.tempo_bpm), notes, state=state), SR))
+        if index == 1:
+            last_full = rendered[-1]
+
+    matching = removal_tempo == 96
+    assert "clean electric lead guitar playing a clear melodic riff" in model.prompts[1]
+    assert "guitar" not in model.prompts[-1]
+    assert model.frames[125][1] == (63 if matching else 125)
+    assert playback.diagnostics()["recent_bars"][-1]["backing_context_restored"] is matching
+    if matching:
+        np.testing.assert_array_equal(rendered[0], last_full)
+        assert rendered[300, 0] == 64 * 32
+
+
+def test_guitar_chords_keep_the_original_style_condition(model):
+    clock = BarClock(SR)
+    state = JamState(tempo_bpm=96, layers=(Layer("drums"), Layer("bass"), Layer("gm_27"),
+        Layer("keys", active=False), Layer("lead", active=False)))
+    playback = stream.BrowserMRT2Stream("solo drum groove", "mrt2_small")
+    chords = tuple(Note(pitch, 0., .5, instrument="gm_27") for pitch in (60, 64, 67))
+    consume(playback.open_bar(PlaybackBar(clock.reserve(96), chords, state=state), SR))
+    assert model.prompts == ["drum kit, bass, electric guitar (clean), drum groove"]
 
 
 def test_encoded_requests_overlap_egress_and_can_replay_earlier_bars(model):
