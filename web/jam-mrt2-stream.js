@@ -41,19 +41,19 @@ async function downloadEncodedBar(session, bar, format, signal) {
   return bytes;
 }
 
-async function downloadWithReplay(download, deadline, replay) {
+// Use only with requests whose duplicate has no additional effect.
+export async function requestWithReplay(request, deadline, replay) {
   const cancel = new AbortController();
   const signal = AbortSignal.any([deadline, cancel.signal]);
   let timer;
   try {
-    const primary = download(signal);
+    const primary = request(signal);
     const first = await Promise.race([primary, new Promise(resolve => {
       timer = setTimeout(resolve, replay.afterMs);
     })]);
     if (first !== undefined) return first;
     if (!replay.needed()) return await primary;
-    // The backend keeps this bar's generated PCM. Start one more download of it.
-    return await Promise.any([primary, download(signal)]).catch(({errors}) => {
+    return await Promise.any([primary, request(signal)]).catch(({errors}) => {
       throw errors.find(error => !retryableConnection(error)) ?? errors[0];
     });
   } finally {
@@ -71,7 +71,7 @@ export async function readEncodedMrt2Bar(session, packet, signal, decoder, forma
     reconnect.throwIfAborted();
     try {
       const deadline = AbortSignal.any([reconnect, AbortSignal.timeout(10_000)]);
-      bytes = await (replay ? downloadWithReplay(download, deadline, replay) : download(deadline));
+      bytes = await (replay ? requestWithReplay(download, deadline, replay) : download(deadline));
       break;
     } catch (error) {
       if (reconnect.aborted || !retryableConnection(error)) throw error;

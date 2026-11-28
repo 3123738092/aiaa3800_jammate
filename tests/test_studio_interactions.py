@@ -176,6 +176,18 @@ def test_stream_can_change_tempo_after_reserved_short_bars(monkeypatch, command)
         assert previous.timing.end_sample == session.playing.timing.start_sample
         assert {note.instrument for note in session.playing.notes} == {"drums"}
 
+        # A delayed copy of the acknowledgement can arrive after the next bar.
+        applied = session.playing.timing
+        packet = session.packet
+        buffered = session.last_reserved_bar()
+        latest = session.poll(packet["bar"], packet["start"], buffered)
+        before = session.debug()
+        replay = session.poll(applied.bar_index, packet["end"], buffered)
+        after = session.debug()
+        assert replay == latest
+        assert after["sample"] == before["sample"]
+        assert after["turns"] == before["turns"]
+
 
 def test_warm_opening_can_repair_invalid_provider_selection():
     from types import SimpleNamespace

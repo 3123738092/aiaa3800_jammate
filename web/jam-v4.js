@@ -1,5 +1,5 @@
 import {decodeBase64, StudioPlayback, wave} from './jam-v4-playback.js';
-import {MRT2_RECONNECT_MS, retryableConnection} from './jam-mrt2-stream.js';
+import {MRT2_RECONNECT_MS, requestWithReplay, retryableConnection} from './jam-mrt2-stream.js';
 
 const $ = id => document.getElementById(id);
 const studio = window.JamMate;
@@ -65,10 +65,11 @@ async function checkIdle() {
   }
 }
 
-async function post(operation, body, timeout = 12_000) {
+async function post(operation, body, timeout = 12_000, signal) {
+  const deadline = AbortSignal.timeout(timeout);
   const response = await fetch('/api/jam/' + operation, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body), signal: AbortSignal.timeout(timeout),
+    body: JSON.stringify(body), signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
   });
   const result = await response.json().catch(error => {
     if (response.ok) throw error;
@@ -386,8 +387,12 @@ async function poll(active) {
       timer = setTimeout(() => poll(active), delay);
       return;
     }
-    // Recover a lost playback acknowledgement within the usual stream buffer.
-    const view = await post('poll', position, active.stream ? 2200 : 6000);
+    // New acknowledgements release more audio. Replay one slow response before the buffer runs out.
+    const isNewAck = active.scoreLookahead && active.streamDecoder && position.started > active.confirmedBar;
+    const view = isNewAck && active.pollUnavailableSince == null
+      ? await requestWithReplay(signal => post('poll', position, 2200, signal), active.abort.signal,
+        {afterMs: 850, needed: () => live === active})
+      : await post('poll', position, active.stream ? 2200 : 6000, active.abort.signal);
     if (live !== active) return;
     active.confirmedBar = view.current_bar ?? -1;
     await active.enqueue(view.next);

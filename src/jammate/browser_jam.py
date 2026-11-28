@@ -445,6 +445,9 @@ class BrowserJam:
         with self.lock:
             self.check_open()
             latest = self.playing.timing.bar_index if self.playing else -1
+            if self.stream_lookahead and started < latest:
+                # A redundant network acknowledgement can arrive after a later bar.
+                return self.snapshot(buffered)
             previously_reserved = 1
             if started != latest:
                 if not self.reserved or started != self.reserved.timing.bar_index:
