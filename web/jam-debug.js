@@ -1,4 +1,4 @@
-import {outputRows, pipelineStages, streamForBar} from './jam-pipeline-debug.js?v=pipeline-log';
+import {outputRows, pipelineStages, streamForBar} from './jam-pipeline-debug.js?v=score-mix';
 
 const colors = ['#71d7a4', '#f2bd73', '#7cb9f2', '#d7a7e9', '#f38f91', '#7bd8d7'];
 const pitches = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];

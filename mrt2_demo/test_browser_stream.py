@@ -112,6 +112,47 @@ def test_guitar_chords_keep_the_original_style_condition(model):
     assert model.prompts == ["drum kit, bass, electric guitar (clean), drum groove"]
 
 
+@pytest.mark.parametrize(("tempo", "beats"), [(120, 4), (110, 2)])
+def test_mrt2_guitar_mix_protects_backing_and_replays_the_same_pcm(monkeypatch, model, tempo, beats):
+    monkeypatch.setattr(stream, "SCORE_STREAM_LEAD_S", 10.)
+    # The fake model emits the same premixed guitar and bass in all three render paths.
+    def generate(*, conditioning, frames, state):
+        step = state or 0
+        t = np.arange(step * FRAME_SAMPLES, (step + 1) * FRAME_SAMPLES) / SAMPLE_RATE
+        wave = .12 * np.sin(2 * np.pi * 440 * t) + .20 * np.sin(2 * np.pi * 98 * t)
+        return SimpleNamespace(sample_rate=SAMPLE_RATE,
+                               samples=np.column_stack((wave, wave)).astype(np.float32)), step + 1
+
+    monkeypatch.setattr(model, "generate", generate)
+    backing = (Layer("bass"), Layer("drums"), Layer("keys", active=False), Layer("lead", active=False))
+    state = JamState(tempo_bpm=tempo, beats_per_bar=beats, layers=(*backing, Layer("gm_27", level=.7)))
+    notes = (Note(43, 0., beats, instrument="bass"), Note(69, 0., beats, instrument="gm_27"))
+    timing = BarClock(SR, beats_per_bar=beats).reserve(tempo)
+    focused = PlaybackBar(timing, notes, state=state)
+    plain = replace(focused, state=replace(state, layers=(*backing, Layer("gm_27"))))
+    pcm = stream.BrowserMRT2Stream("drum groove", "mrt2_small")
+    encoded = stream.BrowserMRT2Stream("drum groove", "mrt2_small")
+    dry = consume(stream.BrowserMRT2Stream("drum groove", "mrt2_small").open_bar(plain, SR))
+    wet = consume(pcm.open_bar(focused, SR))
+    archive = consume(encoded.open_bar(focused, SR, replayable=True))
+    replay = consume(encoded.open_bar(focused, SR, replayable=True))
+
+    assert wet.shape == dry.shape == (pcm.samples_for_bar(timing, SR), 2)
+    np.testing.assert_array_equal(wet, archive)
+    np.testing.assert_array_equal(wet, replay)
+    np.testing.assert_array_equal(wet[[0, -1]], dry[[0, -1]])
+    window = slice(SAMPLE_RATE // 4, 3 * SAMPLE_RATE // 4)
+    t = np.arange(window.start, window.stop) / SAMPLE_RATE
+
+    def amplitude(x, hz):
+        return abs(np.mean(x[window, 0] * np.exp(-2j * np.pi * hz * t)))
+
+    assert amplitude(wet, 440) > 1.2 * amplitude(dry, 440)
+    assert amplitude(wet, 98) == pytest.approx(amplitude(dry, 98), rel=.005)
+    assert pcm.diagnostics()["recent_bars"][-1]["guitar_focus_db"] == pytest.approx(6.)
+    assert encoded.diagnostics()["replayed_bars"] == 1
+
+
 def test_encoded_requests_overlap_egress_and_can_replay_earlier_bars(model):
     clock = BarClock(SR)
     state = JamState(tempo_bpm=96)

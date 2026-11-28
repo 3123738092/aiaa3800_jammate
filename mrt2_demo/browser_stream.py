@@ -3,7 +3,7 @@
 import math
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from threading import Condition, Event, Lock, local
 from time import monotonic
 
@@ -14,6 +14,7 @@ from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.backend_arrangement import MRTArrangement
 from jammate.render.mrt2_style import english_style
 
+from .guitar_mix import focus_chunks, guitar_focus
 from .inference import (
     DRUM_KEY, FRAME_SAMPLES, PITCH_KEY, SAMPLE_RATE, STYLE_KEY, create_mlxfn_model, encode_style, generate_frame,
 )
@@ -127,7 +128,7 @@ class BrowserMRT2Stream:
                 raise ValueError("这个 MRT2 音频小节已失效，请重新开始。")
             samples = self.samples_for_bar(bar.timing, clock_rate)
             try:
-                yield samples * SAMPLE_BYTES, self._chunks(bar, samples, reference)
+                yield samples * SAMPLE_BYTES, self._audio_chunks(bar, samples, reference)
             except BaseException:
                 self.close()
                 raise
@@ -156,7 +157,7 @@ class BrowserMRT2Stream:
                 raise ValueError("这个 MRT2 音频小节已失效，请重新开始。")
             samples = self.samples_for_bar(bar.timing, clock_rate)
             try:
-                raw = b"".join(self._chunks(bar, samples, reference))
+                raw = b"".join(self._audio_chunks(bar, samples, reference))
                 if len(raw) != samples * SAMPLE_BYTES:
                     raise ValueError("MRT2 小节未生成完整。")
             except BaseException:
@@ -170,6 +171,17 @@ class BrowserMRT2Stream:
         finally:
             self._rendering.notify_all()
             self._rendering.release()
+
+    def _audio_chunks(self, bar, samples, reference):
+        focus = guitar_focus(bar) if not self.direct and reference is None else None
+        with closing(self._chunks(bar, samples, reference)) as chunks:
+            if focus is None:
+                yield from chunks
+                return
+            yield from focus_chunks(chunks, samples, focus)
+        with self._report_lock:
+            if self._reports and self._reports[-1]["bar"] == bar.timing.bar_index:
+                self._reports[-1]["guitar_focus_db"] = round(focus[0], 2)
 
     def _chunks(self, bar, samples, reference):
         received = monotonic()
