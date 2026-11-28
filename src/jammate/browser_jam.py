@@ -579,9 +579,12 @@ class BrowserJam:
                 self.debug_turns[event.event_id]["input_events"] = [item.to_dict() for item in batch]
             if len(self.debug_turns) > DEBUG_HISTORY:
                 del self.debug_turns[next(iter(self.debug_turns))]
-            if self.reserved is not None:
-                # This buffer is already committed to the browser's playback
-                # timeline. Apply new observations after its start is confirmed.
+            # Scored MRT2 input registers material without changing the
+            # sounding backing. Plan past the buffer while it plays, unless a
+            # previous plan still needs to receive its playback acknowledgement.
+            can_plan_ahead = (self.stream_lookahead and self.playing is not None
+                              and self.deferred is None and not self.runtime.has_pending_change)
+            if self.reserved is not None and not can_plan_ahead:
                 self.deferred = batch
                 self.deferred_after = self.last_reserved_bar()
                 self.update_feedback(status="buffered")

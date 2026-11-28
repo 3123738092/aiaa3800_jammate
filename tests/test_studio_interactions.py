@@ -157,6 +157,11 @@ def test_stream_can_change_tempo_after_reserved_short_bars(monkeypatch, command)
         session.poll(0, 0, 3)
         sent = session.submit(command)
         reserved = session.last_reserved_bar()
+        assert session.future is not None
+        session.future.result(timeout=3)
+        prepared = next(row for row in session.debug()["turns"] if row["input_event"]["event_id"] == sent["id"])
+        assert prepared["bound_plan"]["effective_at"]["bar"] == reserved + 1
+        assert "playback_receipt" not in prepared
         previous = session.playing
         for _ in range(12):
             packet = session.packet
@@ -187,6 +192,30 @@ def test_stream_can_change_tempo_after_reserved_short_bars(monkeypatch, command)
         assert replay == latest
         assert after["sample"] == before["sample"]
         assert after["turns"] == before["turns"]
+
+
+def test_stream_defers_an_edit_if_a_previous_plan_is_already_in_the_buffer(monkeypatch):
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    with closing(BrowserJamService()) as service:
+        opening = service.dispatch("start", {"renderer": "mrt2_stream", "stream_lookahead": True,
+            "opening_mode": "cold", "meter": "6/8", "bpm": 110, "opening": {"text": "只要鼓点"}})
+        jam = service.sessions[opening["session"]]
+        jam.poll(0, 0, 3)
+        old = jam.submit("把速度调到 100 BPM")
+        jam.future.result(timeout=3)
+        plan = next(row["bound_plan"] for row in jam.debug()["turns"] if row["input_event"]["event_id"] == old["id"])
+        boundary = plan["effective_at"]["bar"]
+        packet = jam.packet
+        jam.poll(packet["bar"], packet["start"], jam.last_reserved_bar())
+        assert jam.last_reserved_bar() == boundary
+        newer = jam.submit("把速度调到 120 BPM")
+        assert newer["status"] == "buffered"
+
+        while jam.playing.timing.bar_index < boundary:
+            packet = jam.packet
+            jam.poll(packet["bar"], packet["start"], jam.last_reserved_bar())
+        assert jam.playing.started.plan_id == plan["plan_id"]
+        assert jam.manager.state.tempo_bpm == 100
 
 
 def test_named_guitar_riff_and_followups_keep_the_same_part():

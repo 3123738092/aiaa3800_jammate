@@ -167,6 +167,10 @@ class RealtimeSession:
     def sample(self) -> int:
         return self._sample
 
+    @property
+    def has_pending_change(self) -> bool:
+        return self._queued is not None
+
     def schedule_window(self) -> tuple[ScheduleSlot, ...]:
         """Upcoming writable boundaries in the same sample domain as advance_to."""
         clock = copy(self._clock)
