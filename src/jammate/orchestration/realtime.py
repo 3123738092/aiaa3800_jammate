@@ -9,6 +9,7 @@ from copy import copy
 from dataclasses import dataclass, replace
 
 from jammate.contracts import BandPlan, InputEvent, PlanError
+from jammate.generate.harmony import harmony_cycle
 from jammate.interaction import TransportPosition
 from jammate.music import Note
 from jammate.render.clock import BarClock, BarTiming
@@ -87,6 +88,14 @@ class BoundDecision:
 class PreparedChange:
     decision: BoundDecision
     performance: PlannedPerformance
+    repeat_layer: str | None = None
+
+
+@dataclass(frozen=True)
+class _RepeatingPart:
+    name: str
+    performance: PlannedPerformance
+    state: JamState
 
 
 @dataclass(frozen=True)
@@ -143,6 +152,7 @@ class RealtimeSession:
         self._queued: PreparedChange | None = None
         self._active: PlannedPerformance | None = None
         self._active_plan: BandPlan | None = None
+        self._repeating_part: _RepeatingPart | None = None
         self.conditioning_only = conditioning_only
         if opening_plan is not None:
             request = DecisionRequest(manager.current_batch(), initial, (), 0, 0)
@@ -213,15 +223,17 @@ class RealtimeSession:
         source = state.with_updates(position=replace(state.position, next_bar=slot.bar))
         return BoundDecision(request, slot, BandPlan.from_dict(data), source)
 
-    def schedule(self, change: PreparedChange, *, reuse_local_score=False) -> bool:
+    def schedule(self, change: PreparedChange, *, reuse_local_score=False, repeat_layer=None) -> bool:
         """Queue one prepared plan, rechecking request and deadline on the owner."""
         decision = change.decision
         self._require_current(decision.request)
         if (reuse_local_score and self._active is not None and not self.conditioning_only
                 and change.performance.beats_per_bar == self._active.beats_per_bar):
             change = self._reuse_local_score(change)
+        if repeat_layer is not None:
+            change = replace(change, repeat_layer=repeat_layer)
         if self._queued is not None:
-            if self._queued is change or (reuse_local_score and self._queued == change):
+            if self._queued is change or ((reuse_local_score or repeat_layer is not None) and self._queued == change):
                 return False
             raise PlanError("a plan is already scheduled for this decision")
         if self.sample > decision.slot.enqueue_deadline_sample or decision.slot not in self.schedule_window():
@@ -313,6 +325,7 @@ class RealtimeSession:
         """Project a short buffer without advancing the transport or applying a receipt."""
         clock = copy(self._clock)
         state, performance, plan = self.manager.state, self._active, self._active_plan
+        part = self._repeating_part
         queued = self._queued
         bars = []
         for _ in range(count):
@@ -322,19 +335,63 @@ class RealtimeSession:
                 state = project(state, queued.decision.plan)
                 if not queued.decision.keeps_playing_material():
                     performance = queued.performance
+                part = self._repeat_after_change(part, queued, state)
                 if plan is None or queued.decision.updates_conditioning():
                     plan = queued.decision.plan
             clock.beats_per_bar = state.beats_per_bar
             timing = clock.reserve(state.tempo_bpm)
-            bars.append(self._make_bar(timing, state, performance, plan))
+            bars.append(self._make_bar(timing, state, performance, plan, part=part))
         return tuple(bars)
 
-    def _make_bar(self, timing, state, performance, plan, receipt=None):
+    @staticmethod
+    def _repeat_after_change(part, change, state):
+        if change.repeat_layer is not None:
+            cycle_length = len(harmony_cycle(state)) or 1
+            if change.performance.bars % cycle_length == 0:
+                return _RepeatingPart(change.repeat_layer, change.performance, state)
+            return None
+        if part is None:
+            return None
+        source = part.state
+        if (not state.playing or not state.layer(part.name).active or source.beats_per_bar != state.beats_per_bar
+                or source.key != state.key or source.style != state.style
+                or source.progression_start_bar != state.progression_start_bar
+                or harmony_cycle(source) != harmony_cycle(state)):
+            return None
+        for action in change.decision.plan.actions:
+            if action["scope"] not in {part.name, "band"}:
+                continue
+            if action["action"] not in {"PRESERVE", "SIMPLIFY"} and not (
+                action["action"] == "ADJUST_FEEL" and action["parameters"].keys() == {"level_delta"}
+            ):
+                return None
+        return part
+
+    def _make_bar(self, timing, state, performance, plan, receipt=None, *, part=None):
         if plan is not None:
             data = plan.to_dict()
             if timing.bar_index >= data["effective_at"]["bar"] + data["valid_for_bars"]:
                 plan = None
         notes = () if self.conditioning_only else self._bar_notes(state, performance, timing.bar_index)
+        if part is not None:
+            bar = timing.bar_index
+            pattern = part.performance
+            original = pattern.start_bar + (bar - pattern.start_bar) % pattern.bars
+            before, after = part.state.layer(part.name), state.layer(part.name)
+            shift = (bar - original) * state.beats_per_bar
+            line = tuple(n.shifted(shift) for n in _notes_in_bar(pattern, original) if n.instrument == part.name)
+            if before != after:
+                # The saved notes already include the original mix settings.
+                density = min(1., after.density / before.density)
+                gain = after.level / before.level
+                relative_layer = replace(after, density=density, level=.5)
+                relative_state = state.with_updates(layers=tuple(
+                    relative_layer if layer.name == part.name else layer for layer in state.layers
+                ))
+                line = tuple(replace(n, velocity=max(1, min(127, round(n.velocity * gain))))
+                             for n in apply_layer_settings(line, relative_state, bar=bar) if gain)
+            backing = tuple(n for n in notes if n.instrument != part.name)
+            notes = tuple(sorted(backing + line, key=lambda n: (n.start, n.instrument, n.pitch)))
         return PlaybackBar(timing, notes, receipt, plan=plan, state=state)
 
     @staticmethod
@@ -361,6 +418,7 @@ class RealtimeSession:
                     receipt = PlaybackStarted(self.manager.state.session_id, plan.plan_id, bar, start)
                     if not queued.decision.keeps_playing_material():
                         self._active = performance
+                    self._repeating_part = self._repeat_after_change(self._repeating_part, queued, self.manager.state)
                     if self._active_plan is None or queued.decision.updates_conditioning():
                         self._active_plan = plan
         state = self.manager.state
@@ -371,7 +429,7 @@ class RealtimeSession:
             self.manager.update_transport(bar=bar, beat=0., next_bar=bar + 1)
         if self._active is not None and bar >= self._active.start_bar + self._active.bars:
             self._active = None
-        return self._make_bar(timing, state, self._active, self._active_plan, receipt)
+        return self._make_bar(timing, state, self._active, self._active_plan, receipt, part=self._repeating_part)
 
     def advance_to(self, sample: int) -> tuple[PlaybackBar, ...]:
         """Stand in for the playback driver, reporting bars as they start."""

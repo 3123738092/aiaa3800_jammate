@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 import json
 from threading import Event
 
@@ -9,7 +10,8 @@ from jammate.contracts import PlanError
 from jammate.contracts.adapters import from_system, from_text
 from jammate.generate.arranger import chord_for_bar
 from jammate.generate.harmony import harmony_cycle
-from jammate.music import Key
+from jammate.music import Key, Note
+from jammate.orchestration.addition_intent import guitar_command_plan
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.llm import LLMAgent, ModelReply
 from jammate.orchestration.llm_config import LLMConfig
@@ -96,6 +98,50 @@ def test_repeat_request_for_more_instruments_reports_the_existing_lineup():
     assert "木吉他已经加入" in plan.to_dict()["unresolved"][0]
     assert runtime.manager.hold(plan)
     assert sum(layer.name == "guitar" for layer in runtime.manager.state.layers) == 1
+
+
+def test_named_guitar_riff_continues_and_level_edit_reuses_the_same_notes():
+    initial = JamState(session_id="live-test", auto_harmony=False)
+    runtime = RealtimeSession(StateManager(initial), sample_rate=1000)
+    runtime.advance_to(0)
+    request = observe(runtime, "来个清楚的电吉他 riff", "riff")
+    plan, _ = guitar_command_plan(request.events, request.state, "riff", {27: "Clean"})
+    change = prepare(runtime, request, plan)
+    source = change.performance
+    riff = tuple(Note(69 + offset, 4.0 * bar + offset / 2., .5, 60, "gm_27")
+                 for bar in range(source.start_bar, source.start_bar + source.bars) for offset in range(2))
+    perf = replace(source, notes=tuple(n for n in source.notes if n.instrument != "gm_27") + riff)
+    assert runtime.schedule(replace(change, performance=perf), repeat_layer="gm_27")
+    at = change.decision.slot.start_sample
+    joined, = runtime.advance_to(at)
+    step = joined.timing.end_sample - at
+    runtime.advance_to(at + (source.bars - 1)*step)
+    looped, = runtime.advance_to(at + source.bars*step)
+    assert looped.plan is None
+    assert scoped(looped.notes, "gm_27") == tuple(n.shifted(4*source.bars) for n in riff[:2])
+
+    request = observe(runtime, "吉他再突出一点，bass 不要变，鼓也保持", "louder")
+    plan, _ = guitar_command_plan(request.events, request.state, "louder", {27: "Clean"})
+    louder = prepare(runtime, request, plan)
+    point = louder.decision.slot
+    assert runtime.schedule(louder, reuse_local_score=True)
+    predicted = runtime.preview_next_bar()
+    raised, = runtime.advance_to(point.start_sample)
+    assert predicted.notes == raised.notes
+    assert raised.started.plan_id == plan.plan_id
+    assert scoped(raised.notes, "gm_27") == tuple(
+        replace(n.shifted(4*(point.bar - source.start_bar)), velocity=84) for n in riff[:2]
+    )
+    assert scoped(raised.notes, "bass") == scoped(prepare_bar(request.state, point.bar), "bass")
+    assert scoped(raised.notes, "drums") == scoped(prepare_bar(request.state, point.bar), "drums")
+
+    request = observe(runtime, "去掉吉他，保留鼓和 bass", "mute")
+    plan, _ = guitar_command_plan(request.events, request.state, "mute", {27: "Clean"})
+    mute = prepare(runtime, request, plan)
+    assert runtime.schedule(mute, reuse_local_score=True)
+    stopped, = runtime.advance_to(mute.decision.slot.start_sample)
+    assert not scoped(stopped.notes, "gm_27")
+    assert not scoped(runtime.preview_next_bar().notes, "gm_27")
 
 
 def test_llm_arrangement_changes_multiple_parts_and_persists_past_the_plan():

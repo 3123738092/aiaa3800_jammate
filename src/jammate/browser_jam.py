@@ -905,7 +905,8 @@ class BrowserJam:
                     try:
                         if bound.slot.bar <= self.last_reserved_bar():
                             raise PlanError("enqueue deadline missed")
-                        self.runtime.schedule(change, reuse_local_score=not use_score)
+                        repeat_layer = data["actions"][0]["scope"] if route == "scoped_guitar_riff" and use_score else None
+                        self.runtime.schedule(change, reuse_local_score=not use_score, repeat_layer=repeat_layer)
                     except PlanError as error:
                         if (str(error) != "enqueue deadline missed" or attempt or not allow_wait
                                 or self.turn_timing.target_bar is not None):
