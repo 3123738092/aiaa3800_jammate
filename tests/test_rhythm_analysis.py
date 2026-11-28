@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from jammate.analysis.rhythm import analyze_rhythm_audio, analyze_rhythm_bar, rhythm_from_onsets
+from jammate.analysis.rhythm import analyze_rhythm_audio, analyze_rhythm_bar, analyze_rhythm_feel, rhythm_from_onsets
 
 SR = 22050
 
@@ -60,6 +60,31 @@ def test_known_tempo_and_explicit_origin_preserve_a_leading_rest():
     audio = claps([.5, .75, 1.5], 2.1)
     context = analyze_rhythm_audio(audio, SR, tempo_hint=120, count_in=0, beat_origin_s=0)
     assert context.onset_beats == (1, 1.5, 3)
+
+
+def test_rhythm_sketch_keeps_soft_triplets_under_a_small_decode_difference():
+    from scipy.signal import butter, sosfiltfilt
+
+    rate = 16_000
+    rng = np.random.default_rng(5)
+    samples = np.zeros(rate * 2)
+    deviations = (0, -.024, .026, .032, -.028, .020)
+    gains = (.45, .10, .085, .46, .104, .10)
+    band = butter(2, (600, 7200), fs=rate, btype="bandpass", output="sos")
+    for index, (deviation, gain) in enumerate(zip(deviations, gains)):
+        start = round((.32 + index * (60 / 88 / 3) + deviation) * rate)
+        clap = sosfiltfilt(band, rng.standard_normal(620)) * np.exp(-np.linspace(0, 7, 620)) * gain
+        samples[start:start + len(clap)] += clap
+        echo = start + 700
+        samples[echo:echo + len(clap)] += .095 * clap
+    high = butter(3, 5200, fs=rate, btype="highpass", output="sos")
+    different_decode = samples - .28 * sosfiltfilt(high, samples)
+    expected = tuple(index / 3 for index in range(6))
+    for audio in (samples, different_decode):
+        context = analyze_rhythm_feel(audio, rate, 88, 2)
+        assert context.onset_beats == expected
+        assert context.beat_origin_s == pytest.approx(.32, abs=.015)
+        assert context.accents[0] > context.accents[1]
 
 
 @pytest.mark.integration

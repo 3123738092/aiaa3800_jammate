@@ -12,6 +12,7 @@ from typing import Sequence
 
 import librosa
 import numpy as np
+from scipy.ndimage import uniform_filter1d
 
 from jammate.analysis.tempo import ONSET_HOP, tempo_from_onsets
 from jammate.rhythm import RhythmContext
@@ -52,7 +53,8 @@ ignored. Multiple detections in one grid cell keep their strongest accent.
 
 def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
                         relative_peak_floor: float = .12,
-                        absolute_peak_floor: float = .01) -> tuple[np.ndarray, np.ndarray]:
+                        absolute_peak_floor: float = .01,
+                        refine_attacks: bool = False) -> tuple[np.ndarray, np.ndarray]:
     audio = np.asarray(y, dtype=np.float32)
     if audio.ndim != 1 or not np.isfinite(audio).all() or sr <= 0:
         raise ValueError("rhythm audio must be finite mono audio with a positive sample rate")
@@ -63,7 +65,9 @@ def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
     pad = int(round(0.1 * sr))
     padded = np.pad(audio, (pad, pad))
     onsets = librosa.onset.onset_detect(y=padded, sr=sr, hop_length=ONSET_HOP,
-                                       units="time", backtrack=backtrack) - pad / sr
+                                       units="time", backtrack=backtrack and not refine_attacks) - pad / sr
+    if refine_attacks:
+        return _sketch_attack_envelope(audio, sr, onsets)
     # Backtracking may land up to one analysis frame before the attack.
     onsets = np.maximum(0, onsets)
     onsets = np.unique(onsets[onsets < audio.size / sr])
@@ -72,6 +76,31 @@ def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
     keep = peaks >= max(absolute_peak_floor, max_peak * relative_peak_floor)
     peaks = peaks[keep]
     return onsets[keep], peaks / peaks.max() if peaks.size else peaks
+
+
+def _sketch_attack_envelope(audio, sr, candidates):
+    """Locate each spectral candidate at its nearby rise in short-window energy."""
+    energy = uniform_filter1d(np.square(audio, dtype=np.float64), max(1, round(.003 * sr)))
+    floor = max(.008 ** 2, .10 ** 2 * float(energy.max()))
+    attacks = {}
+    for candidate in candidates:
+        center = round(candidate * sr)
+        left = max(0, center - round(.024 * sr))
+        right = min(len(audio), center + round(.040 * sr))
+        if left >= right:
+            continue
+        peak = left + int(np.argmax(energy[left:right]))
+        power = energy[peak]
+        if power < floor:
+            continue
+        start = max(left, peak - round(.020 * sr))
+        quiet = np.flatnonzero(energy[start:peak] <= .16 * power)
+        attack = start + int(quiet[-1]) + 1 if quiet.size else start
+        attacks[peak] = min(attack, attacks.get(peak, attack))
+    peaks = sorted(attacks, key=attacks.get)
+    times = np.array([attacks[peak] for peak in peaks]) / sr
+    strengths = np.sqrt(energy[peaks])
+    return times, strengths / strengths.max() if strengths.size else strengths
 
 
 def analyze_rhythm_audio(y: np.ndarray, sr: int, tempo_hint: float | None = None,
@@ -133,7 +162,7 @@ def analyze_rhythm_bar(y: np.ndarray, sr: int, tempo_bpm: float,
 
 def analyze_rhythm_feel(y: np.ndarray, sr: int, tempo_bpm: float, beats_per_bar: int = 4) -> RhythmContext:
     """Quantize a short rhythm sketch to the supplied session tempo."""
-    onsets, accents = _onsets_and_accents(y, sr)
+    onsets, accents = _onsets_and_accents(y, sr, refine_attacks=True)
     if len(onsets) < 2:
         raise ValueError("至少需要两个清晰的节奏起音。")
     # Studio uses two dotted beats for 6/8. Preserve its three eighth-note subdivisions.
