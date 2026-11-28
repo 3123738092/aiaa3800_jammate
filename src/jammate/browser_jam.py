@@ -44,7 +44,7 @@ from jammate.orchestration.key_intent import explicit_key_plan
 from jammate.orchestration.progression_intent import asks_for_new_progression, explicit_progression_plan
 from jammate.orchestration.tempo_intent import compile_jev_tempo, explicit_tempo
 from jammate.orchestration.llm import LLMAgent, OpenAIProvider, ProviderFailure, validate_plan
-from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError
+from jammate.orchestration.llm_config import LLMConfig, LLMConfigurationError, studio_providers
 from jammate.orchestration.live_text import JEV_TIMEOUT, JevLiveTagger, LiveTextAgent
 from jammate.orchestration.live_timing import LiveTurnTiming, can_wait, target_position
 from jammate.orchestration.manager import StateManager
@@ -66,6 +66,7 @@ from jammate.studio_input import midi_phrase, pad_rhythm, studio_text, with_stud
 
 BUFFER_SECONDS = 1.0
 MRT2_BUFFER_SECONDS = 1.3
+MRT2_SCORE_BUFFER_SECONDS = 2.6
 MRT2_STREAM_RENDERERS = {"mrt2_stream", "mrt2_direct"}
 VOICE_LIMIT = 2 * 1024 * 1024
 DEBUG_HISTORY = 12
@@ -441,7 +442,8 @@ class BrowserJam:
                 end = self.playing.timing.end_sample
                 self.runtime.advance_to(max(self.runtime.sample, min(sample, end - 1)))
                 self.refresh_wait()
-                buffer_s = MRT2_BUFFER_SECONDS if self.mrt2_stream is not None else BUFFER_SECONDS
+                buffer_s = (MRT2_SCORE_BUFFER_SECONDS if self.renderer == "mrt2_stream" else
+                            MRT2_BUFFER_SECONDS if self.mrt2_stream is not None else BUFFER_SECONDS)
                 if self.reserved is None and (self.renderer == "mrt2"
                                               or end - self.runtime.sample <= round(SR * buffer_s)):
                     self.reserve()
@@ -924,6 +926,11 @@ class BrowserJamService:
         except LLMConfigurationError:
             return None
 
+    def studio_providers(self):
+        if find_spec("openai") is None:
+            return {}
+        return studio_providers(self.optional_config())
+
     @staticmethod
     def recording(body):
         if not isinstance(body, dict):
@@ -1143,7 +1150,10 @@ class BrowserJamService:
     def dispatch(self, operation, body):
         if operation == "status":
             llm = self.optional_config()
-            llm_ready = llm is not None
+            providers = self.studio_providers()
+            preferred = os.getenv("JAMMATE_STUDIO_LLM_DEFAULT")
+            default_id = preferred if preferred in providers else next(iter(providers), None)
+            llm_ready = llm is not None or bool(providers)
             catalog = None
             if self.soundfont and self.soundfont.programs:
                 catalog = {
@@ -1154,7 +1164,11 @@ class BrowserJamService:
             stream_ready = self.mrt2_stream_available()
             speech_ready = bool(getattr(self.audio_router, "dictation_ready", False))
             return {"studio_v4": True, "release": os.getenv("JAMMATE_RELEASE"),
+                    "studio_requires_stream": bool(os.getenv("JAMMATE_PUBLIC_ORIGIN")),
                     "llm_ready": llm_ready, "llm_model": llm.model if llm else None,
+                    "llm_backend_default": default_id,
+                    "llm_backends": [{"id": identifier, "label": label, "model": config.model}
+                                     for identifier, (label, config) in providers.items()],
                     "local_scoped_opening": True, "voice_wake": speech_ready,
                     "speech_ready": speech_ready, "speech_mode": "server" if speech_ready else "browser",
                     "humming_correction_ready": bool(self.humming_provider()) or llm_ready,
@@ -1187,6 +1201,13 @@ class BrowserJamService:
             return {"offer": {"id": idea, "message": STUDIO_INTROS[idea]["message"], "kind": "opening"}}
         if operation == "start":
             agent = body.get("agent", "rule")
+            identifier = body.get("llm_backend")
+            selected = None
+            if identifier is not None:
+                if not isinstance(identifier, str) or (selected := self.studio_providers().get(identifier)) is None:
+                    raise ValueError("所选 LLM 后端未配置，请在设置里重新选择。")
+            selected_config = selected[1] if selected else None
+            style_config = (lambda: selected_config) if selected_config else self.optional_config
             mode = body.get("opening_mode", "warm")
             renderer, arrangement = body.get("renderer", "synth"), body.get("arranger", "rule")
             profile = body.get("profile", "electric")
@@ -1233,7 +1254,7 @@ class BrowserJamService:
             audio_references = {} if renderer == "mrt2_direct" and body.get("mrt2_audio_reference") is True else None
             events = self.opening_events(opening, bpm=bpm_override, audio_references=audio_references, beats=beats)
             if agent == "llm" or arrangement == "llm_all":
-                config = self.config()
+                config = selected_config or self.config()
             else:
                 config = self.optional_config() if mode == "warm" and renderer != "mrt2_direct" else None
             programs = self.soundfont.programs if self.soundfont else {}
@@ -1265,16 +1286,17 @@ class BrowserJamService:
             selection.setdefault("settings", {})["beats_per_bar"] = state.beats_per_bar
             if renderer in {*MRT2_STREAM_RENDERERS, "mrt2"}:
                 text = next((event.payload["text"] for event in events if event.event_type == "speech"), "")
-                style = selection.get("style_hint") or resolve_style(text, self.optional_config)
+                style = selection.get("style_hint") or resolve_style(text, style_config)
                 if mode == "humming" or selection.get("develop_humming"):
                     style = ", ".join(filter(None, (style, "continue the hummed melody")))
                 state = state.with_updates(style=style)
             make_agent = RuleAgent
+            jev = self.jev if identifier in (None, "relay") else None
             if agent == "llm":
                 options = {"execution_validator": project} if arrangement == "llm_all" or renderer == "mrt2_direct" else {}
                 make_agent = lambda: LiveTextAgent(
                     LLMAgent(config, fallback="error", soundfont_programs=programs,
-                             arrangement_enabled=arrangement == "llm_all", capture_replies=True, **options), self.jev,
+                             arrangement_enabled=arrangement == "llm_all", capture_replies=True, **options), jev,
                 )
             with self.lock:
                 now = monotonic()
@@ -1286,15 +1308,16 @@ class BrowserJamService:
                 session = BrowserJam(state.tempo_bpm, make_agent, self.workers, soundfont=self.soundfont,
                                      renderer=renderer, profile=profile, timbres=timbres,
                                      arrangement_config=config if arrangement == "llm_all" else None,
-                                     decision_timeout=config.timeout_s + (JEV_TIMEOUT if self.jev else 0.) if agent == "llm" else 0.,
+                                     decision_timeout=config.timeout_s + (JEV_TIMEOUT if jev else 0.) if agent == "llm" else 0.,
                                      preview_lock=self.preview_lock, opening=(state, events, selection),
-                                     preview_workers=self.preview_workers, style_config=self.optional_config,
+                                     preview_workers=self.preview_workers, style_config=style_config,
                                      audio_references=audio_references)
                 session.reserve()
                 if mode in {"cold", "humming"} and renderer == "mrt2":
                     session.start_opening_preview()
                 self.sessions[session.id] = session
-                return {**session.snapshot(), "opening": {
+                return {**session.snapshot(), "llm_backend": identifier, "llm_model": config.model if config else None,
+                        "opening": {
                     "mode": mode, "instruments": selection["instruments"], "model": selection["model"],
                     "reason": selection["reason"], "key": state.key.name if state.key else None,
                     "settings": selection["settings"],

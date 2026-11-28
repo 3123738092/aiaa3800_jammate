@@ -2,6 +2,8 @@ import {MRT2_RATE, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
 import {pcmWave, StreamRecording, waveHeader} from './jam-recording.js';
 
 const retainedSeconds = 600;
+const streamStartFrames = Math.round(1.6 * MRT2_RATE);
+const streamScheduleAhead = .32;
 export const decodeBase64 = value => Uint8Array.from(atob(value), character => character.charCodeAt(0));
 
 export function wave(samples, rate, channels = 1) {
@@ -23,7 +25,10 @@ export class StudioPlayback {
     this.epoch = null;
     this.streamEnd = 0;
     this.streamQueue = Promise.resolve();
+    this.streamReady = [];
+    this.streamTimer = null;
     this.gaps = 0;
+    this.boundaryGaps = 0;
   }
 
   attach(view) {
@@ -38,12 +43,13 @@ export class StudioPlayback {
     this.volumeChanges.push({at, value});
   }
 
-  schedule(buffer, planned) {
+  schedule(buffer, planned, boundary = true) {
     const now = this.clock.currentTime;
     this.epoch ??= now + .12 - planned;
     let at = this.epoch + planned;
     if (at < now + .008) {
       this.gaps++;
+      if (boundary) this.boundaryGaps++;
       at = now + .05;
       this.epoch = at - planned;
     }
@@ -55,28 +61,52 @@ export class StudioPlayback {
     return at;
   }
 
+  scheduleStream() {
+    if (this.abort.signal.aborted || this.streamTimer !== null || this.streamReady.length === 0) return;
+    if (this.epoch === null) {
+      const {packet} = this.streamReady[0];
+      const last = this.streamReady.at(-1);
+      const pendingFrames = last.offset + last.pcm.byteLength / 4;
+      if (pendingFrames < Math.min(streamStartFrames, packet.pcm_frames)) return;
+    }
+    try {
+      while (this.streamReady.length) {
+        const {packet, pcm, offset} = this.streamReady[0];
+        const planned = packet.start / this.rate + offset / MRT2_RATE;
+        if (this.epoch !== null && this.epoch + planned - this.clock.currentTime > streamScheduleAhead) {
+          this.streamTimer = setTimeout(() => {
+            this.streamTimer = null;
+            this.scheduleStream();
+          }, 20);
+          return;
+        }
+        this.streamReady.shift();
+        const buffer = stereoPcmBuffer(this.clock, pcm);
+        const at = this.schedule(buffer, planned, offset === 0);
+        this.streamEnd = at + buffer.duration;
+        if (offset === 0) this.markers.push({at, bar: packet.bar});
+        this.markersStart ??= at;
+        if (at - this.markersStart < retainedSeconds) this.stream.append(packet.bar, at, pcm);
+      }
+    } catch (error) {
+      this.onStreamError(error);
+    }
+  }
+
   async enqueue(packet) {
     if (!packet || packet.bar <= this.buffered || this.abort.signal.aborted) return;
     const start = packet.start / this.rate;
     if (this.stream) {
       this.buffered = packet.bar;
-      this.streamQueue = this.streamQueue.then(() => readMrt2Bar(
-        this.id, packet, this.abort.signal, async (pcm, offset) => {
-          const planned = start + offset / MRT2_RATE;
-          while (!this.abort.signal.aborted && this.epoch !== null
-                 && this.epoch + planned - this.clock.currentTime > .32) {
-            await new Promise(resolve => setTimeout(resolve, 20));
-          }
-          if (this.abort.signal.aborted) return;
-          const buffer = stereoPcmBuffer(this.clock, pcm);
-          const at = this.schedule(buffer, planned);
-          this.streamEnd = at + buffer.duration;
-          if (!offset) this.markers.push({at, bar: packet.bar});
-          this.markersStart ??= at;
-          // Keep the export window bounded across long sessions.
-          if (at - this.markersStart < retainedSeconds) this.stream.append(packet.bar, at, pcm);
-        }
-      )).catch(error => {
+      this.streamQueue = this.streamQueue.then(() => {
+        if (this.abort.signal.aborted) return;
+        const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(45_000)]);
+        return readMrt2Bar(this.id, packet, signal, (pcm, offset) => {
+          if (signal.aborted) return;
+          this.streamReady.push({packet, pcm, offset});
+          this.scheduleStream();
+        });
+      }).catch(error => {
         if (!this.abort.signal.aborted) this.onStreamError(error);
       });
       return;
@@ -144,6 +174,8 @@ export class StudioPlayback {
 
   close() {
     this.abort.abort();
+    clearTimeout(this.streamTimer);
+    this.streamReady.length = 0;
     return this.clock.close().catch(() => {});
   }
 }

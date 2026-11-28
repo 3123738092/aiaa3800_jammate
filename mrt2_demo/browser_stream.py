@@ -21,6 +21,7 @@ from .plan_conditioning import band_plan_style
 CHANNELS = 2
 SAMPLE_BYTES = CHANNELS * 2
 STREAM_LEAD_S = .85
+SCORE_STREAM_LEAD_S = 2.6
 # MLX streams are thread-local. HTTP handlers can change between bars.
 _mlx_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jam-mrt2-mlx")
 _mlx_cache = local()
@@ -124,9 +125,10 @@ class BrowserMRT2Stream:
             yield self._tail
             remaining -= carry
             self._tail = b""
+        lead = STREAM_LEAD_S if self.direct else SCORE_STREAM_LEAD_S
         for frame in range(count):
             elapsed = (samples - remaining) / SAMPLE_RATE
-            if self._closed.wait(max(0., start + elapsed - STREAM_LEAD_S - monotonic())):
+            if self._closed.wait(max(0., start + elapsed - lead - monotonic())):
                 return
             if active:
                 conditioning = {STYLE_KEY: self._style}

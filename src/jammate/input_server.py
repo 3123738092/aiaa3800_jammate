@@ -65,6 +65,20 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition("?")
+        canonical = getattr(self.server, "canonical_origin", None)
+        if canonical and path in {"/jam.html", "/jam-classic.html"}:
+            host = self.headers.get("Host", "").lower()
+            bypass_local = host.split(":", 1)[0] in {"localhost", "127.0.0.1"}
+            classic = path == "/jam-classic.html"
+            explicit_classic = classic and "classic" in parse_qs(query).get("view", ())
+            if not bypass_local and (host != urlsplit(canonical).netloc or (classic and not explicit_classic)):
+                destination = "/jam-classic.html" if explicit_classic else "/jam.html"
+                self.send_response(302)
+                self.send_header("Location", canonical + destination + ("?" + query if query else ""))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
         if path == "/api/jam/mrt2-stream":
             if not self.same_workspace():
                 self.json_response(403, {"error": "请从工作台页面发起请求。"})
@@ -293,6 +307,8 @@ def main():
     ):
         server.fluidsynth, server.soundfont = args.fluidsynth, args.soundfont
         server.public_origins = public_origins
+        origins = os.getenv("JAMMATE_PUBLIC_ORIGIN", "").split(",")
+        server.canonical_origin = next((origin.strip() for origin in origins if origin.strip()), None)
         server.start_lock = Lock()
         server.pending_starts = 0
         drain_file = os.getenv("JAMMATE_DRAIN_FILE")

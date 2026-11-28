@@ -177,6 +177,26 @@ class OpenAIProvider:
                 if response.status != "completed":
                     raise ProviderFailure("incomplete_output")
                 content = response.output_text
+            elif self.config.provider in {"dashscope", "deepseek"}:
+                instruction = "Return exactly one JSON object matching this JSON Schema. " + json.dumps(
+                    schema, ensure_ascii=False, separators=(",", ":"))
+                prompt = [{**messages[0], "content": messages[0]["content"] + "\n" + instruction}, *messages[1:]]
+                enable_thinking = self.config.model == "qwen4-max"
+                if self.config.provider == "dashscope":
+                    extras = {"enable_thinking": enable_thinking}
+                    if enable_thinking:
+                        extras["reasoning_effort"] = self.config.reasoning_effort or "low"
+                else:
+                    extras = {"thinking": {"type": "disabled"}}
+                response = client.chat.completions.create(model=self.config.model, messages=prompt,
+                    response_format={"type": "json_object"}, max_tokens=self.config.max_output_tokens,
+                    extra_body=extras)
+                if not response.choices:
+                    raise ProviderFailure("empty_output")
+                choice = response.choices[0]
+                if choice.finish_reason != "stop":
+                    raise ProviderFailure("incomplete_output")
+                content = choice.message.content
             else:
                 options = {"reasoning_effort": self.config.reasoning_effort} if self.config.reasoning_effort is not None else {}
                 response = client.chat.completions.create(model=self.config.model, messages=messages,

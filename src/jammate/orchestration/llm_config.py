@@ -22,6 +22,7 @@ class LLMConfig:
     timeout_s: float = 20.
     max_output_tokens: int = 2400
     reasoning_effort: str | None = None
+    provider: str = "openai"
 
     def __post_init__(self):
         if not isinstance(self.api_key, str) or not self.api_key.strip():
@@ -33,6 +34,8 @@ class LLMConfig:
             raise LLMConfigurationError("base_url must be HTTPS without credentials, query or fragment")
         if self.api not in {"responses", "chat_completions"}:
             raise LLMConfigurationError("api must be responses or chat_completions")
+        if self.provider not in {"openai", "dashscope", "deepseek"}:
+            raise LLMConfigurationError("unsupported LLM provider")
         if isinstance(self.timeout_s, bool) or not math.isfinite(self.timeout_s) or not 0 < self.timeout_s <= 60:
             raise LLMConfigurationError("timeout_s must be within (0, 60]")
         if type(self.max_output_tokens) is not int or not 256 <= self.max_output_tokens <= 8192:
@@ -71,3 +74,27 @@ class LLMConfig:
     def public_info(self):
         return {"model": self.model, "api": self.api, "timeout_s": self.timeout_s,
                 "max_output_tokens": self.max_output_tokens, "reasoning_effort": self.reasoning_effort}
+
+
+def studio_providers(relay, environ=None):
+    """Build per-session providers. The UI receives only labels and model names."""
+    env = os.environ if environ is None else environ
+    providers = {}
+    secret = Path(env.get("JAMMATE_LLM_CONFIG", Path.home() / ".config/jammate/openai.json")).parent
+    try:
+        deepseek = LLMConfig.load(secret / "deepseek.secrets.json", environ={})
+    except LLMConfigurationError:
+        pass
+    else:
+        providers["deepseek"] = ("DeepSeek 官方", deepseek)
+    if key := env.get("DASHSCOPE_API_KEY", "").strip():
+        base = env.get("JAMMATE_BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        for identifier, label, model in (
+            ("bailian-flash", "百炼 · DeepSeek Flash", "deepseek-v4.1-flash-1017"),
+            ("bailian-qwen", "百炼 · Qwen4 Max", "qwen4-max"),
+        ):
+            providers[identifier] = (label, LLMConfig(key, model=model, base_url=base, api="chat_completions",
+                timeout_s=25, max_output_tokens=4096, reasoning_effort="low", provider="dashscope"))
+    if relay is not None:
+        providers["relay"] = ("GPT 中转", relay)
+    return providers

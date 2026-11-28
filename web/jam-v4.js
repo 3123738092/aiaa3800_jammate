@@ -14,6 +14,8 @@ const traces = new Map();
 let live, preparing, timer, publish, service, previewUrl, previewShown, previewPending, savedTake;
 let loadedRelease, releaseStatus;
 let checkingRelease = false;
+let backendPreference;
+try { backendPreference = localStorage.getItem('jammate-llm-backend'); } catch {}
 let failureCount = 0;
 let pendingTempo, pendingMeter;
 let lastActivity = performance.now();
@@ -102,9 +104,12 @@ function saveRequest(id, requestId) {
 }
 
 function studioProfile() {
+  const provider = service?.llm_backends?.find(item => item.id === backendPreference)
+    ?? service?.llm_backends?.find(item => item.id === service.llm_backend_default);
   return {agent: service?.llm_ready ? 'llm' : 'rule',
     arranger: service?.llm_ready ? 'llm_all' : 'rule',
-    renderer: service?.mrt2 ? 'mrt2' : 'synth'};
+    llm_backend: provider?.id,
+    renderer: service?.mrt2_stream ? 'mrt2_stream' : service?.studio_requires_stream ? null : 'synth'};
 }
 
 function renderConnection() {
@@ -112,11 +117,22 @@ function renderConnection() {
   const profile = studioProfile();
   $('backend-agent').textContent = !ready ? '未连接' : profile.agent === 'llm' ? '大模型 Agent' : '本地规则';
   $('backend-arranger').textContent = !ready ? '未连接' : profile.arranger === 'llm_all' ? '大模型编排' : '本地规则';
-  $('backend-renderer').textContent = !ready ? '未连接' : profile.renderer === 'mrt2'
-    ? '内置伴奏 · MRT2 试听' : '内置合成器';
+  $('backend-renderer').textContent = !ready ? '未连接' : profile.renderer === 'mrt2_stream'
+    ? 'MRT2 流式伴奏' : profile.renderer === null ? 'MRT2 流式不可用' : '本地合成器';
   $('backend-stop').disabled = !live?.id;
+  const choices = service?.llm_backends ?? [];
+  const selector = $('llm-backend');
+  $('model-setting').hidden = choices.length === 0;
+  if ([...selector.options].map(option => option.value).join() !== choices.map(item => item.id).join()) {
+    selector.replaceChildren(...choices.map(item => new Option(item.label, item.id)));
+  }
+  selector.value = profile.llm_backend ?? '';
+  selector.disabled = Boolean(live || preparing);
+  $('model-setting-note').textContent = selector.disabled
+    ? '结束会话后可切换' : '下次开演时生效';
+  const model = choices.find(item => item.id === profile.llm_backend)?.model ?? service?.llm_model;
   const features = [
-    service?.llm_ready ? (service.llm_model || '大模型') + ' 可用' : '大模型未配置',
+    service?.llm_ready ? (model || '大模型') : '大模型未配置',
     service?.speech_ready ? '语音可用' : '语音未配置',
     service?.release ? '后端 ' + service.release.slice(0, 7) : null,
   ];
@@ -284,6 +300,12 @@ async function inspect(active) {
     trace(id, 'playback', 'applied', turn.playback_receipt);
     trace(id, 'error', 'error', turn.error);
   }
+  const stream = data.mrt2_stream;
+  const bar = stream?.recent_bars?.at(-1);
+  if (bar) trace(active.id, 'render', 'completed', {
+    renderer: data.renderer, ...bar, generated_frames: stream.generated_frames,
+    buffer_reconnections: active.gaps, bar_boundary_reconnections: active.boundaryGaps,
+  });
   const scheduledNotes = (data.queued?.notes ?? data.current?.notes ?? []).map(note => ({
     pitch: note.pitch, startBeat: note.start, durationBeats: note.duration, track: note.instrument,
   }));
@@ -395,7 +417,7 @@ function failPlayback(error) {
   send({type: 'error', message: error.message || '播放中断。'});
 }
 
-async function launch(active, opening, requestId, ideaId) {
+async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
   if (live) throw new Error('已有演奏正在进行。');
   live = active;
   activity(false);
@@ -409,11 +431,12 @@ async function launch(active, opening, requestId, ideaId) {
     scheduledNotes: null, jamState: null, playbackReceipt: null, tracks: null});
   try {
     const profile = studioProfile();
-    const openingMode = profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
+    if (profile.renderer === null) throw new Error('MRT2 流式伴奏暂不可用，请稍后重新开演。');
+    openingMode ??= profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
     const useConfiguredTempo = tempoExplicit || opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
     const bpm = useConfiguredTempo && !opening.rhythm?.count_in_ms?.length ? config.bpm : null;
     const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm,
-      meter: config.meter, ...profile, allow_preview: profile.renderer === 'mrt2'}, 100_000);
+      meter: config.meter, ...profile}, 100_000);
     if (live !== active) {
       release(view.session);
       throw new Error('会话已取消。');
@@ -551,7 +574,8 @@ async function dispatch(action) {
       preparing = requestId;
       try {
         const active = await openPlayback();
-        await launch(active, {text: '完整乐队伴奏，' + config.bpm + ' BPM', target: 'band'}, requestId);
+        await launch(active, {text: 'Full band accompaniment, ' + config.bpm + ' BPM', target: 'band'}, requestId,
+          {openingMode: 'cold'});
       } finally {
         preparing = null;
         renderConnection();
@@ -643,7 +667,7 @@ $('suggestion-accept').onclick = async () => {
       saveRequest(feedback.id, requestId);
     } else {
       opening = await openPlayback();
-      await launch(opening, {text: accepted.message, target: 'band'}, requestId, accepted.id);
+      await launch(opening, {text: accepted.message, target: 'band'}, requestId, {ideaId: accepted.id});
     }
   } catch (error) {
     send({type: 'error', requestId, message: error.message});
@@ -667,6 +691,12 @@ $('backend-settings').onclick = () => {
   if (!studio.connected) void connect();
 };
 $('backend-stop').onclick = () => { stop(); $('backend-dialog').close(); };
+$('llm-backend').onchange = event => {
+  if (live || preparing) return;
+  backendPreference = event.target.value;
+  try { localStorage.setItem('jammate-llm-backend', backendPreference); } catch {}
+  renderConnection();
+};
 wavPlayer.volume = volume.band;
 wavPlayer.addEventListener('play', () => {
   const active = live;

@@ -222,8 +222,13 @@ protect real trace endpoints on the server as well.
       <div><dt>音符编排</dt><dd id="backend-arranger">正在连接</dd></div>
       <div><dt>声音</dt><dd id="backend-renderer">正在连接</dd></div>
     </dl>
+    <div class="model-setting" id="model-setting" hidden>
+      <label for="llm-backend">LLM 后端</label>
+      <select id="llm-backend" aria-describedby="model-setting-note"></select>
+      <p id="model-setting-note">下次开演时生效</p>
+    </div>
     <p id="backend-note" role="status"></p>
-    <div class="backend-links"><button id="backend-stop" class="inspector-trigger" type="button" disabled>结束会话</button><a href="jam-classic.html">经典工作台 · 键盘、设置与日志</a></div>
+    <div class="backend-links"><button id="backend-stop" class="inspector-trigger" type="button" disabled>结束会话</button><a href="jam-classic.html?view=classic">高级测试工作台</a></div>
   </form>
 </dialog>
 <section id="backend-output" hidden aria-label="音频输出">

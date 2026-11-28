@@ -6,6 +6,7 @@
 
 - 每个成员在自己的分支修改 `web/`，从仓库根目录运行 `python scripts/team_frontend.py`。在终端粘贴固定团队邀请链接，再打开 [本地 Studio](http://127.0.0.1:4188/jam.html)。修改前端文件后刷新页面。该程序只提供本机页面与转发 API，无需安装音频模型或保存供应商密钥。也可传 `--port 4190` 或 `--invite-file <团队邀请文本>`。
 - 本地页面的「设置」展示 Mac 当前后端提交号。团队共享 Mac 上的最新通过检查版本。需要联调尚未合入 `main` 的后端改动时，应在单独的服务环境测试。
+- 团队共用邀请链接里的 Studio。公开的旧工作台链接会转到 Studio，设置里的「高级测试工作台」仍可用于对照试听和 FluidSynth。用「LLM 后端」选择已配置的百炼模型、DeepSeek 官方或 GPT 中转。选择保存在当前浏览器，下次开演时使用，并固定在该会话内。
 - 代码进入 GitHub `main` 后，配有 Git 缓存的 Mac 每 20 秒检查一次，只拉取缺少的 Git 对象。前台网页每 5 秒检查发布状态，切回标签页会立刻检查。发现提交后显示「正在准备更新」，失败时保留旧版本并提示自动重试。候选版本在独立端口检查并合成开场。已有会话可以继续演奏，全部结束后自动切换，启动失败自动恢复上一版本。网页提示刷新时，可保存当前演奏后手动刷新。本地联调的前端文件随自己的 Git 检出更新。
 
 Mac 管理者在已有 `~/jammate-team` 安装上，从仓库运行 `~/jammate-team/python/bin/python3.12 deploy/macos/install-updater.py` 注册发布任务。发布与候选检查日志位于 `~/jammate-team/logs/com.jammate.team.update.{out,err}.log` 及 `candidate.log`。手动回退运行 `~/jammate-team/python/bin/python3.12 ~/jammate-team/bin/update.py --rollback`。回退会暂停自动发布。解决问题后删除 `~/jammate-team/config/deploy-paused` 即可恢复。
@@ -32,6 +33,8 @@ JAMMATE_MRT2_ENGINE=mlx .venv/bin/python -m jammate.render.mrt2 \
 
 把讯飞和 LLM 的配置放在仅服务账号可读的目录。用 `JAMMATE_XFYUN_ASR_CONFIG`、`JAMMATE_LLM_CONFIG` 指向这些文件，在同一服务环境中设置 `DASHSCOPE_API_KEY`。有独立总麦克风分类配置时，可以额外指定 `JAMMATE_AUDIO_ROUTER_CONFIG`。配置文件与环境变量均留在 Mac 服务端。
 
+Studio 的百炼模型使用同一个 `DASHSCOPE_API_KEY`。为官方 DeepSeek 准备同目录的 `deepseek.secrets.json`，使用 `https://api.deepseek.com`、`deepseek-flash`、`chat_completions` 和 `provider: "deepseek"`。设置 `JAMMATE_STUDIO_LLM_DEFAULT` 可覆盖部署默认选项。
+
 ## HTTPS 入口
 
 1. 为团队生成单独的测试口令，用 `caddy hash-password` 取散列，设置 `JAMMATE_TEAM_PASSWORD_HASH`。登录名缺省为 `jamteam`。运行 `caddy run --config deploy/macos/Caddyfile --adapter caddyfile`。
@@ -54,7 +57,7 @@ JAMMATE_MRT2_ENGINE=mlx .venv/bin/python -m jammate.render.mrt2 \
 | 冷启动和语音 | 首次允许浏览器使用麦克风。刷新后无须点 JamMate 的麦克风按钮，看到「在听」后说「Hey JamMate」或「Hey 旋律组」，再说「加一段 Bossa Nova 旋律」。用 `/jam.html?asr=xfyun`、`/jam.html?asr=qwen` 分别测试两家转写。浏览器如限制自动播放，页面仍可识别并显示指令。 |
 | Agent 和编排 | 在 Studio 直接发送「先来三拍子的鼓点」。演奏中改为 4/4，核对 InputEvent、JamState、BandPlan 和播放回执。 |
 | 拍手、哼唱、MIDI | 分别提交三种输入。在 Inspector 查看识别或导入结果，并确认乐队实际使用了素材。 |
-| 内置伴奏与 MRT2 | 在 Studio 听实时伴奏，并等待 MRT2 试听 WAV。需要单独比较 FluidSynth、MRT2 流式和独立生成时，从「设置」打开经典工作台。流式需收到连续 PCM 并验证可播放。 |
+| MRT2 流式伴奏 | 在 Studio 直接开场，确认连续多个小节收到可播放的 MRT2 PCM。在运行日志核对模型生成帧数、音高与鼓条件和缓冲重新接续次数。演奏中改拍号并核对播放回执。需要比较 FluidSynth、MRT2 独立生成或试听 WAV 时，从「设置」打开经典工作台。 |
 | 并行测试 | 两个浏览器分别开场、发指令和导出，核对每个窗口只看到自己的会话。记录两路 MRT2 同时运行时的首帧延迟和断音情况。 |
 
 临时联调用的团队登录仅适用于受控成员。语音片段会经 HTTPS 入口发送到 Mac，由所选的听写服务处理。团队成员可以在自己的会话里看到转写、计划和渲染记录。
