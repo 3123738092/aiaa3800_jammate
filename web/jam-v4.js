@@ -377,13 +377,23 @@ function showView(active, view) {
 async function poll(active) {
   let delay = 100;
   try {
+    const position = active.position();
+    // Between bar starts the compressed stream already owns its lookahead.
+    // A slow status-only query should not sit in front of the next acknowledgement.
+    if (active.scoreLookahead && active.streamDecoder && active.firstBar && !active.decisionBusy
+        && position.started === active.confirmedBar && active.pollUnavailableSince == null
+        && performance.now() - active.lastPollAt < 2000) {
+      timer = setTimeout(() => poll(active), delay);
+      return;
+    }
     // Recover a lost playback acknowledgement within the usual stream buffer.
-    const view = await post('poll', active.position(), active.stream ? 2200 : 6000);
+    const view = await post('poll', position, active.stream ? 2200 : 6000);
     if (live !== active) return;
     active.confirmedBar = view.current_bar ?? -1;
     await active.enqueue(view.next);
     if (live !== active) return;
     active.pollUnavailableSince = null;
+    active.lastPollAt = performance.now();
     showView(active, view);
     if (active.debugAt <= performance.now()) {
       active.debugAt = performance.now() + 900;
@@ -459,6 +469,7 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
       throw new Error('会话已取消。');
     }
     active.attach(view, {opus: service?.mrt2_opus, lossless: service?.mrt2_flac, parallel: service?.mrt2_parallel});
+    active.scoreLookahead = profile.renderer === 'mrt2_stream';
     config.meter = view.meter ?? config.meter;
     active.debugAt = 0;
     saveRequest(view.session, requestId);
