@@ -118,8 +118,12 @@ export class StudioPlayback {
 
   async receiveEncoded(request) {
     try {
+      const replay = this.epoch === null ? undefined : {
+        afterMs: Math.max(1500, (this.epoch + request.packet.start / this.rate - this.clock.currentTime - 1.25) * 1000),
+        needed: () => this.clock.state === 'running' && this.encodedPending[0] === request,
+      };
       request.pcm = await readEncodedMrt2Bar(this.id, request.packet, this.abort.signal,
-        this.streamDecoder, this.streamFormat);
+        this.streamDecoder, this.streamFormat, replay);
       if (this.abort.signal.aborted) return;
       // Requests may finish in a different order. Release only contiguous audio.
       while (this.encodedPending[0]?.pcm) {

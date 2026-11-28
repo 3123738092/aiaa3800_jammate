@@ -33,21 +33,49 @@ async function openMrt2Bar(session, bar, signal, format) {
   return response;
 }
 
-export async function readEncodedMrt2Bar(session, packet, signal, decoder, format) {
+async function downloadEncodedBar(session, bar, format, signal) {
+  const response = await openMrt2Bar(session, bar, signal, format);
+  const bytes = await response.arrayBuffer();
+  const length = Number(response.headers.get('Content-Length'));
+  if (length && bytes.byteLength !== length) throw new TypeError('MRT2 小节传输未完成。');
+  return bytes;
+}
+
+async function downloadWithReplay(download, deadline, replay) {
+  const cancel = new AbortController();
+  const signal = AbortSignal.any([deadline, cancel.signal]);
+  let timer;
+  try {
+    const primary = download(signal);
+    const first = await Promise.race([primary, new Promise(resolve => {
+      timer = setTimeout(resolve, replay.afterMs);
+    })]);
+    if (first !== undefined) return first;
+    if (!replay.needed()) return await primary;
+    // The backend keeps this bar's generated PCM. Start one more download of it.
+    return await Promise.any([primary, download(signal)]).catch(({errors}) => {
+      throw errors.find(error => !retryableConnection(error)) ?? errors[0];
+    });
+  } finally {
+    clearTimeout(timer);
+    cancel.abort();
+  }
+}
+
+export async function readEncodedMrt2Bar(session, packet, signal, decoder, format, replay) {
   const reconnect = AbortSignal.any([signal, AbortSignal.timeout(MRT2_RECONNECT_MS)]);
+  const download = deadline => downloadEncodedBar(session, packet.bar, format, deadline);
   let bytes;
   let retryDelay = 180;
   for (;;) {
     reconnect.throwIfAborted();
     try {
       const deadline = AbortSignal.any([reconnect, AbortSignal.timeout(10_000)]);
-      const response = await openMrt2Bar(session, packet.bar, deadline, format);
-      bytes = await response.arrayBuffer();
-      const length = Number(response.headers.get('Content-Length'));
-      if (length && bytes.byteLength !== length) throw new TypeError('MRT2 小节传输未完成。');
+      bytes = await (replay ? downloadWithReplay(download, deadline, replay) : download(deadline));
       break;
     } catch (error) {
       if (reconnect.aborted || !retryableConnection(error)) throw error;
+      replay = undefined;
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       retryDelay = Math.min(retryDelay * 2, 1250);
     }
