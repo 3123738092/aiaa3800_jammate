@@ -10,6 +10,7 @@ from jammate.contracts import PlanError
 from jammate.contracts.adapters import from_system, from_text
 from jammate.generate.arranger import chord_for_bar
 from jammate.generate.harmony import harmony_cycle
+from jammate.interaction import Layer
 from jammate.music import Key, Note
 from jammate.orchestration.addition_intent import guitar_command_plan
 from jammate.orchestration.agent import RuleAgent
@@ -100,10 +101,24 @@ def test_repeat_request_for_more_instruments_reports_the_existing_lineup():
     assert sum(layer.name == "guitar" for layer in runtime.manager.state.layers) == 1
 
 
-def test_named_guitar_riff_continues_and_level_edit_reuses_the_same_notes():
-    initial = JamState(session_id="live-test", auto_harmony=False)
+def test_authored_bass_and_guitar_continue_and_level_edits_keep_the_riff():
+    initial = JamState(session_id="live-test", auto_harmony=False,
+                       layers=(Layer("drums"), Layer("bass", active=False), Layer("keys"), Layer("lead")))
     runtime = RealtimeSession(StateManager(initial), sample_rate=1000)
     runtime.advance_to(0)
+    request = observe(runtime, "加一条弹性的贝斯线", "bassline")
+    plan = make_plan(request.state, request.events, "bassline", "FOLLOW",
+                     [{"action": "ADD_LAYER", "scope": "bass", "strength": .5, "parameters": {}}],
+                     ["tempo", "key", "progression", "playing", "groove"], {}, 4, "加贝斯", [])
+    bass = prepare(runtime, request, plan)
+    groove = tuple(Note(38, 4.*bar + 1.25, .5, 85, "bass")
+                   for bar in range(bass.performance.start_bar, bass.performance.start_bar + bass.performance.bars))
+    backing = replace(bass.performance,
+                      notes=tuple(n for n in bass.performance.notes if n.instrument != "bass") + groove)
+    assert runtime.schedule(replace(bass, performance=backing), repeat_layers=("bass",))
+    first, = runtime.advance_to(bass.decision.slot.start_sample)
+    runtime.advance_to(first.timing.start_sample + 4 * (first.timing.end_sample - first.timing.start_sample))
+
     request = observe(runtime, "来个清楚的电吉他 riff", "riff")
     plan, _ = guitar_command_plan(request.events, request.state, "riff", {27: "Clean"})
     change = prepare(runtime, request, plan)
@@ -111,7 +126,7 @@ def test_named_guitar_riff_continues_and_level_edit_reuses_the_same_notes():
     riff = tuple(Note(69 + offset, 4.0 * bar + offset / 2., .5, 60, "gm_27")
                  for bar in range(source.start_bar, source.start_bar + source.bars) for offset in range(2))
     perf = replace(source, notes=tuple(n for n in source.notes if n.instrument != "gm_27") + riff)
-    assert runtime.schedule(replace(change, performance=perf), repeat_layer="gm_27")
+    assert runtime.schedule(replace(change, performance=perf), repeat_layers=("gm_27",))
     at = change.decision.slot.start_sample
     joined, = runtime.advance_to(at)
     step = joined.timing.end_sample - at
@@ -132,7 +147,7 @@ def test_named_guitar_riff_continues_and_level_edit_reuses_the_same_notes():
     assert scoped(raised.notes, "gm_27") == tuple(
         replace(n.shifted(4*(point.bar - source.start_bar)), velocity=84) for n in riff[:2]
     )
-    assert scoped(raised.notes, "bass") == scoped(prepare_bar(request.state, point.bar), "bass")
+    assert scoped(raised.notes, "bass") == (groove[0].shifted(4 * (point.bar - bass.performance.start_bar)),)
     assert scoped(raised.notes, "drums") == scoped(prepare_bar(request.state, point.bar), "drums")
 
     request = observe(runtime, "去掉吉他，保留鼓和 bass", "mute")
@@ -141,6 +156,7 @@ def test_named_guitar_riff_continues_and_level_edit_reuses_the_same_notes():
     assert runtime.schedule(mute, reuse_local_score=True)
     stopped, = runtime.advance_to(mute.decision.slot.start_sample)
     assert not scoped(stopped.notes, "gm_27")
+    assert scoped(stopped.notes, "bass") == (groove[0].shifted(4 * (stopped.timing.bar_index - bass.performance.start_bar)),)
     assert not scoped(runtime.preview_next_bar().notes, "gm_27")
 
 

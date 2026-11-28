@@ -905,8 +905,13 @@ class BrowserJam:
                     try:
                         if bound.slot.bar <= self.last_reserved_bar():
                             raise PlanError("enqueue deadline missed")
-                        repeat_layer = data["actions"][0]["scope"] if route == "scoped_guitar_riff" and use_score else None
-                        self.runtime.schedule(change, reuse_local_score=not use_score, repeat_layer=repeat_layer)
+                        repeat_layers = ()
+                        if self.renderer == "mrt2_stream" and use_score:
+                            arranged = writable_layers(target, bound.plan)
+                            repeat_layers = tuple(dict.fromkeys(a["scope"] for a in data["actions"]
+                                                  if a["action"] in {"ADD_LAYER", "INTRODUCE_LAYER"}
+                                                  and a["scope"] in arranged - {"lead"}))
+                        self.runtime.schedule(change, reuse_local_score=not use_score, repeat_layers=repeat_layers)
                     except PlanError as error:
                         if (str(error) != "enqueue deadline missed" or attempt or not allow_wait
                                 or self.turn_timing.target_bar is not None):
