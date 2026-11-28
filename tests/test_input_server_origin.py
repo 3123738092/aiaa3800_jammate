@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 from contextlib import contextmanager
 from http.client import HTTPConnection
@@ -7,6 +8,7 @@ from threading import Lock, Thread
 from types import SimpleNamespace
 
 import pytest
+import soundfile as sf
 
 from jammate.input_server import Handler, https_origin
 
@@ -69,6 +71,10 @@ def test_exact_public_origin_accepts_api_calls_and_streams():
         stream = "/api/jam/mrt2-stream?session=jam&bar=2"
         assert request(port, "GET", stream, PUBLIC_ORIGIN) == (200, b"abcd")
         assert request(port, "GET", stream, fetch_site="cross-site")[0] == 403
+        status, encoded = request(port, "GET", stream + "&format=flac", PUBLIC_ORIGIN)
+        assert status == 200
+        samples, rate = sf.read(io.BytesIO(encoded), dtype="int16")
+        assert rate == 48000 and samples.astype("<i2").tobytes() == b"abcd"
 
 
 def test_rotating_origin_only_accepts_the_current_name(tmp_path):

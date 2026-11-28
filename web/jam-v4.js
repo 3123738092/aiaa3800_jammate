@@ -441,7 +441,7 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
       release(view.session);
       throw new Error('会话已取消。');
     }
-    active.attach(view);
+    active.attach(view, {lossless: service?.mrt2_flac});
     config.meter = view.meter ?? config.meter;
     active.debugAt = 0;
     saveRequest(view.session, requestId);

@@ -1177,6 +1177,7 @@ class BrowserJamService:
                     "fluidsynth": self.soundfont is not None,
                     "timbre_catalog": catalog, "mrt2": self.mrt2_available(), "opening_modes": ["warm", "cold", "humming"],
                     "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True,
+                    "mrt2_flac": stream_ready and sf.check_format("FLAC", "PCM_16"),
                     "mrt2_stream": stream_ready, "mrt2_direct": stream_ready}
         if operation == "studio-classify":
             bpm = body.get("bpm", 100)

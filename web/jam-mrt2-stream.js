@@ -15,13 +15,36 @@ export function stereoPcmBuffer(context, pcm) {
   return buffer;
 }
 
-export async function readMrt2Bar(session, packet, signal, onBlock) {
-  const query = new URLSearchParams({session, bar: packet.bar});
+async function openMrt2Bar(session, bar, signal, format) {
+  const query = new URLSearchParams({session, bar});
+  if (format) query.set('format', format);
   const response = await fetch('/api/jam/mrt2-stream?' + query, {signal, cache: 'no-store'});
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
     throw new Error(result.error ?? 'MRT2 音频流连接失败。');
   }
+  return response;
+}
+
+export async function readLosslessMrt2Bar(session, packet, signal, decoder) {
+  const response = await openMrt2Bar(session, packet.bar, signal, 'flac');
+  const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
+  if (decoded.length !== packet.pcm_frames || decoded.numberOfChannels !== 2) {
+    throw new Error('MRT2 小节解码后长度不匹配。');
+  }
+  const pcm = new Uint8Array(decoded.length * sampleBytes);
+  const view = new DataView(pcm.buffer);
+  for (let channel = 0; channel < 2; channel++) {
+    const values = decoded.getChannelData(channel);
+    for (let frame = 0; frame < decoded.length; frame++) {
+      view.setInt16(frame * sampleBytes + channel * 2, Math.round(values[frame] * 32768), true);
+    }
+  }
+  return pcm;
+}
+
+export async function readMrt2Bar(session, packet, signal, onBlock) {
+  const response = await openMrt2Bar(session, packet.bar, signal);
   const expected = packet.pcm_frames * sampleBytes;
   if (!response.body || Number(response.headers.get('Content-Length')) !== expected) {
     throw new Error('MRT2 音频流格式不匹配。');

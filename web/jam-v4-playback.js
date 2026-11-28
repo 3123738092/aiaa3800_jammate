@@ -1,4 +1,4 @@
-import {MRT2_RATE, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
+import {MRT2_RATE, readLosslessMrt2Bar, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
 import {pcmWave, StreamRecording, waveHeader} from './jam-recording.js';
 
 const retainedSeconds = 600;
@@ -31,10 +31,13 @@ export class StudioPlayback {
     this.boundaryGaps = 0;
   }
 
-  attach(view) {
+  attach(view, {lossless} = {}) {
     this.id = view.session;
     this.rate = view.sample_rate;
     if (['mrt2_stream', 'mrt2_direct'].includes(view.renderer)) this.stream = new StreamRecording();
+    if (this.stream && lossless && document.createElement('audio').canPlayType('audio/flac')) {
+      this.losslessDecoder = new OfflineAudioContext(2, 1, MRT2_RATE);
+    }
   }
 
   setVolume(value) {
@@ -98,14 +101,19 @@ export class StudioPlayback {
     const start = packet.start / this.rate;
     if (this.stream) {
       this.buffered = packet.bar;
-      this.streamQueue = this.streamQueue.then(() => {
+      this.streamQueue = this.streamQueue.then(async () => {
         if (this.abort.signal.aborted) return;
         const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(45_000)]);
-        return readMrt2Bar(this.id, packet, signal, (pcm, offset) => {
+        const receive = (pcm, offset) => {
           if (signal.aborted) return;
           this.streamReady.push({packet, pcm, offset});
           this.scheduleStream();
-        });
+        };
+        if (this.losslessDecoder) {
+          receive(await readLosslessMrt2Bar(this.id, packet, signal, this.losslessDecoder), 0);
+        } else {
+          await readMrt2Bar(this.id, packet, signal, receive);
+        }
       }).catch(error => {
         if (!this.abort.signal.aborted) this.onStreamError(error);
       });

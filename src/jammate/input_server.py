@@ -122,14 +122,28 @@ class Handler(SimpleHTTPRequestHandler):
     def send_mrt2_bar(self, query):
         response_started = False
         try:
-            values = parse_qs(query, max_num_fields=2, strict_parsing=True)
+            values = parse_qs(query, max_num_fields=3, strict_parsing=True)
             session, = values["session"]
             index, = values["bar"]
+            encoding, = values.get("format", ["pcm"])
+            if encoding not in {"pcm", "flac"}:
+                raise ValueError("未知的 MRT2 音频编码。")
             with self.server.jam.open_mrt2_bar(session, int(index)) as (length, chunks):
                 with closing(chunks):
-                    first = next(chunks)
+                    if encoding == "flac":
+                        from mrt2_demo.inference import SAMPLE_RATE
+                        raw = b"".join(chunks)
+                        if len(raw) != length:
+                            raise ValueError("MRT2 小节未生成完整。")
+                        lossless = io.BytesIO()
+                        sf.write(lossless, np.frombuffer(raw, dtype="<i2").reshape(-1, 2),
+                                 SAMPLE_RATE, format="FLAC", subtype="PCM_16")
+                        first = lossless.getvalue()
+                        length = len(first)
+                    else:
+                        first = next(chunks)
                     self.send_response(200)
-                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Type", "audio/flac" if encoding == "flac" else "application/octet-stream")
                     self.send_header("Content-Length", str(length))
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
