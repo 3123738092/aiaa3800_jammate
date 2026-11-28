@@ -147,6 +147,36 @@ def test_stream_uses_more_prefetch_for_short_bars_without_early_receipts(monkeyp
         assert started["next"]["bar"] == 4
 
 
+@pytest.mark.parametrize("command", ["把速度调到 100 BPM", "保留鼓点，把速度改成 100 BPM。"])
+def test_stream_can_change_tempo_after_reserved_short_bars(monkeypatch, command):
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    with closing(BrowserJamService()) as service:
+        opening = service.dispatch("start", {"renderer": "mrt2_stream", "stream_lookahead": True,
+            "opening_mode": "cold", "meter": "6/8", "bpm": 110, "opening": {"text": "只要鼓点"}})
+        session = service.sessions[opening["session"]]
+        session.poll(0, 0, 3)
+        sent = session.submit(command)
+        reserved = session.last_reserved_bar()
+        previous = session.playing
+        for _ in range(12):
+            packet = session.packet
+            view = session.poll(packet["bar"], packet["start"], session.last_reserved_bar())
+            if session.future is not None:
+                session.future.result(timeout=3)
+            if view["feedback"]["status"] == "applied":
+                break
+            assert view["bpm"] == 110
+            previous = session.playing
+        turn = next(row for row in session.debug()["turns"] if row["input_event"]["event_id"] == sent["id"])
+        assert view["feedback"]["status"] == "applied", turn
+        assert view["bpm"] == 100 and view["meter"] == "6/8"
+        assert view["current_bar"] > reserved
+        assert turn["decision"]["source"] == "local_explicit"
+        assert turn["playback_receipt"]["bar"] == turn["bound_plan"]["effective_at"]["bar"] == view["current_bar"]
+        assert previous.timing.end_sample == session.playing.timing.start_sample
+        assert {note.instrument for note in session.playing.notes} == {"drums"}
+
+
 def test_warm_opening_can_repair_invalid_provider_selection():
     from types import SimpleNamespace
     import json

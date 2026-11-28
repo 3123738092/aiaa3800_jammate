@@ -67,6 +67,7 @@ from jammate.studio_input import midi_phrase, pad_rhythm, studio_text, with_stud
 BUFFER_SECONDS = 1.0
 MRT2_BUFFER_SECONDS = 1.3
 MRT2_SCORE_BUFFER_SECONDS = 2.6
+MRT2_MAX_PREFETCH_BARS = 6
 MRT2_STREAM_RENDERERS = {"mrt2_stream", "mrt2_direct"}
 VOICE_LIMIT = 2 * 1024 * 1024
 DEBUG_HISTORY = 12
@@ -189,6 +190,8 @@ class BrowserJam:
         budget = arrangement_config.timeout_s if arrangement_config and renderer != "mrt2_direct" else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
         lookahead = max(3, ceil((decision_timeout + budget) * MAX_TEMPO_BPM / (60 * state.beats_per_bar)) + 3)
+        if self.stream_lookahead:
+            lookahead = max(lookahead, MRT2_MAX_PREFETCH_BARS + 3)
         # Reserve for typical score preparation, not the provider's failure timeout.
         # A late flexible turn can bind again at a later, unbuffered bar.
         prepare_ms = max(350, round(budget * 1000))
@@ -288,7 +291,7 @@ class BrowserJam:
             state = self.manager.state
             seconds_per_bar = state.beats_per_bar * 60 / state.tempo_bpm
             # Keep a similar duration in reserve for short measures.
-            count = max(minimum_bars, min(6, max(2, ceil(3.5 / seconds_per_bar))))
+            count = max(minimum_bars, min(MRT2_MAX_PREFETCH_BARS, max(2, ceil(3.5 / seconds_per_bar))))
         bars = self.runtime.preview_bars(count)
         bar = bars[0]
         self.following_mrt2 = bars[1:] if bar.state.playing else ()
@@ -633,6 +636,9 @@ class BrowserJam:
             sent_bar = max(sent_bar, timing.target_bar - 1)
         elif not allow_wait and self.renderer != "mrt2":
             through = timing.soft_bar
+            if self.stream_lookahead:
+                # A larger buffer can cover the entire normal decision window.
+                through = max(through, sent_bar + 1)
         return self.runtime.bind(request, plan, preparation_budget_ms=preparation_budget_ms if use_score else 350,
                                  after_bar=sent_bar, through_bar=through)
 
@@ -1237,6 +1243,7 @@ class BrowserJamService:
                     "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True,
                     "mrt2_flac": stream_ready and sf.check_format("FLAC", "PCM_16"),
                     "mrt2_opus": stream_ready and sf.check_format("OGG", "OPUS"),
+                    "mrt2_parallel": stream_ready,
                     "mrt2_stream": stream_ready, "mrt2_direct": stream_ready}
         if operation == "studio-classify":
             bpm = body.get("bpm", 100)

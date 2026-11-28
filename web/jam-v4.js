@@ -453,7 +453,7 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
       release(view.session);
       throw new Error('会话已取消。');
     }
-    active.attach(view, {opus: service?.mrt2_opus, lossless: service?.mrt2_flac});
+    active.attach(view, {opus: service?.mrt2_opus, lossless: service?.mrt2_flac, parallel: service?.mrt2_parallel});
     config.meter = view.meter ?? config.meter;
     active.debugAt = 0;
     saveRequest(view.session, requestId);

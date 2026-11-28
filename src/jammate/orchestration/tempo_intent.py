@@ -23,7 +23,7 @@ _SET = re.compile(
 _DOWN = re.compile(rf"(?:(?:从(?:当前速度|现在这个数))?\s*(?:再)?\s*(?:减(?:慢)?|降(?:低)?|慢)|(?:reduce|decrease)(?:\s+tempo)?\s+by)\s*{_NUMBER}\s*{_UNIT}")
 _UP = re.compile(rf"(?:(?:从(?:当前速度|现在这个数))?\s*(?:再)?\s*(?:加(?:快)?|升(?:高)?|快)|(?:increase|raise)(?:\s+tempo)?\s+by)\s*{_NUMBER}\s*{_UNIT}")
 _KEEP = {"只改速度", "其他都不动", "其他全部保持", "其他保持", "其他照旧", "编制照旧", "配器别碰",
-         "保持其他不变", "除此之外都别动", "keep everything else", "keep everything else unchanged"}
+         "保持其他不变", "除此之外都别动", "保留鼓点", "鼓点保留", "keep everything else", "keep everything else unchanged"}
 _CONDITIONAL = re.compile(rf"(?:如果)?\s*(?:能做到|能设到|支持)\s*{_NUMBER}\s*{_UNIT}\s*就(?:用|设为)\s*{_NUMBER}(?:\s*{_UNIT})?")
 _ON_FAILURE = re.compile(
     r"(?:(?:这个数)?(?:超出范围|超范围|不支持|做不到)(?:的?话|就|时)?(?:请)?告诉我"

@@ -28,11 +28,13 @@ export class StudioPlayback {
     this.streamQueue = Promise.resolve();
     this.streamReady = [];
     this.streamTimer = null;
+    this.encodedPending = [];
+    this.encodedActive = 0;
     this.gaps = 0;
     this.boundaryGaps = 0;
   }
 
-  attach(view, {opus, lossless} = {}) {
+  attach(view, {opus, lossless, parallel} = {}) {
     this.id = view.session;
     this.rate = view.sample_rate;
     if (['mrt2_stream', 'mrt2_direct'].includes(view.renderer)) this.stream = new StreamRecording();
@@ -44,6 +46,7 @@ export class StudioPlayback {
       this.streamFormat = opus && audio.canPlayType('audio/ogg; codecs="opus"') ? 'opus'
         : lossless && audio.canPlayType('audio/flac') ? 'flac' : null;
       if (this.streamFormat) this.streamDecoder = new OfflineAudioContext(2, 1, MRT2_RATE);
+      this.encodedLimit = parallel ? 2 : 1;
     }
   }
 
@@ -103,27 +106,56 @@ export class StudioPlayback {
     }
   }
 
+  fillEncodedRequests() {
+    while (!this.abort.signal.aborted && this.encodedActive < this.encodedLimit) {
+      const request = this.encodedPending.find(item => !item.requested);
+      if (!request) return;
+      request.requested = true;
+      this.encodedActive++;
+      void this.receiveEncoded(request);
+    }
+  }
+
+  async receiveEncoded(request) {
+    try {
+      request.pcm = await readEncodedMrt2Bar(this.id, request.packet, this.abort.signal,
+        this.streamDecoder, this.streamFormat);
+      if (this.abort.signal.aborted) return;
+      // Requests may finish in a different order. Release only contiguous audio.
+      while (this.encodedPending[0]?.pcm) {
+        const {packet, pcm} = this.encodedPending.shift();
+        this.streamReady.push({packet, pcm, offset: 0});
+      }
+      this.scheduleStream();
+    } catch (error) {
+      if (!this.abort.signal.aborted) this.onStreamError(error);
+    } finally {
+      this.encodedActive--;
+      this.fillEncodedRequests();
+    }
+  }
+
   async enqueue(packet) {
     if (!packet || packet.bar <= this.buffered || this.abort.signal.aborted) return;
     const start = packet.start / this.rate;
     if (this.stream) {
       this.buffered = packet.bar;
-      this.streamQueue = this.streamQueue.then(async () => {
-        if (this.abort.signal.aborted) return;
-        const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(45_000)]);
-        const receive = (pcm, offset) => {
-          if (signal.aborted) return;
-          this.streamReady.push({packet, pcm, offset});
-          this.scheduleStream();
-        };
-        if (this.streamDecoder) {
-          receive(await readEncodedMrt2Bar(this.id, packet, signal, this.streamDecoder, this.streamFormat), 0);
-        } else {
-          await readMrt2Bar(this.id, packet, signal, receive);
-        }
-      }).catch(error => {
-        if (!this.abort.signal.aborted) this.onStreamError(error);
-      });
+      if (this.streamDecoder) {
+        this.encodedPending.push({packet});
+        this.fillEncodedRequests();
+      } else {
+        this.streamQueue = this.streamQueue.then(async () => {
+          if (this.abort.signal.aborted) return;
+          const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(45_000)]);
+          await readMrt2Bar(this.id, packet, signal, (pcm, offset) => {
+            if (signal.aborted) return;
+            this.streamReady.push({packet, pcm, offset});
+            this.scheduleStream();
+          });
+        }).catch(error => {
+          if (!this.abort.signal.aborted) this.onStreamError(error);
+        });
+      }
       if (packet.following) await this.enqueue(packet.following);
       return;
     }
@@ -192,6 +224,7 @@ export class StudioPlayback {
     this.abort.abort();
     clearTimeout(this.streamTimer);
     this.streamReady.length = 0;
+    this.encodedPending.length = 0;
     return this.clock.close().catch(() => {});
   }
 }

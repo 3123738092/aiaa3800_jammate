@@ -4,7 +4,7 @@ import math
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from threading import Event, Lock, local
+from threading import Condition, Event, Lock, local
 from time import monotonic
 
 import numpy as np
@@ -22,6 +22,7 @@ CHANNELS = 2
 SAMPLE_BYTES = CHANNELS * 2
 STREAM_LEAD_S = .85
 SCORE_STREAM_LEAD_S = 2.6
+ENCODED_REPLAY_BARS = 6
 # MLX streams are thread-local. HTTP handlers can change between bars.
 _mlx_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jam-mrt2-mlx")
 _mlx_cache = local()
@@ -46,10 +47,10 @@ class BrowserMRT2Stream:
         self._engine = self._style = self._state = None
         self._tail = b""
         self._held_pitches = {}
-        self._buffered_bar = None
+        self._buffered_bars = {}
         self._next_bar = 0
         self._closed = Event()
-        self._rendering = Lock()
+        self._rendering = Condition()
         self._report_lock = Lock()
         self._reports = deque(maxlen=12)
         self._generated_frames = 0
@@ -58,6 +59,12 @@ class BrowserMRT2Stream:
 
     def close(self):
         self._closed.set()
+        # A renderer that owns the lock also wakes its waiters when it exits.
+        if self._rendering.acquire(blocking=False):
+            try:
+                self._rendering.notify_all()
+            finally:
+                self._rendering.release()
 
     def diagnostics(self):
         with self._report_lock:
@@ -71,7 +78,7 @@ class BrowserMRT2Stream:
 
     @contextmanager
     def open_bar(self, bar, clock_rate, *, reference=None, replayable=False):
-        """Keep the latest full encoded-response source available for a transport retry."""
+        """Serve compressed-response sources independently of model execution."""
         if replayable:
             raw = self._prepare_bar(bar, clock_rate, reference)
             yield len(raw), (chunk for chunk in (raw,))
@@ -89,19 +96,25 @@ class BrowserMRT2Stream:
                 raise
             self._next_bar += 1
         finally:
+            self._rendering.notify_all()
             self._rendering.release()
 
     def _prepare_bar(self, bar, clock_rate, reference):
-        if not self._rendering.acquire(timeout=8):
+        timeout = 8.
+        deadline = monotonic() + timeout
+        if not self._rendering.acquire(timeout=timeout):
             raise TimeoutError("这个 MRT2 小节仍在生成，请重试。")
         try:
             index = bar.timing.bar_index
+            if not self._rendering.wait_for(lambda: self._closed.is_set() or index <= self._next_bar,
+                                            timeout=max(0., deadline - monotonic())):
+                raise TimeoutError("前面的小节尚未生成，请重试。")
             if self._closed.is_set():
                 raise ValueError("这个 MRT2 会话已经结束。")
-            if self._buffered_bar is not None and self._buffered_bar[0] == index:
+            if index in self._buffered_bars:
                 with self._report_lock:
                     self._replayed_bars += 1
-                return self._buffered_bar[1]
+                return self._buffered_bars[index]
             if index != self._next_bar:
                 raise ValueError("这个 MRT2 音频小节已失效，请重新开始。")
             samples = self.samples_for_bar(bar.timing, clock_rate)
@@ -112,10 +125,13 @@ class BrowserMRT2Stream:
             except BaseException:
                 self.close()
                 raise
-            self._buffered_bar = (index, raw)
+            self._buffered_bars[index] = raw
+            if len(self._buffered_bars) > ENCODED_REPLAY_BARS:
+                self._buffered_bars.pop(next(iter(self._buffered_bars)))
             self._next_bar += 1
             return raw
         finally:
+            self._rendering.notify_all()
             self._rendering.release()
 
     def _chunks(self, bar, samples, reference):
