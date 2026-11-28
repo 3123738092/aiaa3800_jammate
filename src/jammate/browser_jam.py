@@ -123,7 +123,7 @@ def reference_event(event):
 class BrowserJam:
     def __init__(self, bpm, make_agent, workers, *, soundfont=None, renderer="synth",
                  profile="electric", timbres=None, arrangement_config=None, decision_timeout=0., preview_lock=None,
-                 opening=None, preview_workers=None, style_config=None, audio_references=None):
+                 opening=None, preview_workers=None, style_config=None, audio_references=None, stream_lookahead=False):
         if opening is None:
             state = JamState(session_id=uuid4().hex, tempo_bpm=bpm)
             events, selection = (), None
@@ -175,6 +175,8 @@ class BrowserJam:
         self.renderer, self.profile, self.arrangement_config = renderer, profile, arrangement_config
         self.mrt2_style = state.style or os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band")
         self.mrt2_stream = None
+        self.stream_lookahead = stream_lookahead and renderer == "mrt2_stream"
+        self.following_mrt2 = None
         if renderer in MRT2_STREAM_RENDERERS:
             from mrt2_demo.browser_stream import BrowserMRT2Stream
             style = state.style or ("" if self.direct_mrt2 and selection else self.mrt2_style)
@@ -206,6 +208,7 @@ class BrowserJam:
         self.reserved = self.packet = self.playing = None
         self.reserved_output = self.playing_output = None
         self.feedback = self.last_applied = self.deferred = self.future = None
+        self.deferred_after = -1
         self.suggestion_offer = self.accepted_suggestion = None
         self.target = ("flexible", None)
         self.turn_timing = None
@@ -274,15 +277,15 @@ class BrowserJam:
         self.last_seen = monotonic()
 
     def reserve(self):
-        bar = self.runtime.preview_next_bar()
+        bars = self.runtime.preview_bars(2 if self.stream_lookahead else 1)
+        bar = bars[0]
+        self.following_mrt2 = bars[1] if self.stream_lookahead and bar.state.playing else None
         timing = bar.timing
         timbres = self.timbres_for_bar(timing.bar_index)
-        packet = {"bar": timing.bar_index, "start": timing.start_sample, "end": timing.end_sample,
-                  "bpm": timing.tempo_bpm}
+        packet = self.packet_for(bar)
         if self.mrt2_stream is not None:
             from mrt2_demo.inference import SAMPLE_RATE
 
-            packet["pcm_frames"] = self.mrt2_stream.samples_for_bar(timing, SR)
             output = {"renderer": self.renderer, "format": "PCM16", "sample_rate": SAMPLE_RATE, "channels": 2,
                       "sample_frames": packet["pcm_frames"], "model": self.mrt2_stream.model}
         else:
@@ -317,10 +320,24 @@ class BrowserJam:
                       "channels": audio.shape[1] if audio.ndim == 2 else 1, "sample_frames": len(audio), "tracks": tracks}
         self.reserved, self.reserved_timbres, self.packet, self.reserved_output = bar, timbres, packet, output
 
+    def packet_for(self, bar):
+        timing = bar.timing
+        packet = {"bar": timing.bar_index, "start": timing.start_sample, "end": timing.end_sample,
+                  "bpm": timing.tempo_bpm}
+        if self.mrt2_stream is not None:
+            packet["pcm_frames"] = self.mrt2_stream.samples_for_bar(timing, SR)
+        return packet
+
+    def last_reserved_bar(self):
+        edge = self.following_mrt2 or self.reserved
+        return edge.timing.bar_index if edge is not None else -1
+
     def open_mrt2_bar(self, index):
         with self.lock:
             self.check_open()
             bar = self.reserved
+            if self.following_mrt2 and self.following_mrt2.timing.bar_index == index:
+                bar = self.following_mrt2
             if self.mrt2_stream is None or bar is None or bar.timing.bar_index != index:
                 raise ValueError("这个 MRT2 小节尚未预约或已失效。")
             reference = None
@@ -375,6 +392,11 @@ class BrowserJam:
         cycle = harmony_cycle(state) if state.key else ()
         index = ((self.playing.timing.bar_index - state.progression_start_bar) % len(cycle)
                  if cycle and self.playing else None)
+        queued_through = -1 if buffered is None else buffered
+        packet = self.packet if self.packet and self.packet["bar"] > queued_through else None
+        if self.following_mrt2 and self.following_mrt2.timing.bar_index > queued_through:
+            following = self.packet_for(self.following_mrt2)
+            packet = {**packet, "following": following} if packet else following
         return {
             "session": self.id, "sample_rate": SR, "current_bar": self.playing.timing.bar_index if self.playing else None,
             "bpm": state.tempo_bpm, "playing": state.playing, "feedback": self.feedback,
@@ -393,7 +415,7 @@ class BrowserJam:
                        for layer in state.layers
                        if (layer.name != "lead" if self.opening is None else
                            layer.active or any(part["name"] == layer.name for part in self.opening["instruments"]))],
-            "next": self.packet if self.packet and self.packet["bar"] != buffered else None,
+            "next": packet,
         }
 
     def poll(self, started, sample, buffered):
@@ -416,6 +438,7 @@ class BrowserJam:
                 if self.next_timbres and self.next_timbres["bar"] <= started:
                     self.next_timbres = None
                 self.reserved = self.packet = self.reserved_timbres = None
+                self.following_mrt2 = None
                 if bar.started is not None:
                     self.last_applied = {"bar": started, "plan": bar.started.plan_id}
                     if self.opening and any(self.opening.get(key, {}).get("plan_id") == bar.started.plan_id
@@ -435,7 +458,7 @@ class BrowserJam:
                             "bar": started, "sample": bar.started.start_sample,
                             "mode": "mrt2_conditioning" if self.direct_mrt2 else "rendered_score",
                         })
-                if self.deferred is not None:
+                if self.deferred is not None and started >= self.deferred_after:
                     batch, self.deferred = self.deferred, None
                     self.begin(*batch)
             if self.playing is not None:
@@ -444,7 +467,7 @@ class BrowserJam:
                 self.refresh_wait()
                 buffer_s = (MRT2_SCORE_BUFFER_SECONDS if self.renderer == "mrt2_stream" else
                             MRT2_BUFFER_SECONDS if self.mrt2_stream is not None else BUFFER_SECONDS)
-                if self.reserved is None and (self.renderer == "mrt2"
+                if self.reserved is None and (self.renderer == "mrt2" or self.stream_lookahead
                                               or end - self.runtime.sample <= round(SR * buffer_s)):
                     self.reserve()
             return self.snapshot(buffered)
@@ -528,6 +551,7 @@ class BrowserJam:
                 # This buffer is already committed to the browser's playback
                 # timeline. Apply new observations after its start is confirmed.
                 self.deferred = batch
+                self.deferred_after = self.last_reserved_bar()
                 self.update_feedback(status="buffered")
             else:
                 self.begin(*batch)
@@ -580,7 +604,7 @@ class BrowserJam:
 
     def bind_turn(self, request, plan, *, use_score, allow_wait):
         timing = self.turn_timing
-        sent_bar = self.reserved.timing.bar_index if self.reserved else -1
+        sent_bar = self.last_reserved_bar()
         through = timing.target_bar
         if timing.target_bar is not None:
             sent_bar = max(sent_bar, timing.target_bar - 1)
@@ -836,7 +860,7 @@ class BrowserJam:
                     if not self.is_current(event_id):
                         return
                     try:
-                        if self.reserved and bound.slot.bar <= self.reserved.timing.bar_index:
+                        if bound.slot.bar <= self.last_reserved_bar():
                             raise PlanError("enqueue deadline missed")
                         self.runtime.schedule(change, reuse_local_score=not use_score)
                     except PlanError as error:
@@ -1312,7 +1336,7 @@ class BrowserJamService:
                                      decision_timeout=config.timeout_s + (JEV_TIMEOUT if jev else 0.) if agent == "llm" else 0.,
                                      preview_lock=self.preview_lock, opening=(state, events, selection),
                                      preview_workers=self.preview_workers, style_config=style_config,
-                                     audio_references=audio_references)
+                                     audio_references=audio_references, stream_lookahead=body.get("stream_lookahead") is True)
                 session.reserve()
                 if mode in {"cold", "humming"} and renderer == "mrt2":
                     session.start_opening_preview()

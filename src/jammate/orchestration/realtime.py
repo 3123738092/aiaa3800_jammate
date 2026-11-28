@@ -307,21 +307,27 @@ class RealtimeSession:
 
     def preview_next_bar(self) -> PlaybackBar:
         """Read the next bar for buffering without confirming its playback."""
+        return self.preview_bars(1)[0]
+
+    def preview_bars(self, count: int) -> tuple[PlaybackBar, ...]:
+        """Project a short buffer without advancing the transport or applying a receipt."""
         clock = copy(self._clock)
-        bar = clock.bar_index
         state, performance, plan = self.manager.state, self._active, self._active_plan
         queued = self._queued
-        if (queued is not None and queued.decision.slot.bar == bar
-                and queued.decision.slot.start_sample == clock.next_sample
-                and self.manager.plan_status(queued.decision.plan.plan_id) == "pending"):
-            state = project(state, queued.decision.plan)
-            if not queued.decision.keeps_playing_material():
-                performance = queued.performance
-            if self.conditioning_only and (plan is None or queued.decision.updates_conditioning()):
-                plan = queued.decision.plan
-        clock.beats_per_bar = state.beats_per_bar
-        timing = clock.reserve(state.tempo_bpm)
-        return self._make_bar(timing, state, performance, plan)
+        bars = []
+        for _ in range(count):
+            if (queued is not None and queued.decision.slot.bar == clock.bar_index
+                    and queued.decision.slot.start_sample == clock.next_sample
+                    and self.manager.plan_status(queued.decision.plan.plan_id) == "pending"):
+                state = project(state, queued.decision.plan)
+                if not queued.decision.keeps_playing_material():
+                    performance = queued.performance
+                if self.conditioning_only and (plan is None or queued.decision.updates_conditioning()):
+                    plan = queued.decision.plan
+            clock.beats_per_bar = state.beats_per_bar
+            timing = clock.reserve(state.tempo_bpm)
+            bars.append(self._make_bar(timing, state, performance, plan))
+        return tuple(bars)
 
     def _make_bar(self, timing, state, performance, plan, receipt=None):
         if self.conditioning_only:

@@ -109,6 +109,25 @@ def test_mrt2_direct_can_open_with_style_only_and_an_explicit_meter(monkeypatch)
         assert "bossa nova" in details["jam_state"]["arrangement"]["style"].casefold()
 
 
+def test_stream_prefetch_does_not_confirm_playback(monkeypatch):
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    with closing(BrowserJamService()) as service:
+        opening = service.dispatch("start", {"renderer": "mrt2_stream", "stream_lookahead": True,
+            "opening_mode": "cold", "opening": {"text": "Full band accompaniment, 96 BPM"}})
+        session = opening["session"]
+        first = opening["next"]
+        assert first["bar"] == 0 and first["following"]["bar"] == 1
+        assert opening["current_bar"] is None
+        assert service.dispatch("poll", {"session": session, "started": -1, "sample": 0,
+                                        "buffered": 1})["current_bar"] is None
+        started = service.dispatch("poll", {"session": session, "started": 0, "sample": first["start"],
+                                            "buffered": 1})
+        assert started["current_bar"] == 0 and started["next"]["bar"] == 2
+        followed = service.dispatch("poll", {"session": session, "started": 1, "sample": first["end"],
+                                             "buffered": 2})
+        assert followed["current_bar"] == 1 and followed["next"]["bar"] == 3
+
+
 def test_warm_opening_can_repair_invalid_provider_selection():
     from types import SimpleNamespace
     import json

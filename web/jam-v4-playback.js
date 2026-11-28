@@ -22,6 +22,7 @@ export class StudioPlayback {
     this.markers = [];
     this.recorded = [];
     this.buffered = -1;
+    this.confirmedBar = -1;
     this.epoch = null;
     this.streamEnd = 0;
     this.streamQueue = Promise.resolve();
@@ -35,6 +36,7 @@ export class StudioPlayback {
     this.id = view.session;
     this.rate = view.sample_rate;
     if (['mrt2_stream', 'mrt2_direct'].includes(view.renderer)) this.stream = new StreamRecording();
+    this.streamLookahead = Boolean(this.stream && view.next?.following);
     if (this.stream && lossless && document.createElement('audio').canPlayType('audio/flac')) {
       this.losslessDecoder = new OfflineAudioContext(2, 1, MRT2_RATE);
     }
@@ -70,7 +72,8 @@ export class StudioPlayback {
       const {packet} = this.streamReady[0];
       const last = this.streamReady.at(-1);
       const pendingFrames = last.offset + last.pcm.byteLength / 4;
-      if (pendingFrames < Math.min(streamStartFrames, packet.pcm_frames)) return;
+      if (this.streamLookahead && last.packet.bar === packet.bar) return;
+      if (pendingFrames < Math.min(streamStartFrames, last.packet.pcm_frames)) return;
     }
     try {
       while (this.streamReady.length) {
@@ -117,6 +120,7 @@ export class StudioPlayback {
       }).catch(error => {
         if (!this.abort.signal.aborted) this.onStreamError(error);
       });
+      if (packet.following) await this.enqueue(packet.following);
       return;
     }
     const buffer = await this.clock.decodeAudioData(decodeBase64(packet.wav).buffer);
@@ -130,13 +134,13 @@ export class StudioPlayback {
 
   position() {
     const now = this.clock.currentTime;
-    while (this.markers.length > 1 && this.markers[1].at <= now) this.markers.shift();
-    const marker = this.markers[0];
+    while (this.markers.length > 1 && this.markers[1].bar <= this.confirmedBar) this.markers.shift();
+    const marker = this.markers.find(item => item.bar === this.confirmedBar + 1);
     this.markersStart ??= marker?.at;
     const time = this.stream ? Math.min(now, this.streamEnd) : now;
     return {
       session: this.id, buffered: this.buffered,
-      started: marker?.at <= now ? marker.bar : -1,
+      started: marker?.at <= now ? marker.bar : this.confirmedBar,
       sample: this.epoch === null ? 0 : Math.max(0, Math.floor((time - this.epoch) * this.rate)),
     };
   }

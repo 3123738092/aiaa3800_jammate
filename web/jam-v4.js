@@ -369,6 +369,7 @@ async function poll(active) {
   try {
     const view = await post('poll', active.position());
     if (live !== active) return;
+    active.confirmedBar = view.current_bar ?? -1;
     await active.enqueue(view.next);
     if (live !== active) return;
     failureCount = 0;
@@ -436,7 +437,7 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
     const useConfiguredTempo = tempoExplicit || opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
     const bpm = useConfiguredTempo && !opening.rhythm?.count_in_ms?.length ? config.bpm : null;
     const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm,
-      meter: config.meter, ...profile}, 100_000);
+      meter: config.meter, ...profile, stream_lookahead: profile.renderer === 'mrt2_stream'}, 100_000);
     if (live !== active) {
       release(view.session);
       throw new Error('会话已取消。');
