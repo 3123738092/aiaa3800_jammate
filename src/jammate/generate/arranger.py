@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import replace
 
-from jammate.generate.harmony import harmony_cycle
+from jammate.generate.harmony import harmony_cycle, triad
 from jammate.generate.motif_backing import follow_motif
 from jammate.generate.patterns import added_instrument_bar, bass_bar, comp_bar, drum_bar
 from jammate.generate.performance import perform_backing
@@ -42,6 +42,11 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
     if not state.playing:
         return ()
     chord = chord_for_bar(state, bar_index)
+    has_cycle = chord is not None
+    if (chord is None and state.key is not None
+            and any(layer.active and layer.name not in {"drums", "lead"} for layer in state.layers)):
+        # A pitched part can play on the tonic without gaining a progression.
+        chord = triad(state.key, 0)
     phrase_pos = bar_index % PHRASE_BARS
     if state.rhythm is not None:
         backing = rhythm_parts(chord, state.rhythm, state.rhythm_mode, state.energy, bar_index)
@@ -50,7 +55,7 @@ def arrange_bar(state: JamState, bar_index: int, lead: tuple[Note, ...] = ()) ->
         if chord is not None:
             backing += tuple(note for note in bass_bar(chord, state.energy) + comp_bar(chord, state.energy)
                              if note.start < state.beats_per_bar)
-            if state.energy > 0 and not (state.accompaniment_motif and bar_index >= state.accompaniment_motif.start_bar):
+            if has_cycle and state.energy > 0 and not (state.accompaniment_motif and bar_index >= state.accompaniment_motif.start_bar):
                 backing = perform_backing(backing, chord, chord_for_bar(state, max(0, bar_index - 1)),
                                           chord_for_bar(state, bar_index + 1), bar_index, state.energy)
     for layer in state.layers:

@@ -183,16 +183,22 @@ class BrowserJam:
             settings = selection.get("settings", {}) if selection else {}
             self.mrt2_stream = BrowserMRT2Stream(style, os.environ.get("JAMMATE_MRT2_MODEL", "mrt2_small"),
                                                 direct=self.direct_mrt2,
+                                                lead_voice=selection.get("solo_voice") if selection else None,
                                                 tempo=settings.get("tempo_source") in {"manual", "text", "claps", "drum_pads"},
                                                 key=settings.get("key_source") in {"manual", "text"})
         budget = arrangement_config.timeout_s if arrangement_config and renderer != "mrt2_direct" else 0.
         self.decision_budget_samples = round((decision_timeout + budget) * SR)
         lookahead = max(3, ceil((decision_timeout + budget) * MAX_TEMPO_BPM / (60 * state.beats_per_bar)) + 3)
+        # Reserve for typical score preparation, not the provider's failure timeout.
+        # A late flexible turn can bind again at a later, unbuffered bar.
+        prepare_ms = max(350, round(budget * 1000))
+        if renderer == "mrt2_stream":
+            prepare_ms = min(5000, prepare_ms)
         self.runtime = RealtimeSession(self.manager, sample_rate=SR, opening_plan=opening_plan,
                                        opening_answer=self.opening_answer, conditioning_only=self.direct_mrt2,
                                        timing=TimingPolicy(
             enqueue_guard_ms=350 if self.mrt2_stream is not None else 750,
-            preparation_budget_ms=max(350, round(budget * 1000)),
+            preparation_budget_ms=prepare_ms,
             lookahead_bars=lookahead))
         self.preview_lock = preview_lock or threading.Lock()
         self.preview = self.opening_preview = self.opening_preview_future = None
@@ -454,10 +460,13 @@ class BrowserJam:
                                     self.preview_future = self.preview_workers.submit(self.finish_plan_preview, *job)
                             break
                     if self.feedback and self.feedback.get("plan") == bar.started.plan_id:
+                        fields = {"message": "正在播放按本轮编排生成的 MRT2 伴奏。"} if (
+                            self.renderer == "mrt2_stream" and not self.feedback.get("keeps_material")
+                        ) else {}
                         self.update_feedback(status="applied", playback={
                             "bar": started, "sample": bar.started.start_sample,
-                            "mode": "mrt2_conditioning" if self.direct_mrt2 else "rendered_score",
-                        })
+                            "mode": "mrt2_conditioning" if self.mrt2_stream else "rendered_score",
+                        }, **fields)
                 if self.deferred is not None and started >= self.deferred_after:
                     batch, self.deferred = self.deferred, None
                     self.begin(*batch)
@@ -602,7 +611,7 @@ class BrowserJam:
         elif timing.target_bar is None and self.runtime.sample > timing.soft_sample:
             self.update_feedback(status="waiting_ready")
 
-    def bind_turn(self, request, plan, *, use_score, allow_wait):
+    def bind_turn(self, request, plan, *, use_score, allow_wait, preparation_budget_ms=None):
         timing = self.turn_timing
         sent_bar = self.last_reserved_bar()
         through = timing.target_bar
@@ -610,12 +619,12 @@ class BrowserJam:
             sent_bar = max(sent_bar, timing.target_bar - 1)
         elif not allow_wait and self.renderer != "mrt2":
             through = timing.soft_bar
-        return self.runtime.bind(request, plan, preparation_budget_ms=None if use_score else 350,
+        return self.runtime.bind(request, plan, preparation_budget_ms=preparation_budget_ms if use_score else 350,
                                  after_bar=sent_bar, through_bar=through)
 
-    def prepare_arrangement(self, state, plan, events, arranger):
+    def prepare_arrangement(self, state, plan, events, arranger, *, score_cache=None):
         if self.renderer in {"synth", "mrt2", "mrt2_stream"}:
-            performance, _ = prepare_scoped_score(state, plan, events, arranger)
+            performance, _ = prepare_scoped_score(state, plan, events, arranger, score_cache=score_cache)
             return performance
         runtime = create_runtime(".", backend="fluidsynth", fluidsynth=self.soundfont.executable,
                                  soundfont=self.soundfont.soundfont, profile=self.profile,
@@ -833,7 +842,8 @@ class BrowserJam:
                     return
                 use_score = (self.arrangement_config is not None and not self.direct_mrt2
                              and not direct
-                             and bool(harmony_cycle(target := project(self.manager.state, plan)))
+                             and (target := project(self.manager.state, plan)).key is not None
+                             and (self.renderer == "mrt2_stream" or bool(harmony_cycle(target)))
                              and bool(writable_layers(target, plan)))
                 allow_wait = allow_wait or use_score
                 data = plan.to_dict()
@@ -850,7 +860,9 @@ class BrowserJam:
             if use_score:
                 backend = "fluidsynth" if self.renderer == "fluidsynth" else "synth"
                 arranger = LLMBackendArranger(self.arrangement_config, backend, capture_replies=True, retry_invalid=True)
-            arrange = (lambda state, plan, events: self.prepare_arrangement(state, plan, events, arranger)) if use_score else None
+            score_cache = {} if use_score and self.renderer == "mrt2_stream" else None
+            arrange = (lambda state, plan, events: self.prepare_arrangement(
+                state, plan, events, arranger, score_cache=score_cache)) if use_score else None
             if self.direct_mrt2:
                 arrange = prepare_conditioning
             for attempt in range(2):
@@ -867,7 +879,11 @@ class BrowserJam:
                         if (str(error) != "enqueue deadline missed" or attempt or not allow_wait
                                 or self.turn_timing.target_bar is not None):
                             raise
-                        bound = self.bind_turn(request, plan, use_score=use_score, allow_wait=True)
+                        retry_ms = None
+                        if score_cache:
+                            retry_ms = 350 if not harmony_cycle(project(bound.state, bound.plan)) else 8000
+                        bound = self.bind_turn(request, plan, use_score=use_score, allow_wait=True,
+                                               preparation_budget_ms=retry_ms)
                         self.record_turn(event_id, bound_plan=bound.plan.to_dict(), slot=asdict(bound.slot))
                         continue
                     keeps_material = bound.keeps_playing_material()
@@ -881,7 +897,9 @@ class BrowserJam:
                         self.preview_job = (event_id, bound, change.performance if use_score else None)
                     self.update_feedback(status="scheduled", bar=bound.slot.bar, plan=plan.plan_id,
                                          keeps_material=keeps_material,
-                                         message=data["reason"], decision_source=route,
+                                         message=("MRT2 将按这次编排生成混合伴奏，请以实际声音为准。"
+                                                  if self.renderer == "mrt2_stream" and not keeps_material
+                                                  else data["reason"]), decision_source=route,
                                          timing="when_ready" if bound.slot.bar > self.turn_timing.soft_bar else "prompt")
                     return
         except (PlanError, ProviderFailure, LLMConfigurationError, ValueError, RuntimeError, OSError) as error:
@@ -1202,6 +1220,7 @@ class BrowserJamService:
                     "timbre_catalog": catalog, "mrt2": self.mrt2_available(), "opening_modes": ["warm", "cold", "humming"],
                     "cold_opening_settings": True, "cold_mrt2_preview": True, "mrt2_live_state": True,
                     "mrt2_flac": stream_ready and sf.check_format("FLAC", "PCM_16"),
+                    "mrt2_opus": stream_ready and sf.check_format("OGG", "OPUS"),
                     "mrt2_stream": stream_ready, "mrt2_direct": stream_ready}
         if operation == "studio-classify":
             bpm = body.get("bpm", 100)

@@ -1,4 +1,4 @@
-import {MRT2_RATE, readLosslessMrt2Bar, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
+import {MRT2_RATE, readEncodedMrt2Bar, readMrt2Bar, stereoPcmBuffer} from './jam-mrt2-stream.js';
 import {pcmWave, StreamRecording, waveHeader} from './jam-recording.js';
 
 const retainedSeconds = 600;
@@ -32,13 +32,16 @@ export class StudioPlayback {
     this.boundaryGaps = 0;
   }
 
-  attach(view, {lossless} = {}) {
+  attach(view, {opus, lossless} = {}) {
     this.id = view.session;
     this.rate = view.sample_rate;
     if (['mrt2_stream', 'mrt2_direct'].includes(view.renderer)) this.stream = new StreamRecording();
     this.streamLookahead = Boolean(this.stream && view.next?.following);
-    if (this.stream && lossless && document.createElement('audio').canPlayType('audio/flac')) {
-      this.losslessDecoder = new OfflineAudioContext(2, 1, MRT2_RATE);
+    if (this.stream) {
+      const audio = document.createElement('audio');
+      this.streamFormat = opus && audio.canPlayType('audio/ogg; codecs="opus"') ? 'opus'
+        : lossless && audio.canPlayType('audio/flac') ? 'flac' : null;
+      if (this.streamFormat) this.streamDecoder = new OfflineAudioContext(2, 1, MRT2_RATE);
     }
   }
 
@@ -78,7 +81,7 @@ export class StudioPlayback {
     try {
       while (this.streamReady.length) {
         const {packet, pcm, offset} = this.streamReady[0];
-        const planned = packet.start / this.rate + offset / MRT2_RATE;
+        const planned = (Math.round(packet.start * MRT2_RATE / this.rate) + offset) / MRT2_RATE;
         if (this.epoch !== null && this.epoch + planned - this.clock.currentTime > streamScheduleAhead) {
           this.streamTimer = setTimeout(() => {
             this.streamTimer = null;
@@ -112,8 +115,8 @@ export class StudioPlayback {
           this.streamReady.push({packet, pcm, offset});
           this.scheduleStream();
         };
-        if (this.losslessDecoder) {
-          receive(await readLosslessMrt2Bar(this.id, packet, signal, this.losslessDecoder), 0);
+        if (this.streamDecoder) {
+          receive(await readEncodedMrt2Bar(this.id, packet, signal, this.streamDecoder, this.streamFormat), 0);
         } else {
           await readMrt2Bar(this.id, packet, signal, receive);
         }

@@ -293,18 +293,19 @@ def writable_layers(target, plan):
                      or (action["action"] == "ADJUST_FEEL" and action["parameters"] == {"level_delta": 0})]
     new_motif = any(action["action"] == "INTRODUCE_MOTIF" for action in actions)
     rhythm_parts = {"drums", "bass", "keys"} if target.rhythm is not None else set()
+    introduced = {action["scope"] for action in actions if action["action"] == "ADD_LAYER"}
     return {
         layer.name for layer in target.layers
         if target.playing and layer.active and layer.level > 0 and layer.density > 0
         and f"layer:{layer.name}" not in data["preserve"]
-        and layer.name not in rhythm_parts
+        and (layer.name not in rhythm_parts or (layer.name != "drums" and layer.name in introduced))
         and not (layer.name == "drums" and "groove" in data["preserve"])
         and (new_motif if layer.name == "lead" else any(
             a["scope"] in {layer.name, "band"} for a in score_actions))
     }
 
 
-def prepare_scoped_score(state, plan, events, arranger, *, seed=3800, request_notes=None, reference=None):
+def prepare_scoped_score(state, plan, events, arranger, *, seed=3800, request_notes=None, reference=None, score_cache=None):
     """Compile model-written parts alongside protected host material."""
     from .offline import apply_layer_settings, performance_state_for_bar, prepare_plan
 
@@ -326,7 +327,14 @@ def prepare_scoped_score(state, plan, events, arranger, *, seed=3800, request_no
                "chord_pitch_classes_by_bar": [list(chord.pcs) if chord else [] for chord in chords],
                "target_key": target.key.name, "scale_pitch_classes": list(target.key.scale_pcs)}
     if request_notes is None:
-        model_notes = arranger.score(events, state, plan, target, mutable, length, origin, context)
+        signature = (context, frozenset(mutable), length)
+        if score_cache is not None and score_cache.get("signature") == signature:
+            offset = origin - score_cache["origin"]
+            model_notes = tuple(note.shifted(offset) for note in score_cache["notes"])
+        else:
+            model_notes = arranger.score(events, state, plan, target, mutable, length, origin, context)
+            if score_cache is not None:
+                score_cache.update(signature=signature, origin=origin, notes=model_notes)
         meta = None
     else:
         model_notes, meta = request_notes(target, mutable, length, origin, context)

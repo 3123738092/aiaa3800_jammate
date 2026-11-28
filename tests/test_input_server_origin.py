@@ -75,6 +75,11 @@ def test_exact_public_origin_accepts_api_calls_and_streams():
         assert status == 200
         samples, rate = sf.read(io.BytesIO(encoded), dtype="int16")
         assert rate == 48000 and samples.astype("<i2").tobytes() == b"abcd"
+        if sf.check_format("OGG", "OPUS"):
+            status, encoded = request(port, "GET", stream + "&format=opus", PUBLIC_ORIGIN)
+            assert status == 200 and encoded.startswith(b"OggS")
+            samples, rate = sf.read(io.BytesIO(encoded), dtype="int16")
+            assert rate == 48000 and samples.shape == (1, 2)
 
 
 def test_rotating_origin_only_accepts_the_current_name(tmp_path):

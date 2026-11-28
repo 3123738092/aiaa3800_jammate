@@ -9,11 +9,51 @@ from pretty_midi import program_to_instrument_name
 
 
 PARTS = {"band": "ensemble", "drums": "drum kit", "keys": "keyboards",
-         "lead": "lead melody", "motif": "melody"}
+         "lead": "lead melody", "motif": "melody", "guitar": "acoustic guitar"}
+
+_PART_WORDS = {
+    "drums": r"\b(?:drums?|percussion)\b",
+    "bass": r"\bbass(?:line)?\b",
+    "keys": r"\b(?:keys|keyboards?|piano)\b",
+    "guitar": r"\bguitars?\b",
+    "lead": r"\b(?:lead|melody|melodic|harmony)\b",
+}
 
 def part_name(scope):
     program = gm_program(scope)
     return program_to_instrument_name(program).lower() if program is not None else PARTS.get(scope, scope)
+
+
+def score_stream_style(style, state, *, lead_voice=None):
+    """Describe the current audible lineup before any background style cues."""
+    active = [part for part in state.layers if part.active and part.level > 0 and part.density > 0]
+    names = [part_name(lead_voice if part.name == "lead" and lead_voice else part.name) for part in active]
+    joined = ", ".join(names)
+    families = {part.name for part in active}
+    for family, pattern in _PART_WORDS.items():
+        if re.search(pattern, joined, re.I):
+            families.add(family)
+    pieces = [("solo " if len(active) == 1 else "") + (("prominent " if part.level >= .65 else
+               "soft " if part.level < .4 else "") + ("sparse " if part.density < .8 else "") + name)
+              for part, name in zip(active, names)]
+    for cue in re.split(r"[,;]", style or ""):
+        cue = cue.strip()
+        if not cue:
+            continue
+        mentioned = {part for part, pattern in _PART_WORDS.items() if re.search(pattern, cue, re.I)}
+        negative = re.match(r"^(?:no|without)\b", cue, re.I)
+        if negative and families - {"drums"} and re.search(r"\bharmony\b", cue, re.I):
+            continue
+        if (negative and mentioned & families) or (not negative and mentioned - families):
+            continue
+        if len(active) > 1:
+            cue = re.sub(r"\b(?:solo|only|unaccompanied)\b", "", cue, flags=re.I).strip()
+        if cue and len(", ".join((*pieces, cue))) <= STYLE_LIMIT:
+            pieces.append(cue)
+    prompt = ", ".join(pieces)
+    if len(prompt) > STYLE_LIMIT:
+        prompt = prompt[:STYLE_LIMIT].rsplit(", ", 1)[0]
+    return english_style(prompt)
 
 
 def describe_action(action, state):

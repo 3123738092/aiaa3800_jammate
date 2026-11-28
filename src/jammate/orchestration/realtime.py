@@ -322,7 +322,7 @@ class RealtimeSession:
                 state = project(state, queued.decision.plan)
                 if not queued.decision.keeps_playing_material():
                     performance = queued.performance
-                if self.conditioning_only and (plan is None or queued.decision.updates_conditioning()):
+                if plan is None or queued.decision.updates_conditioning():
                     plan = queued.decision.plan
             clock.beats_per_bar = state.beats_per_bar
             timing = clock.reserve(state.tempo_bpm)
@@ -330,13 +330,12 @@ class RealtimeSession:
         return tuple(bars)
 
     def _make_bar(self, timing, state, performance, plan, receipt=None):
-        if self.conditioning_only:
-            if plan is not None:
-                data = plan.to_dict()
-                if timing.bar_index >= data["effective_at"]["bar"] + data["valid_for_bars"]:
-                    plan = None
-            return PlaybackBar(timing, (), receipt, plan=plan, state=state)
-        return PlaybackBar(timing, self._bar_notes(state, performance, timing.bar_index), receipt, state=state)
+        if plan is not None:
+            data = plan.to_dict()
+            if timing.bar_index >= data["effective_at"]["bar"] + data["valid_for_bars"]:
+                plan = None
+        notes = () if self.conditioning_only else self._bar_notes(state, performance, timing.bar_index)
+        return PlaybackBar(timing, notes, receipt, plan=plan, state=state)
 
     @staticmethod
     def _bar_notes(state, performance, bar):
@@ -362,7 +361,7 @@ class RealtimeSession:
                     receipt = PlaybackStarted(self.manager.state.session_id, plan.plan_id, bar, start)
                     if not queued.decision.keeps_playing_material():
                         self._active = performance
-                    if self.conditioning_only and (self._active_plan is None or queued.decision.updates_conditioning()):
+                    if self._active_plan is None or queued.decision.updates_conditioning():
                         self._active_plan = plan
         state = self.manager.state
         self._clock.beats_per_bar = state.beats_per_bar

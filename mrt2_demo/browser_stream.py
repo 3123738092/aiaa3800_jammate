@@ -16,7 +16,7 @@ from jammate.render.mrt2_style import english_style
 from .inference import (
     DRUM_KEY, FRAME_SAMPLES, PITCH_KEY, SAMPLE_RATE, STYLE_KEY, create_mlxfn_model, encode_style, generate_frame,
 )
-from .plan_conditioning import band_plan_style
+from .plan_conditioning import band_plan_style, score_stream_style
 
 CHANNELS = 2
 SAMPLE_BYTES = CHANNELS * 2
@@ -37,10 +37,11 @@ def _load_stream_model(size):
 class BrowserMRT2Stream:
     """Own the model context and fractional frame tail for one listening session."""
 
-    def __init__(self, prompt, model, *, direct=False, tempo=False, key=False):
+    def __init__(self, prompt, model, *, direct=False, tempo=False, key=False, lead_voice=None):
         self.prompt, self.model = english_style(prompt) if prompt else "", model
         self.direct = direct
         self.explicit_tempo, self.explicit_key = tempo, key
+        self.lead_voice = lead_voice
         self._encoded_prompt = None
         self._engine = self._style = self._state = None
         self._tail = b""
@@ -92,7 +93,8 @@ class BrowserMRT2Stream:
             prompt = band_plan_style(self.prompt, bar.state, bar.plan, tempo=self.explicit_tempo,
                                      key=self.explicit_key)
         else:
-            prompt = self.prompt if bar.notes else None
+            prompt = (score_stream_style(bar.state.style or self.prompt, bar.state, lead_voice=self.lead_voice)
+                      if bar.notes else None)
         active = prompt is not None or reference is not None
         source = ("audio", reference[0]) if reference else ("text", prompt)
         change = active and source != self._encoded_prompt
@@ -121,6 +123,8 @@ class BrowserMRT2Stream:
         if active and not self.direct:
             report["grid"] = {"frame_rate": SAMPLE_RATE // FRAME_SAMPLES, "frames": count,
                               "pitch_cells": int(np.count_nonzero(notes)), "drum_frames": int(np.count_nonzero(drums))}
+            report["score_layers"] = {part: sum(note.instrument == part for note in bar.notes)
+                                      for part in sorted({note.instrument for note in bar.notes})}
         if self._tail:
             yield self._tail
             remaining -= carry
@@ -150,6 +154,7 @@ class BrowserMRT2Stream:
             yield block[:size]
         late_frames = sum(time > .04 for time in elapsed_frames)
         report.update(frames=len(elapsed_frames), frames_over_40ms=late_frames,
+                      generation_wall_ms=round((monotonic() - received) * 1000, 3),
                       frame_p95_ms=round(float(np.percentile(elapsed_frames, 95)) * 1000, 3) if elapsed_frames else None)
         with self._report_lock:
             self._reports.append(report)

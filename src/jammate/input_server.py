@@ -126,25 +126,33 @@ class Handler(SimpleHTTPRequestHandler):
             session, = values["session"]
             index, = values["bar"]
             encoding, = values.get("format", ["pcm"])
-            if encoding not in {"pcm", "flac"}:
+            formats = {"flac": ("FLAC", "PCM_16", "audio/flac"),
+                       "opus": ("OGG", "OPUS", "audio/ogg")}
+            if encoding != "pcm" and encoding not in formats:
                 raise ValueError("未知的 MRT2 音频编码。")
+            if encoding in formats and not sf.check_format(*formats[encoding][:2]):
+                raise ValueError("此服务不支持所请求的 MRT2 音频编码。")
+            started = monotonic()
             with self.server.jam.open_mrt2_bar(session, int(index)) as (length, chunks):
                 with closing(chunks):
-                    if encoding == "flac":
+                    if encoding in formats:
                         from mrt2_demo.inference import SAMPLE_RATE
                         raw = b"".join(chunks)
                         if len(raw) != length:
                             raise ValueError("MRT2 小节未生成完整。")
-                        lossless = io.BytesIO()
-                        sf.write(lossless, np.frombuffer(raw, dtype="<i2").reshape(-1, 2),
-                                 SAMPLE_RATE, format="FLAC", subtype="PCM_16")
-                        first = lossless.getvalue()
+                        format_name, subtype, content_type = formats[encoding]
+                        encoded = io.BytesIO()
+                        sf.write(encoded, np.frombuffer(raw, dtype="<i2").reshape(-1, 2),
+                                 SAMPLE_RATE, format=format_name, subtype=subtype)
+                        first = encoded.getvalue()
                         length = len(first)
                     else:
                         first = next(chunks)
+                        content_type = "application/octet-stream"
                     self.send_response(200)
-                    self.send_header("Content-Type", "audio/flac" if encoding == "flac" else "application/octet-stream")
+                    self.send_header("Content-Type", content_type)
                     self.send_header("Content-Length", str(length))
+                    self.send_header("Server-Timing", f"mrt2;dur={(monotonic() - started) * 1000:.1f}")
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
                     response_started = True

@@ -418,7 +418,11 @@ class LLMAgent:
                 "include a separate scoped ADJUST_FEEL with level_delta set to 0 to authorize the timing edit. "
                 "Keep tempo, key, motif and unrequested layers preserved. Keep groove when compatible with the request. "
                 "Never choose timing or hit-removal edits against a user rhythm anchor, never change lead or invent notes. "
-                "Describe the requested local edit as delegated; only the arranger result establishes what changed."
+                "Describe the requested local edit as delegated; only the arranger result establishes what changed. "
+                "If the user asks to write a new bassline, guitar riff or other pitched accompaniment in a "
+                "drums-only session with no key, the request permits choosing an initial tonal center unless "
+                "the user forbids it. Include SET_KEY before adding the requested pitched part, keep the drums and "
+                "groove, and leave the progression and all other layers alone. State which initial key you chose."
             )
         messages = [{"role": "system", "content": prompt},
                     {"role": "user", "content": context}]

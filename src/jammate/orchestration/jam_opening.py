@@ -55,6 +55,8 @@ _BEATS = re.compile(rf"第\s*({_BEAT}(?:\s*拍?\s*[、,，和与]\s*第?\s*{_BEA
 _BPM = re.compile(r"(?<![\d.])([0-9]+(?:\.[0-9]+)?)\s*bpm\b", re.I)
 _FULL = re.compile(r"完整[^，。]{0,20}伴奏|全乐队|\b(?:full band|full accompaniment|full arrangement)\b", re.I)
 _SOLO = re.compile(r"只(?:要|给我|用)|独奏|\b(?:only|solo|unaccompanied)\b", re.I)
+_DEVELOP_PHRASE = re.compile(r"发展|接续|变奏|\b(?:develop|continue|vary)\b", re.I)
+_BACKING_REQUEST = re.compile(r"伴奏|和弦|配器|和声|\b(?:backing|accompaniment|chords?|harmony|ensemble)\b", re.I)
 _VOICES = (
     (r"鼓点|鼓组|鼓|\b(?:drums?|percussion)\b", "drums", "鼓组", "solo drum groove", None),
     (r"钢琴|键盘|\b(?:piano|keyboard)\b", "keys", "钢琴", "solo piano melody", None),
@@ -307,6 +309,21 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
     tempo_source = ("manual" if tempo_override is not None else "text" if text_bpm is not None else
                     input_rhythm or ("clock" if mode == "cold" else "model"))
     focus = opening_focus(text_event, {} if renderer == "mrt2_direct" else programs)
+    if renderer == "mrt2_stream" and humming_event and text_event and claps is None and mode == "warm":
+        text = text_event.payload["text"]
+        if (_DEVELOP_PHRASE.search(text) and not _BACKING_REQUEST.search(text)
+                and not _FULL.search(text) and not any(re.search(voice[0], text, re.I) for voice in _VOICES)):
+            phrase = to_legacy_phrase(humming_event, tempo_bpm=locked_tempo or JamState.tempo_bpm).notes
+            if has_melodic_contour(phrase):
+                estimate = estimate_key(phrase) if text_key is None else None
+                key = text_key or (estimate.key if estimate else Key(max(phrase, key=lambda n: n.end).pitch % 12))
+                source = "text" if text_key else "humming_estimate" if estimate else "humming_tonic"
+                state, selection = _cold_opening(events, by_source, locked_tempo,
+                                                 "clock" if locked_tempo is None else tempo_source,
+                                                 key, source, None, None)
+                selection.update(mode=mode, develop_humming=True,
+                                 reason="先复奏录入的旋律，再接一句 riff。")
+                return state.with_updates(interaction=replace(state.interaction, allow_initiative=False)), selection
     if renderer == "mrt2_direct" or (mode != "humming" and focus):
         state, selection = _cold_opening(events, by_source, locked_tempo,
                                          "clock" if locked_tempo is None else tempo_source,

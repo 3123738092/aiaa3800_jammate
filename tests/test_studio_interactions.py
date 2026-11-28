@@ -151,6 +151,35 @@ def test_warm_opening_can_repair_invalid_provider_selection():
     assert 0 < second.args[2] <= first.args[2]
 
 
+def test_mrt2_score_additions_replace_solo_condition_and_keep_drums():
+    from jammate.contracts.adapters import from_text
+    from jammate.generate.arranger import arrange_bar
+    from jammate.interaction import Layer
+    from jammate.orchestration.plans import make_plan
+    from jammate.orchestration.transitions import project
+    from jammate.state import JamState
+    from mrt2_demo.plan_conditioning import score_stream_style
+
+    state = JamState(key=None, auto_harmony=False, style="solo drum groove, no melody or harmony",
+                     layers=(Layer("drums"), Layer("bass", active=False),
+                             Layer("keys", active=False), Layer("lead", active=False)))
+    event = from_text("加上贝斯和干净的电吉他", session_id=state.session_id)
+    actions = [
+        {"action": "SET_KEY", "scope": "band", "strength": .5, "parameters": {"tonic": 4, "mode": "major"}},
+        {"action": "ADD_LAYER", "scope": "bass", "strength": .5, "parameters": {}},
+        {"action": "INTRODUCE_LAYER", "scope": "gm_27", "strength": .5, "parameters": {}},
+    ]
+    plan = make_plan(state, (event,), "layers", "FOLLOW", actions, ["layer:drums", "groove"], {}, 1,
+                     "Add bass and guitar while keeping the drum groove.", [])
+    target = project(state, plan)
+    notes = arrange_bar(target, 0)
+    assert {note.instrument for note in notes} >= {"drums", "bass", "gm_27"}
+    assert tuple(note for note in notes if note.instrument == "drums") == arrange_bar(state, 0)
+    prompt = score_stream_style(target.style, target)
+    assert "bass" in prompt and "electric guitar (clean)" in prompt
+    assert "solo" not in prompt and "no melody or harmony" not in prompt
+
+
 def test_playing_drum_only_jam_accepts_bossa_melody_without_requesting_a_key():
     with closing(BrowserJamService()) as service:
         opening = service.dispatch("start", {

@@ -301,11 +301,16 @@ async function inspect(active) {
     trace(id, 'error', 'error', turn.error);
   }
   const stream = data.mrt2_stream;
-  const bar = stream?.recent_bars?.at(-1);
-  if (bar) trace(active.id, 'render', 'completed', {
-    renderer: data.renderer, ...bar, generated_frames: stream.generated_frames,
-    buffer_reconnections: active.gaps, bar_boundary_reconnections: active.boundaryGaps,
-  });
+  for (const bar of stream?.recent_bars ?? []) {
+    if (bar.bar <= (active.lastStreamTraceBar ?? -1)) continue;
+    active.lastStreamTraceBar = bar.bar;
+    const turn = bar.plan_id
+      ? data.turns.find(turn => turn.bound_plan?.plan_id === bar.plan_id) : null;
+    trace(turn?.input_event.event_id ?? active.id, 'render', 'completed', {
+      renderer: data.renderer, ...bar, audio_encoding: active.streamFormat ?? 'pcm',
+      buffer_reconnections: active.gaps, bar_boundary_reconnections: active.boundaryGaps,
+    });
+  }
   const scheduledNotes = (data.queued?.notes ?? data.current?.notes ?? []).map(note => ({
     pitch: note.pitch, startBeat: note.start, durationBeats: note.duration, track: note.instrument,
   }));
@@ -323,7 +328,8 @@ function showView(active, view) {
     if (feedback.message) activity(false);
     active.lastFeedback = JSON.stringify(feedback);
     const status = {buffered: 'running', thinking: 'running', arranging: 'running',
-      scheduled: 'scheduled', applied: 'completed', held: 'needs_input', expired: 'error',
+      scheduled: 'scheduled', applied: feedback.playback?.mode === 'mrt2_conditioning' ? 'playing' : 'completed',
+      held: 'needs_input', expired: 'error',
       superseded: 'error'}[feedback.status];
     reply(feedback.id, feedback.message, status);
   }
@@ -442,7 +448,7 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
       release(view.session);
       throw new Error('会话已取消。');
     }
-    active.attach(view, {lossless: service?.mrt2_flac});
+    active.attach(view, {opus: service?.mrt2_opus, lossless: service?.mrt2_flac});
     config.meter = view.meter ?? config.meter;
     active.debugAt = 0;
     saveRequest(view.session, requestId);

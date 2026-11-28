@@ -19,8 +19,9 @@ from jammate.rhythm import RhythmContext
 
 def rhythm_from_onsets(onset_times: Sequence[float], tempo_bpm: float,
                        beat_origin_s: float, accents: Sequence[float] | None = None,
-                       confidence: float = 1.0, beats_per_bar: int = 4) -> RhythmContext:
-    """Quantize one explicit bar onto a sixteenth-note grid.
+                       confidence: float = 1.0, beats_per_bar: int = 4,
+                       *, subdivisions: int = 4) -> RhythmContext:
+    """Quantize one explicit bar onto the chosen subdivisions of each beat.
 
 Times are absolute seconds on the input clock; onsets outside this bar are
 ignored. Multiple detections in one grid cell keep their strongest accent.
@@ -38,12 +39,12 @@ ignored. Multiple detections in one grid cell keep their strongest accent.
         beat = (time_s - beat_origin_s) * tempo_bpm / 60.0
         if not 0 <= beat < beats_per_bar:
             continue
-        snapped = round(beat * 4) / 4
+        snapped = round(beat * subdivisions) / subdivisions
         if snapped >= beats_per_bar:
             continue  # a late event must not wrap around to the beginning
         cells[snapped] = max(cells.get(snapped, 0), accent)
         errors.append(abs(beat - snapped))
-    fit = max(0.0, 1.0 - float(np.mean(errors)) / 0.25) if errors else 0.0
+    fit = max(0.0, 1.0 - float(np.mean(errors)) * subdivisions) if errors else 0.0
     beats = tuple(sorted(cells))
     return RhythmContext(tempo_bpm, beats, tuple(cells[b] for b in beats),
                          beat_origin_s, beats_per_bar=beats_per_bar, confidence=confidence * fit)
@@ -65,7 +66,7 @@ def _onsets_and_accents(y: np.ndarray, sr: int, *, backtrack: bool = True,
                                        units="time", backtrack=backtrack) - pad / sr
     # Backtracking may land up to one analysis frame before the attack.
     onsets = np.maximum(0, onsets)
-    onsets = onsets[onsets < audio.size / sr]
+    onsets = np.unique(onsets[onsets < audio.size / sr])
     peaks = np.array([np.max(np.abs(audio[int(t * sr):min(audio.size, int(t * sr) + max(1, int(.06 * sr)))]))
                       for t in onsets])
     keep = peaks >= max(absolute_peak_floor, max_peak * relative_peak_floor)
@@ -135,7 +136,9 @@ def analyze_rhythm_feel(y: np.ndarray, sr: int, tempo_bpm: float, beats_per_bar:
     onsets, accents = _onsets_and_accents(y, sr)
     if len(onsets) < 2:
         raise ValueError("至少需要两个清晰的节奏起音。")
-    result = rhythm_from_onsets(onsets, tempo_bpm, float(onsets[0]), accents, beats_per_bar=beats_per_bar)
+    # Studio uses two dotted beats for 6/8. Preserve its three eighth-note subdivisions.
+    result = rhythm_from_onsets(onsets, tempo_bpm, float(onsets[0]), accents, beats_per_bar=beats_per_bar,
+                               subdivisions=3 if beats_per_bar == 2 else 4)
     if len(result.onset_beats) < 2:
         raise ValueError("当前速度的一个小节里没有足够的节奏起音。")
     return result

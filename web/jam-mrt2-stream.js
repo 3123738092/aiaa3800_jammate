@@ -26,10 +26,10 @@ async function openMrt2Bar(session, bar, signal, format) {
   return response;
 }
 
-export async function readLosslessMrt2Bar(session, packet, signal, decoder) {
-  const response = await openMrt2Bar(session, packet.bar, signal, 'flac');
+export async function readEncodedMrt2Bar(session, packet, signal, decoder, format) {
+  const response = await openMrt2Bar(session, packet.bar, signal, format);
   const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
-  if (decoded.length !== packet.pcm_frames || decoded.numberOfChannels !== 2) {
+  if (decoded.length !== packet.pcm_frames || decoded.numberOfChannels !== 2 || decoded.sampleRate !== MRT2_RATE) {
     throw new Error('MRT2 小节解码后长度不匹配。');
   }
   const pcm = new Uint8Array(decoded.length * sampleBytes);
@@ -37,7 +37,8 @@ export async function readLosslessMrt2Bar(session, packet, signal, decoder) {
   for (let channel = 0; channel < 2; channel++) {
     const values = decoded.getChannelData(channel);
     for (let frame = 0; frame < decoded.length; frame++) {
-      view.setInt16(frame * sampleBytes + channel * 2, Math.round(values[frame] * 32768), true);
+      const sample = Math.min(32767, Math.max(-32768, Math.round(values[frame] * 32768)));
+      view.setInt16(frame * sampleBytes + channel * 2, sample, true);
     }
   }
   return pcm;
