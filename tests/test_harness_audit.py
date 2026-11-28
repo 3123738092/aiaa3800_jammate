@@ -119,6 +119,27 @@ def test_rhythm_sketch_uses_clip_duration_without_relaxing_strict_capture():
     assert len(event.payload["rhythm"]["onset_beats"]) >= 2
 
 
+@pytest.mark.parametrize("text,override,expected,source", [
+    ("用这个拍手，只要鼓点", None, 113, "claps"),
+    ("用这个拍手，3/4 拍，88 BPM，只要鼓点", None, 88, "text"),
+    ("用这个拍手，3/4 拍，88 BPM，只要鼓点", 105, 105, "manual"),
+])
+def test_rhythm_sketch_uses_workspace_tempo_only_as_a_hint(text, override, expected, source):
+    from test_rhythm_analysis import claps, SR
+
+    stream = io.BytesIO()
+    sf.write(stream, claps([.1, .36, .59, .89], 1.25), SR, format="WAV")
+    clip = {"mime_type": "audio/wav", "audio": base64.b64encode(stream.getvalue()).decode()}
+    with closing(BrowserJamService()) as service:
+        start = service.dispatch("start", {"meter": "4/4", "tempo_hint": 113, "bpm": override,
+            "opening_mode": "cold", "opening": {"text": text, "rhythm": clip, "rhythm_timing": "feel"}})
+        opening = service.sessions[start["session"]].debug()["opening"]
+    rhythm = next(item["payload"]["rhythm"] for item in opening["input_events"] if item["source"] == "rhythm")
+    assert rhythm["tempo_bpm"] == start["bpm"] == expected
+    assert opening["settings"]["tempo_source"] == source
+    assert rhythm["beats_per_bar"] == (3 if "3/4" in text else 4)
+
+
 def test_opt_in_accepts_audible_audio_without_inventing_pitch(monkeypatch):
     monkeypatch.setattr("jammate.analysis.jam_capture.segment_notes", lambda *_args, **_kwargs: [])
     monkeypatch.setattr("jammate.analysis.jam_capture.track_pitch", lambda *_args, **_kwargs: ())

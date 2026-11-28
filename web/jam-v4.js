@@ -377,7 +377,8 @@ function showView(active, view) {
 async function poll(active) {
   let delay = 100;
   try {
-    const view = await post('poll', active.position(), 6000);
+    // Recover a lost playback acknowledgement within the usual stream buffer.
+    const view = await post('poll', active.position(), active.stream ? 2200 : 6000);
     if (live !== active) return;
     active.confirmedBar = view.current_bar ?? -1;
     await active.enqueue(view.next);
@@ -399,7 +400,7 @@ async function poll(active) {
       failPlayback(error);
       return;
     }
-    delay = 750;
+    delay = active.stream ? 250 : 750;
   }
   if (live === active) timer = setTimeout(() => poll(active), delay);
 }
@@ -445,9 +446,11 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
     const profile = studioProfile();
     if (profile.renderer === null) throw new Error('MRT2 流式伴奏暂不可用，请稍后重新开演。');
     openingMode ??= profile.agent === 'llm' && opening.text ? 'warm' : 'cold';
-    const useConfiguredTempo = tempoExplicit || opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
-    const bpm = useConfiguredTempo && !opening.rhythm?.count_in_ms?.length ? config.bpm : null;
-    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm,
+    const countedIn = opening.rhythm?.count_in_ms?.length;
+    const materialUsesTempo = opening.midi || opening.humming || (opening.rhythm && !opening.rhythm.hits);
+    const bpm = tempoExplicit && !countedIn ? config.bpm : null;
+    const tempoHint = materialUsesTempo && !countedIn && !tempoExplicit ? config.bpm : null;
+    const view = await post('start', {opening, studio_idea: ideaId, opening_mode: openingMode, bpm, tempo_hint: tempoHint,
       meter: config.meter, ...profile, stream_lookahead: profile.renderer === 'mrt2_stream'}, 100_000);
     if (live !== active) {
       release(view.session);

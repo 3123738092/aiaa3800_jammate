@@ -1049,7 +1049,7 @@ class BrowserJamService:
             return from_humming(corrected, session_id=session_id, event_id=event.event_id)
         return event
 
-    def opening_events(self, body, *, bpm=None, audio_references=None, session_id=None, beats=None):
+    def opening_events(self, body, *, bpm=None, tempo_hint=None, audio_references=None, session_id=None, beats=None):
         if not isinstance(body, dict):
             raise ValueError("请提供至少一种开场素材：文字、拍手或哼唱。")
         text = body.get("text", "")
@@ -1080,7 +1080,8 @@ class BrowserJamService:
             try:
                 if timing == "feel":
                     text_bpm = text_settings(text_event)[0]
-                    rhythm = analyze_rhythm_feel(clap, clap_rate, bpm or text_bpm or JamState.tempo_bpm, beats_per_bar)
+                    rhythm = analyze_rhythm_feel(clap, clap_rate, bpm or text_bpm or tempo_hint or JamState.tempo_bpm,
+                                                 beats_per_bar)
                 else:
                     rhythm = analyze_rhythm_audio(clap, clap_rate, beats_per_bar=beats_per_bar)
             except ValueError:
@@ -1280,9 +1281,11 @@ class BrowserJamService:
             profile = body.get("profile", "electric")
             timbres = body.get("timbres")
             bpm_override = body.get("bpm")
-            if bpm_override is not None and (type(bpm_override) not in (int, float) or not isfinite(bpm_override)
-                                             or not MIN_TEMPO_BPM <= bpm_override <= MAX_TEMPO_BPM):
-                raise ValueError(f"手动 BPM 需在 {MIN_TEMPO_BPM}–{MAX_TEMPO_BPM} 之间。")
+            tempo_hint = body.get("tempo_hint")
+            for supplied_tempo in (bpm_override, tempo_hint):
+                if supplied_tempo is not None and (type(supplied_tempo) not in (int, float) or not isfinite(supplied_tempo)
+                                                   or not MIN_TEMPO_BPM <= supplied_tempo <= MAX_TEMPO_BPM):
+                    raise ValueError(f"BPM 需在 {MIN_TEMPO_BPM}–{MAX_TEMPO_BPM} 之间。")
             if agent not in ("rule", "llm") or arrangement not in ("rule", "llm_all"):
                 raise ValueError("未知的指令处理或编排方式。")
             if mode not in ("warm", "cold", "humming"):
@@ -1319,13 +1322,14 @@ class BrowserJamService:
                 meter = requested_meter(opening["text"]) or meter
             beats = METERS.get(meter)
             audio_references = {} if renderer == "mrt2_direct" and body.get("mrt2_audio_reference") is True else None
-            events = self.opening_events(opening, bpm=bpm_override, audio_references=audio_references, beats=beats)
+            events = self.opening_events(opening, bpm=bpm_override, tempo_hint=tempo_hint,
+                                         audio_references=audio_references, beats=beats)
             if agent == "llm" or arrangement == "llm_all":
                 config = selected_config or self.config()
             else:
                 config = self.optional_config() if mode == "warm" and renderer != "mrt2_direct" else None
             programs = self.soundfont.programs if self.soundfont else {}
-            state, selection = prepare_opening(events, config, programs, tempo_override=bpm_override,
+            state, selection = prepare_opening(events, config, programs, tempo_override=bpm_override, tempo_hint=tempo_hint,
                                                key_override=opening.get("key"), mode=mode, renderer=renderer, beats_override=beats)
             state = state.with_updates(beats_per_bar=beats or (
                 state.rhythm.beats_per_bar if state.rhythm and state.rhythm.drum_pitches else text_beats_per_bar(

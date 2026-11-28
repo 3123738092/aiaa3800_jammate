@@ -292,7 +292,7 @@ def cold_audio_plan(request):
 
 
 def prepare_opening(events, config, programs, *, tempo_override=None, key_override=None, provider=None,
-                    mode="warm", renderer="synth", beats_override=None):
+                    mode="warm", renderer="synth", beats_override=None, tempo_hint=None):
     by_source = {event.source: event for event in events}
     rhythm_event, humming_event = by_source.get("rhythm"), by_source.get("midi", by_source.get("humming"))
     text_event = by_source.get("text", by_source.get("speech"))
@@ -305,9 +305,9 @@ def prepare_opening(events, config, programs, *, tempo_override=None, key_overri
         raise ValueError(f"开场速度需在 {MIN_TEMPO_BPM:g}–{MAX_TEMPO_BPM:g} BPM 之间。")
     claps = RhythmContext(**rhythm_event.payload["rhythm"]) if rhythm_event else None
     input_rhythm = _recorded_rhythm_source(claps)
-    locked_tempo = tempo if tempo is not None else claps.tempo_bpm if claps else None
+    locked_tempo = tempo if tempo is not None else claps.tempo_bpm if claps else tempo_hint
     tempo_source = ("manual" if tempo_override is not None else "text" if text_bpm is not None else
-                    input_rhythm or ("clock" if mode == "cold" else "model"))
+                    input_rhythm or ("session" if tempo_hint is not None else "clock" if mode == "cold" else "model"))
     focus = opening_focus(text_event, {} if renderer == "mrt2_direct" else programs)
     if renderer == "mrt2_stream" and humming_event and text_event and claps is None and mode == "warm":
         text = text_event.payload["text"]
