@@ -31,6 +31,7 @@ from jammate.generate.harmony import harmony_cycle
 from jammate.instruments import gm_program
 from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.agent import SCOPES, RuleAgent, _clauses
+from jammate.orchestration.accompaniment_intent import accompaniment_plan
 from jammate.orchestration.addition_intent import asks_for_instruments, guitar_command_plan
 from jammate.orchestration.backend_arrangement import (
     LLMBackendArranger, MRTArrangement, prepare_scoped_score, writable_layers,
@@ -134,12 +135,14 @@ class BrowserJam:
         self.direct_mrt2 = renderer == "mrt2_direct"
         self.style_config = style_config
         self.audio_references = audio_references
-        self.manager = StateManager(state, follow_humming=True)
+        # Live MRT2 registers clips for the Agent without changing an already
+        # sounding backing. A clip chosen to start the session can shape it.
+        self.manager = StateManager(state, follow_humming=renderer != "mrt2_stream")
         opening_plan = None
         self.opening_answer = ()
         self.opening = None
         if selection is not None:
-            self.manager.ingest(events)
+            self.manager.ingest(events, follow_humming=True)
             self.opening = {**selection, "input_events": [event.to_dict() for event in events]}
             humming = next((event for event in events if event.event_type == "musical_phrase"), None)
             if humming is not None and state.layer("lead").active:
@@ -834,11 +837,15 @@ class BrowserJam:
             if plan is None and (bossa := bossa_melody_plan(request)) is not None:
                 plan, route = bossa, "studio_bossa"
             if plan is None and self.renderer == "mrt2_stream":
-                guitar = guitar_command_plan(request.events, request.state, f"guitar_{uuid4().hex}",
-                                             self.soundfont.programs if self.soundfont else None)
-                if guitar is not None:
-                    plan, needs_score = guitar
-                    route = "scoped_guitar_riff" if needs_score else "local_explicit"
+                plan = accompaniment_plan(request, f"accompaniment_{uuid4().hex}")
+                if plan is not None:
+                    route = "local_explicit"
+                else:
+                    guitar = guitar_command_plan(request.events, request.state, f"guitar_{uuid4().hex}",
+                                                 self.soundfont.programs if self.soundfont else None)
+                    if guitar is not None:
+                        plan, needs_score = guitar
+                        route = "scoped_guitar_riff" if needs_score else "local_explicit"
             plan = plan or cold_audio_plan(request)
             if plan is None:
                 agent = self.make_agent()

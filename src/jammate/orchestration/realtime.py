@@ -351,7 +351,7 @@ class RealtimeSession:
         data = change.decision.plan.to_dict()
         rewritten = {action["scope"] for action in data["actions"]
                      if action["action"] not in {"PRESERVE", "SIMPLIFY"} and not (
-                         action["action"] == "ADJUST_FEEL" and action["parameters"].keys() == {"level_delta"}
+                         action["action"] == "ADJUST_FEEL" and set(action["parameters"]) in ({"level_delta"}, {"density"})
                      )}
         retained = []
         for part in parts:

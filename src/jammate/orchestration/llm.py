@@ -274,7 +274,7 @@ def validate_plan(plan, events, state):
     for action in motifs:
         if action["action"] != "INTRODUCE_MOTIF":
             end = max(n.end for n in state.motif(action["parameters"]["motif_id"]).notes)
-            if action["action"] == "ECHO_MOTIF" and end > 4 * data["valid_for_bars"]:
+            if action["action"] == "ECHO_MOTIF" and end > target.beats_per_bar * data["valid_for_bars"]:
                 raise PlanError("valid_for_bars is too short for the original motif including rests")
     if "groove" in data["preserve"]:
         before, after = state.layer("drums"), target.layer("drums")
@@ -286,8 +286,8 @@ def validate_plan(plan, events, state):
     for action in data["actions"]:
         name, params = action["action"], action["parameters"]
         if name == "ADJUST_FEEL" and not params:
-            raise PlanError("ADJUST_FEEL requires level_delta or rhythm_event_id")
-        prop = "level" if name == "BUILD" or params.get("level_delta") else "density" if name == "SIMPLIFY" else "active" if name in {"INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER"} else None
+            raise PlanError("ADJUST_FEEL requires a setting to adjust")
+        prop = "level" if name == "BUILD" or params.get("level_delta") else "density" if name == "SIMPLIFY" or "density" in params else "active" if name in {"INTRODUCE_LAYER", "ADD_LAYER", "REMOVE_LAYER"} else None
         if prop:
             names = tuple(layer.name for layer in target.layers) if action["scope"] == "band" else (action["scope"],)
             for layer in names:

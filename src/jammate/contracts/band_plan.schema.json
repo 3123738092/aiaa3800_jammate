@@ -28,6 +28,7 @@
             "rhythm_event_id": {"type": "string", "minLength": 1},
             "duration_bars": {"type": "integer", "minimum": 1, "maximum": 16},
             "level_delta": {"type": "number", "minimum": -1, "maximum": 1},
+            "density": {"type": "number", "minimum": 0, "maximum": 1},
             "brightness": {"type": "number", "minimum": 0, "maximum": 1},
             "tonic": {"type": "integer", "minimum": 0, "maximum": 11},
             "mode": {"enum": ["major", "minor"]},

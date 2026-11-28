@@ -6,11 +6,13 @@ import pytest
 from jammate.browser_jam import BrowserJam
 from jammate.contracts.adapters import from_humming, from_text
 from jammate.generate.arranger import chord_for_bar
+from jammate.interaction import Layer
 from jammate.music import ChordStep
 from jammate.orchestration.agent import RuleAgent
 from jammate.orchestration.context import select_state
 from jammate.orchestration.jam_opening import prepare_opening
 from jammate.orchestration.offline import prepare_bar
+from jammate.orchestration.plans import make_plan
 from jammate.rhythm import RhythmContext
 from jammate.state import JamState
 
@@ -88,6 +90,60 @@ def test_only_a_new_phrase_with_contour_replaces_the_backing_motif():
         queued = jam.runtime.preview_next_bar()
         assert queued.timing.bar_index == 1 and for_layer(queued.notes, "lead")
         assert for_layer(queued.notes, "lead")[0].pitch == 64
+
+
+def test_stream_continues_the_played_phrase_and_restores_the_prior_backing():
+    class ContinuePhrase:
+        def decide(self, events, state, *, history):
+            assert len(events) == 2
+            actions = [
+                {"action": "ADD_LAYER", "scope": "lead", "strength": .5, "parameters": {}},
+                {"action": "VARY_MOTIF", "scope": "lead", "strength": .5,
+                 "parameters": {"motif_id": "motif_user-take"}},
+            ]
+            return make_plan(state, events, "played-variation", "RESPOND", actions,
+                             ["layer:drums", "layer:bass", "layer:keys"], {}, 2, "接着弹", [])
+
+    initial = JamState(session_id="motif-jam", layers=(Layer("drums", density=.8), Layer("bass", density=.9),
+                                                     Layer("keys"), Layer("lead", active=False)))
+    opening = initial, (), {"reason": "Fixture", "instruments": []}
+    with ThreadPoolExecutor(1) as workers:
+        jam = BrowserJam(96, ContinuePhrase, workers, renderer="mrt2_stream", opening=opening)
+        try:
+            runtime = jam.runtime
+            runtime.advance_to(0)
+            event = from_text("接着我上传的这段哼唱往下发展", session_id=jam.id)
+            jam.submit_event(event, humming(jam.id, "user-take", (60, 64, 67, 69)))
+            jam.future.result(timeout=3)
+            assert jam.manager.state.accompaniment_motif is None
+            played = runtime.preview_next_bar()
+            assert for_layer(played.notes, "keys") == for_layer(prepare_bar(initial, 1), "keys")
+            runtime.advance_to(played.timing.start_sample)
+            phrase = jam.manager.state.last_ai_motif
+            assert phrase and phrase != jam.manager.state.last_user_motif
+            while runtime.preview_next_bar().plan is not None:
+                runtime.advance_to(runtime.preview_next_bar().timing.start_sample)
+
+            jam.submit("保持刚才的旋律，把伴奏减薄。")
+            jam.future.result(timeout=3)
+            thinner = runtime.preview_next_bar()
+            assert [a["action"] for a in thinner.plan.actions] == ["SIMPLIFY", "ECHO_MOTIF"]
+            assert for_layer(thinner.notes, "lead")
+            runtime.advance_to(thinner.timing.start_sample)
+            assert jam.manager.state.last_ai_motif == phrase
+            assert jam.manager.state.layer("drums").density == .55
+
+            jam.submit("恢复刚才的干净伴奏。")
+            jam.future.result(timeout=3)
+            restored = runtime.preview_next_bar()
+            assert jam.manager.state.layer("drums").density == .55
+            assert restored.state.layers == initial.layers
+            assert restored.notes == prepare_bar(initial, restored.timing.bar_index)
+            confirmed, = runtime.advance_to(restored.timing.start_sample)
+            assert confirmed.started.plan_id == restored.plan.plan_id
+            assert jam.manager.state.layers == initial.layers
+        finally:
+            jam.close()
 
 
 def test_humming_completion_plays_a_new_phrase_after_the_unchanged_replay():

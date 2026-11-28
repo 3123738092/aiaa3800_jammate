@@ -40,12 +40,14 @@ class BandPlan:
             params = action["parameters"]
             allowed = {"PRESERVE": set(), "ECHO_MOTIF": {"motif_id"}, "VARY_MOTIF": {"motif_id"},
                        "INTRODUCE_MOTIF": {"motif_id"}, "BUILD": {"duration_bars"}, "SIMPLIFY": {"duration_bars"},
-                       "ADJUST_FEEL": {"rhythm_event_id", "level_delta", "brightness"},
+                       "ADJUST_FEEL": {"rhythm_event_id", "level_delta", "brightness", "density"},
                        "INTRODUCE_LAYER": set(), "ADD_LAYER": set(), "REMOVE_LAYER": set(),
                        "SET_KEY": {"tonic", "mode"}, "SET_PROGRESSION": {"chords"},
                        "SET_TEXTURE": {"scale", "drums", "bass", "keys"}, "FILL": set()}
             if not set(params) <= allowed[action["action"]]:
                 raise PlanError("parameters do not belong to this action")
+            if "density" in params and (set(params) != {"density"} or action["scope"] in {"band", "lead", "motif"}):
+                raise PlanError("a density target applies to one accompaniment layer")
             if action["action"] == "INTRODUCE_LAYER" and added_program(action["scope"]) is None:
                 raise PlanError("INTRODUCE_LAYER requires an instrument from the playable catalogue")
             if action["action"] in {"SET_KEY", "SET_PROGRESSION", "SET_TEXTURE"} and (action["scope"] != "band" or set(params) != allowed[action["action"]]):

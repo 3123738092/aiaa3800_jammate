@@ -106,6 +106,8 @@ def project(state: JamState, plan: BandPlan) -> JamState:
                     layer = replace(layer, active=name == "ADD_LAYER")
                 elif name == "ADJUST_FEEL" and "level_delta" in params:
                     layer = replace(layer, level=max(0., min(1., layer.level + params["level_delta"])))
+                elif name == "ADJUST_FEEL" and "density" in params:
+                    layer = replace(layer, density=params["density"])
             layers.append(layer)
         if not matched:
             raise PlanError(f"unsupported action scope: {scope}")

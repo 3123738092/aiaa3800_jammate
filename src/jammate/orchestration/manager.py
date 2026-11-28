@@ -94,9 +94,10 @@ class StateManager:
                                 "plans": plans})
             return self._state, history
 
-    def ingest(self, events) -> tuple[InputEvent, ...]:
+    def ingest(self, events, *, follow_humming=None) -> tuple[InputEvent, ...]:
         """One explicit related batch. Does not guess grouping from arrival time."""
         events = tuple(events)
+        follow_humming = self._follow_humming if follow_humming is None else follow_humming
         with self._lock:
             proposed = {}
             for event in events:
@@ -126,7 +127,7 @@ class StateManager:
                     if phrase.notes:
                         motif = Motif(f"motif_{event.event_id}", "user", (event.event_id,), phrase.notes)
                         accompaniment = state.accompaniment_motif
-                        if self._follow_humming and event.source in {"humming", "midi"} and has_melodic_contour(phrase.notes):
+                        if follow_humming and event.source in {"humming", "midi"} and has_melodic_contour(phrase.notes):
                             accompaniment = AccompanimentMotif(motif.motif_id, state.position.next_bar)
                         state = state.with_updates(motifs=state.motifs + (motif,), last_user_motif=phrase.notes,
                                                    accompaniment_motif=accompaniment)
@@ -292,6 +293,9 @@ class StateManager:
                 expected = tuple(replace(n, instrument="lead") for n in state.motif(action["parameters"]["motif_id"]).notes)
                 if tuple(lead_notes) != expected:
                     raise PlanError("ECHO_MOTIF receipt changed the user's motif")
+            elif not any(m.notes == tuple(lead_notes) for m in target.motifs):
+                response = Motif(f"response:{plan.plan_id}", "ai", tuple(data["trigger_event_ids"]), tuple(lead_notes))
+                target = target.with_updates(motifs=(*target.motifs, response))
             target = target.with_updates(last_ai_motif=tuple(lead_notes), interaction=replace(target.interaction,
                      strategy=Strategy.LISTEN, initiative=0., current_lead="user",
                      awaiting_user=action["action"] == "INTRODUCE_MOTIF"))
