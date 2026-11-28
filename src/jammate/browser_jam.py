@@ -31,7 +31,7 @@ from jammate.generate.harmony import harmony_cycle
 from jammate.instruments import gm_program
 from jammate.music import BEATS_PER_BAR
 from jammate.orchestration.agent import SCOPES, RuleAgent, _clauses
-from jammate.orchestration.addition_intent import asks_for_instruments
+from jammate.orchestration.addition_intent import asks_for_instruments, guitar_command_plan
 from jammate.orchestration.backend_arrangement import (
     LLMBackendArranger, MRTArrangement, prepare_scoped_score, writable_layers,
 )
@@ -833,6 +833,12 @@ class BrowserJam:
                 route = "local_explicit"
             if plan is None and (bossa := bossa_melody_plan(request)) is not None:
                 plan, route = bossa, "studio_bossa"
+            if plan is None and self.renderer == "mrt2_stream":
+                guitar = guitar_command_plan(request.events, request.state, f"guitar_{uuid4().hex}",
+                                             self.soundfont.programs if self.soundfont else None)
+                if guitar is not None:
+                    plan, needs_score = guitar
+                    route = "scoped_guitar_riff" if needs_score else "local_explicit"
             plan = plan or cold_audio_plan(request)
             if plan is None:
                 agent = self.make_agent()

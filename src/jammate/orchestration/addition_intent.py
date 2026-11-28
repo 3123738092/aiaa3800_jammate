@@ -1,7 +1,7 @@
 """Resolve an unspecified instrument request against the current lineup."""
 import re
 
-from jammate.instruments import ADDED_INSTRUMENTS
+from jammate.instruments import ADDED_INSTRUMENTS, MAX_JAM_LAYERS, added_program
 from .explicit_request import request_hold
 from .plans import make_plan
 from .tempo_intent import speech_clauses
@@ -14,6 +14,63 @@ _ADD_INSTRUMENTS = re.compile(
 )
 _NAMES = {"drums": "鼓", "bass": "贝斯", "keys": "键盘", "lead": "主旋律",
           **{name: instrument.label for name, instrument in ADDED_INSTRUMENTS.items()}}
+_ADD_GUITAR_RIFF = re.compile(
+    r"(?:请\s*)?(?:再\s*)?(?:加上?|加入|来|给我来)\s*(?:一?[段条个句])?\s*"
+    r"(?:清楚的|清晰的|清音的?|干净的)?\s*电吉他\s*(?:riff|乐句)")
+_HIGHLIGHT_GUITAR = re.compile(r"(?:把)?(?:电吉他|吉他)(?:再)?(?:突出|大声|响)(?:一点|一些)?")
+_MUTE_GUITAR = re.compile(r"(?:去掉|移除|停掉|关掉|静音)(?:电吉他|吉他)")
+_BACKING = r"(?:鼓组?|鼓点|bass|贝斯)(?:\s*(?:和|与|及|and)\s*(?:鼓组?|鼓点|bass|贝斯))*"
+_KEEP_BACKING = re.compile(rf"(?:(?:保留|保持)\s*{_BACKING}|{_BACKING}\s*(?:也|都)?(?:保持|保持不变|不要变|不变|照旧))")
+
+
+def guitar_command_plan(events, state, plan_id, soundfont_programs):
+    """Ground an explicit guitar turn without giving the generic lead another part."""
+    clauses = [text for text in speech_clauses(events) if not _KEEP_BACKING.fullmatch(text)]
+    if len(clauses) != 1 or not state.playing:
+        return None
+    text = clauses[0]
+    target = events[0].to_dict()["provenance"].get("target")
+    if target not in (None, "band", "guitar") and not 24 <= (added_program(target) or 0) <= 31:
+        return None
+
+    needs_score = _ADD_GUITAR_RIFF.fullmatch(text) is not None
+    if needs_score:
+        if state.key is None or 27 not in (soundfont_programs or {}):
+            return None
+        scope = "gm_27"
+        if target not in (None, "band", "guitar", scope):
+            return None
+        existing = next((layer for layer in state.layers if added_program(layer.name) == 27), None)
+        if existing and existing.active:
+            return None
+        if not existing and len(state.layers) >= MAX_JAM_LAYERS:
+            return request_hold(events, state, plan_id, "当前编制已满，电吉他还未加入。"), False
+        scope = existing.name if existing else scope
+        action, params = ("ADD_LAYER" if existing else "INTRODUCE_LAYER"), {}
+        reason = "保留现有声部，为清音电吉他写一段 riff。"
+    elif _HIGHLIGHT_GUITAR.fullmatch(text) or _MUTE_GUITAR.fullmatch(text):
+        first_program = 26 if "电吉他" in text else 24
+        matches = [layer.name for layer in state.layers if layer.active
+                   and first_program <= (added_program(layer.name) or 0) <= 31
+                   and (target in (None, "band", "guitar") or target == layer.name)]
+        if not matches:
+            return request_hold(events, state, plan_id, "当前没有在演奏的吉他声部。"), False
+        if len(matches) != 1:
+            return request_hold(events, state, plan_id, "当前有多把吉他，请指明要调整哪一把。"), False
+        scope = matches[0]
+        mute = _MUTE_GUITAR.fullmatch(text) is not None
+        action, params = ("REMOVE_LAYER", {}) if mute else ("ADJUST_FEEL", {"level_delta": .2})
+        reason = "移除指定吉他声部。" if mute else "提高指定吉他声部的音量。"
+    else:
+        return None
+
+    preserve = ["tempo", "key", "progression", "playing", "groove",
+                *(f"layer:{layer.name}" for layer in state.layers if layer.name != scope)]
+    if state.current_motif_id:
+        preserve.append(f"motif:{state.current_motif_id}")
+    return make_plan(state, events, plan_id, "FOLLOW",
+                     [{"action": action, "scope": scope, "strength": .5, "parameters": params}],
+                     preserve, {}, 4, reason, []), needs_score
 
 
 def asks_for_instruments(events):

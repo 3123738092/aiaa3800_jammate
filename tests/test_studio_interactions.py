@@ -189,6 +189,45 @@ def test_stream_can_change_tempo_after_reserved_short_bars(monkeypatch, command)
         assert after["turns"] == before["turns"]
 
 
+def test_named_guitar_riff_and_followups_keep_the_same_part():
+    from dataclasses import replace
+    from jammate.contracts.adapters import from_text
+    from jammate.interaction import Layer
+    from jammate.orchestration.addition_intent import guitar_command_plan
+    from jammate.orchestration.backend_arrangement import writable_layers
+    from jammate.orchestration.transitions import project
+    from jammate.state import JamState
+
+    state = JamState(layers=(Layer("drums"), Layer("bass"), Layer("keys", active=False),
+                            Layer("lead", active=False)))
+    bank = {27: "Clean Guitar", 30: "Distortion Guitar"}
+
+    def plan(text, current):
+        events = (from_text(text, session_id=current.session_id),)
+        return guitar_command_plan(events, current, "guitar-turn", bank)
+
+    riff, compose = plan("再来个清楚的电吉他 riff，bass 和鼓保持。", state)
+    projected = project(state, riff)
+    assert compose and riff.actions == [{"action": "INTRODUCE_LAYER", "scope": "gm_27",
+                                        "strength": .5, "parameters": {}}]
+    assert set(writable_layers(projected, riff)) == {"gm_27"}
+    assert projected.layers[:-1] == state.layers
+
+    louder, compose = plan("吉他再突出一点，bass 不要变，鼓也保持。", projected)
+    assert not compose and louder.actions[0]["scope"] == "gm_27"
+    adjusted = project(projected, louder)
+    assert adjusted.layer("gm_27").level == .7
+    mute, compose = plan("去掉吉他，保留鼓和 bass。", adjusted)
+    assert not compose and mute.actions[0]["scope"] == "gm_27"
+    muted = project(adjusted, mute)
+    assert muted.layers[:-1] == state.layers
+    assert muted.layer("gm_27") == replace(adjusted.layer("gm_27"), active=False)
+
+    held, compose = plan("吉他再突出一点，bass 不要变，鼓也保持。", state)
+    assert not compose and not held.actions and held.to_dict()["unresolved"]
+    assert plan("再来个电吉他 riff，把速度调到 100 BPM", state) is None
+
+
 def test_warm_opening_can_repair_invalid_provider_selection():
     from types import SimpleNamespace
     import json
