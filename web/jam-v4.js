@@ -1,5 +1,5 @@
 import {decodeBase64, StudioPlayback, wave} from './jam-v4-playback.js';
-import {retryableConnection} from './jam-mrt2-stream.js';
+import {MRT2_RECONNECT_MS, retryableConnection} from './jam-mrt2-stream.js';
 
 const $ = id => document.getElementById(id);
 const studio = window.JamMate;
@@ -396,11 +396,13 @@ async function poll(active) {
   } catch (error) {
     if (live !== active) return;
     active.pollUnavailableSince ??= performance.now();
-    if (!retryableConnection(error) || performance.now() - active.pollUnavailableSince >= 18_000) {
+    const unavailableFor = performance.now() - active.pollUnavailableSince;
+    const timeout = active.streamDecoder ? MRT2_RECONNECT_MS : 18_000;
+    if (!retryableConnection(error) || unavailableFor >= timeout) {
       failPlayback(error);
       return;
     }
-    delay = active.stream ? 250 : 750;
+    delay = active.stream ? (unavailableFor < 8000 ? 250 : 1250) : 750;
   }
   if (live === active) timer = setTimeout(() => poll(active), delay);
 }

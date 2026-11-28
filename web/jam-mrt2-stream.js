@@ -1,4 +1,6 @@
 export const MRT2_RATE = 48000;
+// Replayable bars can be retried within the server's 90-second session lifetime.
+export const MRT2_RECONNECT_MS = 60_000;
 const sampleBytes = 4;
 const blockBytes = MRT2_RATE / 25 * sampleBytes;
 
@@ -32,18 +34,22 @@ async function openMrt2Bar(session, bar, signal, format) {
 }
 
 export async function readEncodedMrt2Bar(session, packet, signal, decoder, format) {
+  const reconnect = AbortSignal.any([signal, AbortSignal.timeout(MRT2_RECONNECT_MS)]);
   let bytes;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let retryDelay = 180;
+  for (;;) {
+    reconnect.throwIfAborted();
     try {
-      const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
+      const deadline = AbortSignal.any([reconnect, AbortSignal.timeout(10_000)]);
       const response = await openMrt2Bar(session, packet.bar, deadline, format);
       bytes = await response.arrayBuffer();
       const length = Number(response.headers.get('Content-Length'));
       if (length && bytes.byteLength !== length) throw new TypeError('MRT2 小节传输未完成。');
       break;
     } catch (error) {
-      if (signal.aborted || attempt === 2 || !retryableConnection(error)) throw error;
-      await new Promise(resolve => setTimeout(resolve, 180 * (attempt + 1)));
+      if (reconnect.aborted || !retryableConnection(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      retryDelay = Math.min(retryDelay * 2, 1250);
     }
   }
   const decoded = await decoder.decodeAudioData(bytes);
