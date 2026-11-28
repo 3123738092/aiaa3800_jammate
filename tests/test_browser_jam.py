@@ -488,6 +488,32 @@ def test_spoken_chinese_bpm_numbers_use_the_same_tempo_parser():
     assert tempo_clause("速度调到一百二 bpm") is None
 
 
+def test_humming_keeps_same_pitch_reattacks_and_a_final_sustain():
+    import numpy as np
+    from jammate.analysis.jam_capture import analyze_capture
+
+    rate = 16000
+    starts = (.12, .44, .76, 1.08, 1.40)
+    lengths = (.27, .27, .27, .27, .85)
+    samples = np.zeros(3 * rate, dtype=np.float32)
+    for start, length in zip(starts, lengths):
+        t = np.arange(round(rate * length)) / rate
+        edge = np.clip(np.minimum(t, t[-1] - t) / .01, 0, 1)
+        # Gentle tremolo should never split the held note.
+        motion = .85 + .15 * np.cos(2 * np.pi * 5 * t)
+        first = round(rate * start)
+        samples[first:first + len(t)] = .12 * np.sin(2 * np.pi * 440 * t) * edge * motion
+
+    event, speech = analyze_capture(samples, rate, mode="humming", session_id="reattacks", bpm=90)
+    assert not speech
+    notes = event.payload["melody"]["notes"]
+    assert [note["pitchMidi"] for note in notes] == [69] * 5
+    assert all(abs(note["startSec"] - onset) < .05 for note, onset in zip(notes, starts))
+    assert all(note["startSec"] + note["durationSec"] < next_note["startSec"]
+               for note, next_note in zip(notes, notes[1:]))
+    assert notes[-1]["durationSec"] > .80
+
+
 def test_live_claps_use_session_tempo_and_require_a_complete_bar():
     import numpy as np
     from jammate.analysis.jam_capture import analyze_capture

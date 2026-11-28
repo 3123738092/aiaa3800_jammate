@@ -57,7 +57,7 @@ def _beat_origin(first_voiced: float | None, count_in: np.ndarray, tempo: float,
 def analyze_phrase(y: np.ndarray, sr: int, tempo_hint: float | None = None,
                    default_tempo: float = 96.0) -> PhraseAnalysis:
     times, midi, voiced = track_pitch(y, sr)
-    timed = segment_notes(times, midi, voiced)
+    timed = segment_notes(times, midi, voiced, waveform=(y, sr))
     first_voiced = timed[0].start_s if timed else None
     onsets = detect_onsets(y, sr)
     count_in = onsets if first_voiced is None else onsets[onsets < first_voiced - COUNT_IN_GUARD_S]

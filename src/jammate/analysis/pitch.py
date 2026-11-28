@@ -91,9 +91,36 @@ def _bridge_gaps(notes: list[TimedNote], max_gap: float) -> list[TimedNote]:
     return bridged
 
 
+def _split_rearticulations(notes, audio, sr, min_duration):
+    # pYIN's longer pitch window can bridge physically distinct attacks at the
+    # same pitch. A short RMS window identifies the actual near-silent release.
+    hop = max(1, round(.005 * sr))
+    frames = np.asarray(audio[:len(audio) // hop * hop], dtype=np.float32).reshape(-1, hop)
+    if len(frames) < 3:
+        return notes
+    rms = np.sqrt(np.mean(frames ** 2, axis=1))
+    radius = 16
+    windows = np.lib.stride_tricks.sliding_window_view(np.pad(rms, radius, mode="edge"), 2 * radius + 1)
+    before = windows[:, :radius - 2].max(axis=1)
+    after = windows[:, radius + 3:].max(axis=1)
+    low = rms < .18 * np.minimum(before, after)
+    step = hop / sr
+    rests = [(a * step, b * step) for a, b in _runs(low) if (b - a) * step >= .014]
+    result = []
+    for note in notes:
+        start = note.start_s
+        for release, attack in rests:
+            if release - start >= min_duration and note.end_s - attack >= min_duration:
+                result.append(TimedNote(note.pitch, start, release))
+                start = attack
+        result.append(TimedNote(note.pitch, start, note.end_s))
+    return result
+
+
 def segment_notes(
     times: np.ndarray, midi: np.ndarray, voiced: np.ndarray,
     min_duration: float = MIN_NOTE_S, max_gap: float = MAX_GAP_S,
+    *, waveform: tuple[np.ndarray, int] | None = None,
 ) -> tuple[TimedNote, ...]:
     times = np.asarray(times, dtype=float)
     midi = np.asarray(midi, dtype=float)
@@ -109,6 +136,8 @@ def segment_notes(
         for pitch, s, e in _absorb_short_runs(_label_runs(np.round(segment).astype(int)), min_frames):
             notes.append(TimedNote(pitch, float(times[a + s]), float(times[a + e - 1] + frame)))
     bridged = _bridge_gaps(notes, max_gap)
+    if bridged and waveform is not None:
+        bridged = _split_rearticulations(bridged, *waveform, min_duration)
     return tuple(n for n in bridged if n.end_s - n.start_s >= min_duration - 1e-6)
 
 

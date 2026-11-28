@@ -188,7 +188,7 @@ class LiveJam:
     def _on_phrase(self, audio: np.ndarray) -> None:
         with self._lock:
             tempo = self._state.tempo_bpm
-        timed = segment_notes(*track_pitch(audio, SR))
+        timed = segment_notes(*track_pitch(audio, SR), waveform=(audio, SR))
         notes = to_beats(timed, tempo, origin_s=timed[0].start_s) if timed else ()
         self._log.write("phrase", notes=[[n.pitch, n.start, n.duration] for n in notes])
         if notes:

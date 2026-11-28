@@ -108,7 +108,8 @@ def analyze_capture(audio, rate, *, mode, session_id, bpm, allow_no_notes=False)
     divisor = np.gcd(rate, probe_rate)
     pitch_audio = resample_poly(audio, probe_rate // divisor, rate // divisor)
     notes = []
-    for timed in segment_notes(*track_pitch(pitch_audio, probe_rate), min_duration=.14):
+    tracked = track_pitch(pitch_audio, probe_rate)
+    for timed in segment_notes(*tracked, min_duration=.14, waveform=(pitch_audio, probe_rate)):
         end = min(duration, timed.end_s)
         if end <= timed.start_s:
             continue
