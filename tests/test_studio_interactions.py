@@ -180,6 +180,28 @@ def test_mrt2_score_additions_replace_solo_condition_and_keep_drums():
     assert "solo" not in prompt and "no melody or harmony" not in prompt
 
 
+def test_groove_preservation_keeps_drum_texture_while_compiling_requested_bass():
+    from jammate.contracts.adapters import from_text
+    from jammate.orchestration.offline import prepare_bar, prepare_plan
+    from jammate.orchestration.plans import make_plan, preserve_part_textures
+    from jammate.rhythm import RhythmContext
+    from jammate.state import JamState
+
+    state = JamState(rhythm=RhythmContext(96, (0., 1., 2., 3.), (1., .7, .7, .7)))
+    event = from_text("鼓点保留，贝斯改成切分节奏", session_id=state.session_id)
+    params = {"drums": "steady", "bass": "syncopated", "keys": "default", "scale": "default"}
+    proposed = make_plan(state, (event,), "bass", "FOLLOW",
+                         [{"action": "SET_TEXTURE", "scope": "band", "strength": .5, "parameters": params}],
+                         ["groove", "layer:drums", "layer:keys"], {}, 1, "Change the bass pattern.", [])
+    plan = preserve_part_textures(proposed, state)
+    assert plan.actions[0]["parameters"]["drums"] == "default"
+    assert plan.actions[0]["parameters"]["bass"] == "syncopated"
+    before = prepare_bar(state, plan.to_dict()["effective_at"]["bar"])
+    after = prepare_plan(state, plan).notes
+    assert [n for n in before if n.instrument == "drums"] == [n for n in after if n.instrument == "drums"]
+    assert [n for n in before if n.instrument == "bass"] != [n for n in after if n.instrument == "bass"]
+
+
 def test_playing_drum_only_jam_accepts_bossa_melody_without_requesting_a_key():
     with closing(BrowserJamService()) as service:
         opening = service.dispatch("start", {

@@ -1,4 +1,5 @@
 import {decodeBase64, StudioPlayback, wave} from './jam-v4-playback.js';
+import {retryableConnection} from './jam-mrt2-stream.js';
 
 const $ = id => document.getElementById(id);
 const studio = window.JamMate;
@@ -16,7 +17,6 @@ let loadedRelease, releaseStatus;
 let checkingRelease = false;
 let backendPreference;
 try { backendPreference = localStorage.getItem('jammate-llm-backend'); } catch {}
-let failureCount = 0;
 let pendingTempo, pendingMeter;
 let lastActivity = performance.now();
 let offer, offeredThisLull = false, requestingOffer = false;
@@ -70,8 +70,11 @@ async function post(operation, body, timeout = 12_000) {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body), signal: AbortSignal.timeout(timeout),
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'JamMate 服务请求失败。');
+  const result = await response.json().catch(error => {
+    if (response.ok) throw error;
+    return {};
+  });
+  if (!response.ok) throw Object.assign(new Error(result.error || 'JamMate 服务请求失败。'), {status: response.status});
   return result;
 }
 
@@ -372,13 +375,14 @@ function showView(active, view) {
 }
 
 async function poll(active) {
+  let delay = 100;
   try {
-    const view = await post('poll', active.position());
+    const view = await post('poll', active.position(), 6000);
     if (live !== active) return;
     active.confirmedBar = view.current_bar ?? -1;
     await active.enqueue(view.next);
     if (live !== active) return;
-    failureCount = 0;
+    active.pollUnavailableSince = null;
     showView(active, view);
     if (active.debugAt <= performance.now()) {
       active.debugAt = performance.now() + 900;
@@ -390,12 +394,14 @@ async function poll(active) {
     }
   } catch (error) {
     if (live !== active) return;
-    if (++failureCount >= 3) {
+    active.pollUnavailableSince ??= performance.now();
+    if (!retryableConnection(error) || performance.now() - active.pollUnavailableSince >= 18_000) {
       failPlayback(error);
       return;
     }
+    delay = 750;
   }
-  if (live === active) timer = setTimeout(() => poll(active), 100);
+  if (live === active) timer = setTimeout(() => poll(active), delay);
 }
 
 function release(id) {
@@ -428,7 +434,6 @@ async function launch(active, opening, requestId, {ideaId, openingMode} = {}) {
   if (live) throw new Error('已有演奏正在进行。');
   live = active;
   activity(false);
-  failureCount = 0;
   savedTake = null;
   exportButton.hidden = true;
   resetPreview();

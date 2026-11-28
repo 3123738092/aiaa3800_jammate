@@ -45,6 +45,8 @@ class BrowserMRT2Stream:
         self._encoded_prompt = None
         self._engine = self._style = self._state = None
         self._tail = b""
+        self._held_pitches = {}
+        self._buffered_bar = None
         self._next_bar = 0
         self._closed = Event()
         self._rendering = Lock()
@@ -52,6 +54,7 @@ class BrowserMRT2Stream:
         self._reports = deque(maxlen=12)
         self._generated_frames = 0
         self._late_frames = 0
+        self._replayed_bars = 0
 
     def close(self):
         self._closed.set()
@@ -59,7 +62,7 @@ class BrowserMRT2Stream:
     def diagnostics(self):
         with self._report_lock:
             return {"recent_bars": list(self._reports), "generated_frames": self._generated_frames,
-                    "frames_over_40ms": self._late_frames}
+                    "frames_over_40ms": self._late_frames, "replayed_bars": self._replayed_bars}
 
     @staticmethod
     def samples_for_bar(timing, clock_rate):
@@ -67,8 +70,12 @@ class BrowserMRT2Stream:
                 - round(timing.start_sample * SAMPLE_RATE / clock_rate))
 
     @contextmanager
-    def open_bar(self, bar, clock_rate, *, reference=None):
-        """Claim one ordered stream. A broken response ends this model timeline."""
+    def open_bar(self, bar, clock_rate, *, reference=None, replayable=False):
+        """Keep the latest full encoded-response source available for a transport retry."""
+        if replayable:
+            raw = self._prepare_bar(bar, clock_rate, reference)
+            yield len(raw), (chunk for chunk in (raw,))
+            return
         if not self._rendering.acquire(timeout=.25):
             raise ValueError("上一小节的 MRT2 音频仍在发送。")
         try:
@@ -84,6 +91,33 @@ class BrowserMRT2Stream:
         finally:
             self._rendering.release()
 
+    def _prepare_bar(self, bar, clock_rate, reference):
+        if not self._rendering.acquire(timeout=8):
+            raise TimeoutError("这个 MRT2 小节仍在生成，请重试。")
+        try:
+            index = bar.timing.bar_index
+            if self._closed.is_set():
+                raise ValueError("这个 MRT2 会话已经结束。")
+            if self._buffered_bar is not None and self._buffered_bar[0] == index:
+                with self._report_lock:
+                    self._replayed_bars += 1
+                return self._buffered_bar[1]
+            if index != self._next_bar:
+                raise ValueError("这个 MRT2 音频小节已失效，请重新开始。")
+            samples = self.samples_for_bar(bar.timing, clock_rate)
+            try:
+                raw = b"".join(self._chunks(bar, samples, reference))
+                if len(raw) != samples * SAMPLE_BYTES:
+                    raise ValueError("MRT2 小节未生成完整。")
+            except BaseException:
+                self.close()
+                raise
+            self._buffered_bar = (index, raw)
+            self._next_bar += 1
+            return raw
+        finally:
+            self._rendering.release()
+
     def _chunks(self, bar, samples, reference):
         received = monotonic()
         if self.direct:
@@ -93,8 +127,11 @@ class BrowserMRT2Stream:
             prompt = band_plan_style(self.prompt, bar.state, bar.plan, tempo=self.explicit_tempo,
                                      key=self.explicit_key)
         else:
+            audible = {layer.name for layer in bar.state.layers
+                       if bar.state.playing and layer.active and layer.level > 0 and layer.density > 0}
+            self._held_pitches = {key: length for key, length in self._held_pitches.items() if key[0] in audible}
             prompt = (score_stream_style(bar.state.style or self.prompt, bar.state, lead_voice=self.lead_voice)
-                      if bar.notes else None)
+                      if bar.notes or self._held_pitches else None)
         active = prompt is not None or reference is not None
         source = ("audio", reference[0]) if reference else ("text", prompt)
         change = active and source != self._encoded_prompt
@@ -109,7 +146,7 @@ class BrowserMRT2Stream:
         carry = len(self._tail) // SAMPLE_BYTES
         count = math.ceil((samples - carry) / FRAME_SAMPLES)
         if active and not self.direct:
-            notes, drums = bar_conditions(bar, count, carry)
+            notes, drums, held_pitches = bar_conditions(bar, count, carry, samples, self._held_pitches)
         start = monotonic()
         remaining = samples
         elapsed_frames = []
@@ -122,9 +159,11 @@ class BrowserMRT2Stream:
                   "first_model_pcm_ms": None}
         if active and not self.direct:
             report["grid"] = {"frame_rate": SAMPLE_RATE // FRAME_SAMPLES, "frames": count,
-                              "pitch_cells": int(np.count_nonzero(notes)), "drum_frames": int(np.count_nonzero(drums))}
+                              "pitch_cells": int(np.count_nonzero(notes)), "drum_frames": int(np.count_nonzero(drums)),
+                              "held_pitches": len(self._held_pitches)}
             report["score_layers"] = {part: sum(note.instrument == part for note in bar.notes)
                                       for part in sorted({note.instrument for note in bar.notes})}
+            self._held_pitches = held_pitches
         if self._tail:
             yield self._tail
             remaining -= carry
@@ -185,21 +224,44 @@ class BrowserMRT2Stream:
         return (np.clip(pcm, -1., 32767 / 32768) * 32768).astype("<i2").tobytes()
 
 
-def bar_conditions(bar, frames, carry):
+def bar_conditions(bar, frames, carry, samples, held=None):
     """Project clip-relative notes on the 25 Hz grid without restarting that grid."""
     timing = bar.timing
     beats_per_bar = bar.state.beats_per_bar if bar.state is not None else BEATS_PER_BAR
     bar_beat = timing.bar_index * beats_per_bar
     samples_per_beat = SAMPLE_RATE * 60 / timing.tempo_bpm
-    pitches, drums = [], []
+    pitches, drums, next_held = [], [], {}
+    held = held or {}
+    lead = sorted((note for note in bar.notes if note.instrument == "lead"), key=lambda note: note.start)
+    next_lead_start = {note: next_note.start for note, next_note in zip(lead, lead[1:])
+                       if note.end <= next_note.start + 1e-9}
     for note in bar.notes:
         onset = ((note.start - bar_beat) * samples_per_beat - carry) / FRAME_SAMPLES
-        offset = ((note.end - bar_beat) * samples_per_beat - carry) / FRAME_SAMPLES
+        end_samples = (note.end - bar_beat) * samples_per_beat
+        offset = (end_samples - carry) / FRAME_SAMPLES
         start = min(frames - 1, max(0, math.floor(onset + 1e-9)))
         end = min(frames, max(start + 1, math.ceil(offset - 1e-9)))
+        if note in next_lead_start:
+            next_onset = ((next_lead_start[note] - bar_beat) * samples_per_beat - carry) / FRAME_SAMPLES
+            end = min(end, max(start + 1, math.floor(next_onset + 1e-9)))
         span = {"frame": start, "length": end - start}
         if note.instrument == "drums":
             drums.append(span)
         else:
             pitches.append({**span, "pitch": note.pitch})
-    return MRTArrangement("", tuple(pitches), tuple(drums)).tokens(frames)
+            if end_samples > samples + .5:
+                key = (note.instrument, note.pitch)
+                next_held[key] = max(next_held.get(key, 0), end_samples - samples)
+    notes, drum_tokens = MRTArrangement("", tuple(pitches), tuple(drums)).tokens(frames)
+    first_lead = (lead[0].start - bar_beat) * samples_per_beat if lead else None
+    for key, length in held.items():
+        instrument, pitch = key
+        stop = math.ceil((length - carry) / FRAME_SAMPLES - 1e-9)
+        if instrument == "lead" and first_lead is not None and length <= first_lead + 1e-9:
+            stop = min(stop, math.floor((first_lead - carry) / FRAME_SAMPLES + 1e-9))
+        # A held note uses the sustain token. Keep explicit new attacks or other voices on the same pitch.
+        cells = notes[:max(0, stop), pitch]
+        np.maximum(cells, 1, out=cells)
+        if length > samples + .5:
+            next_held[key] = max(next_held.get(key, 0), length - samples)
+    return notes, drum_tokens, next_held

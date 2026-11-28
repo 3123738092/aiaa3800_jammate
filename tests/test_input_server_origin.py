@@ -19,7 +19,7 @@ PUBLIC_ORIGIN = "https://studio.example.com"
 @contextmanager
 def serve(public_origin=None, *, origin_file=None, drain_file=None):
     @contextmanager
-    def open_bar(session, index):
+    def open_bar(session, index, *, replayable=False):
         assert (session, index) == ("jam", 2)
         yield 4, (chunk for chunk in [b"ab", b"cd"])
 

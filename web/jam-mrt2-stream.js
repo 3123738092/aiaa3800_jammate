@@ -2,6 +2,11 @@ export const MRT2_RATE = 48000;
 const sampleBytes = 4;
 const blockBytes = MRT2_RATE / 25 * sampleBytes;
 
+export function retryableConnection(error) {
+  return ['TypeError', 'TimeoutError'].includes(error?.name)
+    || [408, 429, 500, 502, 503, 504].includes(error?.status);
+}
+
 export function stereoPcmBuffer(context, pcm) {
   const data = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
   const frames = pcm.length / sampleBytes;
@@ -21,14 +26,27 @@ async function openMrt2Bar(session, bar, signal, format) {
   const response = await fetch('/api/jam/mrt2-stream?' + query, {signal, cache: 'no-store'});
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
-    throw new Error(result.error ?? 'MRT2 音频流连接失败。');
+    throw Object.assign(new Error(result.error ?? 'MRT2 音频流连接失败。'), {status: response.status});
   }
   return response;
 }
 
 export async function readEncodedMrt2Bar(session, packet, signal, decoder, format) {
-  const response = await openMrt2Bar(session, packet.bar, signal, format);
-  const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
+  let bytes;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
+      const response = await openMrt2Bar(session, packet.bar, deadline, format);
+      bytes = await response.arrayBuffer();
+      const length = Number(response.headers.get('Content-Length'));
+      if (length && bytes.byteLength !== length) throw new TypeError('MRT2 小节传输未完成。');
+      break;
+    } catch (error) {
+      if (signal.aborted || attempt === 2 || !retryableConnection(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 180 * (attempt + 1)));
+    }
+  }
+  const decoded = await decoder.decodeAudioData(bytes);
   if (decoded.length !== packet.pcm_frames || decoded.numberOfChannels !== 2 || decoded.sampleRate !== MRT2_RATE) {
     throw new Error('MRT2 小节解码后长度不匹配。');
   }

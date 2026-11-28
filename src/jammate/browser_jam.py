@@ -49,7 +49,7 @@ from jammate.orchestration.live_text import JEV_TIMEOUT, JevLiveTagger, LiveText
 from jammate.orchestration.live_timing import LiveTurnTiming, can_wait, target_position
 from jammate.orchestration.manager import StateManager
 from jammate.orchestration.offline import prepare_bar, prepare_humming_answer, prepare_plan
-from jammate.orchestration.plans import make_plan
+from jammate.orchestration.plans import make_plan, preserve_part_textures
 from jammate.orchestration.meter_intent import METERS, remaining_meter_clauses, requested_meter
 from jammate.orchestration.realtime import RealtimeSession, TimingPolicy, prepare_conditioning
 from jammate.orchestration.transitions import project
@@ -338,7 +338,7 @@ class BrowserJam:
         edge = self.following_mrt2 or self.reserved
         return edge.timing.bar_index if edge is not None else -1
 
-    def open_mrt2_bar(self, index):
+    def open_mrt2_bar(self, index, *, replayable=False):
         with self.lock:
             self.check_open()
             bar = self.reserved
@@ -352,7 +352,7 @@ class BrowserJam:
                 ids = bar.plan.to_dict()["trigger_event_ids"]
                 reference = next(((event_id, *self.audio_references[event_id]) for event_id in reversed(ids)
                                   if event_id in self.audio_references), None)
-            return self.mrt2_stream.open_bar(bar, SR, reference=reference)
+            return self.mrt2_stream.open_bar(bar, SR, reference=reference, replayable=replayable)
 
     def keep_audio_reference(self, event, audio, rate):
         if self.audio_references is None or event.source != "humming":
@@ -836,6 +836,8 @@ class BrowserJam:
                 self.refresh_wait()
                 if not self.is_current(event_id):
                     return
+                if self.renderer == "mrt2_stream" and route == "llm":
+                    plan = preserve_part_textures(plan, self.manager.state)
                 timing_label, confidence = trace.get("tags", {}).get("timing", ("flexible", 0))
                 if timing_label == "fixed" and confidence >= .90 and self.turn_timing.target_bar is None:
                     self.update_feedback(status="held", message="需要明确生效位置，目前可以说「下一小节……」。")
@@ -1182,12 +1184,12 @@ class BrowserJamService:
         return (system() == "Darwin" and machine() == "arm64"
                 and all(find_spec(name) is not None for name in ("mrt2_demo", "magenta_rt", "mlx")))
 
-    def open_mrt2_bar(self, session_id, bar):
+    def open_mrt2_bar(self, session_id, bar, *, replayable=False):
         with self.lock:
             session = self.sessions.get(session_id)
         if session is None:
             raise ValueError("会话已结束，请重新开始 Jam。")
-        return session.open_mrt2_bar(bar)
+        return session.open_mrt2_bar(bar, replayable=replayable)
 
     def dispatch(self, operation, body):
         if operation == "status":

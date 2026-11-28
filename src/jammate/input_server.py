@@ -133,7 +133,7 @@ class Handler(SimpleHTTPRequestHandler):
             if encoding in formats and not sf.check_format(*formats[encoding][:2]):
                 raise ValueError("此服务不支持所请求的 MRT2 音频编码。")
             started = monotonic()
-            with self.server.jam.open_mrt2_bar(session, int(index)) as (length, chunks):
+            with self.server.jam.open_mrt2_bar(session, int(index), replayable=encoding in formats) as (length, chunks):
                 with closing(chunks):
                     if encoding in formats:
                         from mrt2_demo.inference import SAMPLE_RATE
@@ -161,6 +161,11 @@ class Handler(SimpleHTTPRequestHandler):
                         self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
+        except TimeoutError as error:
+            if response_started:
+                self.close_connection = True
+            else:
+                self.json_response(503, {"error": str(error)})
         except (KeyError, ValueError, ImportError, RuntimeError, OSError, StopIteration) as error:
             if response_started:
                 self.log_error("MRT2 stream interrupted: %s", error)

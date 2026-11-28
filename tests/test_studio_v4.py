@@ -180,8 +180,57 @@ def test_pad_stream_conditions_use_the_recorded_meter_after_the_first_bar():
     state = JamState(tempo_bpm=120, beats_per_bar=3)
     bar = PlaybackBar(BarTiming(2, 144000, 216000, 120),
                       (Note(38, 7., .1, 90, "drums"),), state=state)
-    _, drums = bar_conditions(bar, 38, 0)
+    _, drums, _ = bar_conditions(bar, 38, 0, 72_000)
     assert np.flatnonzero(drums[:, 0]).tolist() == [12, 13]
+
+
+def test_score_stream_keeps_lead_sustain_without_inventing_attacks_or_chords():
+    from jammate.music import Note
+    from jammate.orchestration.realtime import PlaybackBar
+    from jammate.render.clock import BarTiming
+    from jammate.state import JamState
+    from mrt2_demo.browser_stream import bar_conditions
+
+    state = JamState(tempo_bpm=96)
+    first = PlaybackBar(BarTiming(0, 0, 120_000, 96),
+                        (Note(60, 3.84, .64, 90, "lead"),), state=state)
+    notes, _, held = bar_conditions(first, 63, 0, 120_000)
+    assert notes[60:, 60].tolist() == [2, 1, 1]
+    assert held[("lead", 60)] == pytest.approx(14_400)
+    following = PlaybackBar(BarTiming(1, 120_000, 240_000, 96),
+                            (Note(62, 4.48, .4, 90, "lead"),), state=state)
+    notes, _, held = bar_conditions(following, 62, 960, 120_000, held)
+    assert notes[:7, 60].tolist() == [1] * 7
+    assert notes[7, 60] == 0 and notes[7, 62] == 2
+    assert not held
+
+
+def test_encoded_stream_replays_the_same_render_after_a_lost_response(monkeypatch):
+    from jammate.orchestration.realtime import PlaybackBar
+    from jammate.render.clock import BarTiming
+    from mrt2_demo.browser_stream import BrowserMRT2Stream
+
+    stream = BrowserMRT2Stream("", "test-model")
+    generated = []
+
+    def chunks(bar, samples, reference):
+        generated.append(bar.timing.bar_index)
+        yield bytes([bar.timing.bar_index + 1]) * samples * 4
+
+    monkeypatch.setattr(stream, "_chunks", chunks)
+    first = PlaybackBar(BarTiming(0, 0, 48_000, 96), ())
+    with pytest.raises(ConnectionResetError):
+        with stream.open_bar(first, 48_000, replayable=True) as (size, audio):
+            initial = b"".join(audio)
+            assert len(initial) == size
+            raise ConnectionResetError
+    with stream.open_bar(first, 48_000, replayable=True) as (_, audio):
+        assert b"".join(audio) == initial
+    second = PlaybackBar(BarTiming(1, 48_000, 96_000, 96), ())
+    with stream.open_bar(second, 48_000, replayable=True) as (_, audio):
+        assert next(audio) != initial
+    assert generated == [0, 1]
+    assert stream.diagnostics()["replayed_bars"] == 1
 
 
 def test_studio_harmony_readout_waits_for_applied_bar():
