@@ -176,7 +176,7 @@ class BrowserJam:
         self.mrt2_style = state.style or os.environ.get("JAMMATE_MRT2_PROMPT", "a warm instrumental band")
         self.mrt2_stream = None
         self.stream_lookahead = stream_lookahead and renderer == "mrt2_stream"
-        self.following_mrt2 = None
+        self.following_mrt2 = ()
         if renderer in MRT2_STREAM_RENDERERS:
             from mrt2_demo.browser_stream import BrowserMRT2Stream
             style = state.style or ("" if self.direct_mrt2 and selection else self.mrt2_style)
@@ -282,10 +282,16 @@ class BrowserJam:
             raise ValueError("这个 Jam 会话已经结束，请重新开始。")
         self.last_seen = monotonic()
 
-    def reserve(self):
-        bars = self.runtime.preview_bars(2 if self.stream_lookahead else 1)
+    def reserve(self, *, minimum_bars=1):
+        count = 1
+        if self.stream_lookahead:
+            state = self.manager.state
+            seconds_per_bar = state.beats_per_bar * 60 / state.tempo_bpm
+            # Keep a similar duration in reserve for short measures.
+            count = max(minimum_bars, min(6, max(2, ceil(3.5 / seconds_per_bar))))
+        bars = self.runtime.preview_bars(count)
         bar = bars[0]
-        self.following_mrt2 = bars[1] if self.stream_lookahead and bar.state.playing else None
+        self.following_mrt2 = bars[1:] if bar.state.playing else ()
         timing = bar.timing
         timbres = self.timbres_for_bar(timing.bar_index)
         packet = self.packet_for(bar)
@@ -335,15 +341,14 @@ class BrowserJam:
         return packet
 
     def last_reserved_bar(self):
-        edge = self.following_mrt2 or self.reserved
+        edge = self.following_mrt2[-1] if self.following_mrt2 else self.reserved
         return edge.timing.bar_index if edge is not None else -1
 
     def open_mrt2_bar(self, index, *, replayable=False):
         with self.lock:
             self.check_open()
             bar = self.reserved
-            if self.following_mrt2 and self.following_mrt2.timing.bar_index == index:
-                bar = self.following_mrt2
+            bar = next((item for item in self.following_mrt2 if item.timing.bar_index == index), bar)
             if self.mrt2_stream is None or bar is None or bar.timing.bar_index != index:
                 raise ValueError("这个 MRT2 小节尚未预约或已失效。")
             reference = None
@@ -400,8 +405,15 @@ class BrowserJam:
                  if cycle and self.playing else None)
         queued_through = -1 if buffered is None else buffered
         packet = self.packet if self.packet and self.packet["bar"] > queued_through else None
-        if self.following_mrt2 and self.following_mrt2.timing.bar_index > queued_through:
-            following = self.packet_for(self.following_mrt2)
+        following = None
+        for bar in reversed(self.following_mrt2):
+            if bar.timing.bar_index <= queued_through:
+                break
+            next_packet = self.packet_for(bar)
+            if following is not None:
+                next_packet["following"] = following
+            following = next_packet
+        if following is not None:
             packet = {**packet, "following": following} if packet else following
         return {
             "session": self.id, "sample_rate": SR, "current_bar": self.playing.timing.bar_index if self.playing else None,
@@ -430,6 +442,7 @@ class BrowserJam:
         with self.lock:
             self.check_open()
             latest = self.playing.timing.bar_index if self.playing else -1
+            previously_reserved = 1
             if started != latest:
                 if not self.reserved or started != self.reserved.timing.bar_index:
                     raise ValueError("浏览器播放位置与待播小节不一致。")
@@ -444,7 +457,8 @@ class BrowserJam:
                 if self.next_timbres and self.next_timbres["bar"] <= started:
                     self.next_timbres = None
                 self.reserved = self.packet = self.reserved_timbres = None
-                self.following_mrt2 = None
+                previously_reserved = len(self.following_mrt2)
+                self.following_mrt2 = ()
                 if bar.started is not None:
                     self.last_applied = {"bar": started, "plan": bar.started.plan_id}
                     if self.opening and any(self.opening.get(key, {}).get("plan_id") == bar.started.plan_id
@@ -478,7 +492,7 @@ class BrowserJam:
                             MRT2_BUFFER_SECONDS if self.mrt2_stream is not None else BUFFER_SECONDS)
                 if self.reserved is None and (self.renderer == "mrt2" or self.stream_lookahead
                                               or end - self.runtime.sample <= round(SR * buffer_s)):
-                    self.reserve()
+                    self.reserve(minimum_bars=previously_reserved)
             return self.snapshot(buffered)
 
     def submit(self, text, source="text"):

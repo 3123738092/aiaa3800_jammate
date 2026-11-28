@@ -36,8 +36,10 @@ export class StudioPlayback {
     this.id = view.session;
     this.rate = view.sample_rate;
     if (['mrt2_stream', 'mrt2_direct'].includes(view.renderer)) this.stream = new StreamRecording();
-    this.streamLookahead = Boolean(this.stream && view.next?.following);
     if (this.stream) {
+      let lastInitial = view.next;
+      while (lastInitial?.following) lastInitial = lastInitial.following;
+      this.initialStreamBar = lastInitial?.bar;
       const audio = document.createElement('audio');
       this.streamFormat = opus && audio.canPlayType('audio/ogg; codecs="opus"') ? 'opus'
         : lossless && audio.canPlayType('audio/flac') ? 'flac' : null;
@@ -72,10 +74,9 @@ export class StudioPlayback {
   scheduleStream() {
     if (this.abort.signal.aborted || this.streamTimer !== null || this.streamReady.length === 0) return;
     if (this.epoch === null) {
-      const {packet} = this.streamReady[0];
       const last = this.streamReady.at(-1);
       const pendingFrames = last.offset + last.pcm.byteLength / 4;
-      if (this.streamLookahead && last.packet.bar === packet.bar) return;
+      if (last.packet.bar < this.initialStreamBar) return;
       if (pendingFrames < Math.min(streamStartFrames, last.packet.pcm_frames)) return;
     }
     try {

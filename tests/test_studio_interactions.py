@@ -128,6 +128,25 @@ def test_stream_prefetch_does_not_confirm_playback(monkeypatch):
         assert followed["current_bar"] == 1 and followed["next"]["bar"] == 3
 
 
+def test_stream_uses_more_prefetch_for_short_bars_without_early_receipts(monkeypatch):
+    monkeypatch.setattr(BrowserJamService, "mrt2_stream_available", staticmethod(lambda: True))
+    with closing(BrowserJamService()) as service:
+        opening = service.dispatch("start", {"renderer": "mrt2_stream", "stream_lookahead": True,
+            "opening_mode": "cold", "meter": "6/8", "bpm": 110, "opening": {"text": "只要鼓点"}})
+        packets = []
+        packet = opening["next"]
+        while packet is not None:
+            packets.append(packet)
+            packet = packet.get("following")
+        assert [packet["bar"] for packet in packets] == [0, 1, 2, 3]
+        assert opening["current_bar"] is None
+        session = opening["session"]
+        started = service.dispatch("poll", {"session": session, "started": 0, "sample": packets[0]["start"],
+                                            "buffered": 3})
+        assert started["current_bar"] == 0
+        assert started["next"]["bar"] == 4
+
+
 def test_warm_opening_can_repair_invalid_provider_selection():
     from types import SimpleNamespace
     import json
